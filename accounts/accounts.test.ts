@@ -206,6 +206,41 @@ describe("NearChain, mode contrat (faux backend)", () => {
     void worker;
   });
 
+  it("réservation : lockEscrow enchaîne reserve_task (opérateur) puis lock_escrow (payeur)", async () => {
+    const { chain, backend, payer } = await setup();
+    await chain.lockEscrow({ taskId: "t-5", payer, amount: Y("0.1") });
+    const seq = backend.calls.filter((c) => c.args.task_id === "t-5").map((c) => `${c.method}:${c.signer}`);
+    expect(seq).toEqual(["reserve_task:darwin.testnet", `lock_escrow:${payer}`]);
+    expect(backend.reservations.has("t-5")).toBe(false);
+  });
+
+  it("réservation manquante refusée par le contrat (appel direct sans reserve_task)", async () => {
+    const { backend, payer } = await setup();
+    const signer = { accountId: payer, secretKey: generateKey().secretKey };
+    await expect(backend.call(signer, "c", "lock_escrow", { task_id: "t-6", payer }, { deposit: 1n })).rejects.toThrow(/TASK_NOT_RESERVED/);
+  });
+
+  it("id squatté refusé : réservé pour un autre payeur, ou déjà réservé", async () => {
+    const { chain, backend, payer } = await setup();
+    backend.reservations.set("t-7", "intrus.darwin.testnet");
+    await expect(chain.lockEscrow({ taskId: "t-7", payer, amount: Y("0.1") })).rejects.toMatchObject({ code: "ESCROW_EXISTS" });
+    expect(await chain.getEscrow("t-7")).toBeNull();
+    await expect(
+      backend.call({ accountId: "darwin.testnet", secretKey: generateKey().secretKey }, "c", "reserve_task", { task_id: "t-7", payer }),
+    ).rejects.toMatchObject({ code: "ESCROW_EXISTS" });
+    // réservation identique laissée par un échec précédent : reprise sans nouvel appel reserve_task
+    backend.reservations.set("t-8", payer);
+    await chain.lockEscrow({ taskId: "t-8", payer, amount: Y("0.1") });
+    expect(backend.calls.filter((c) => c.method === "reserve_task" && c.args.task_id === "t-8")).toHaveLength(0);
+  });
+
+  it("malus accepté après remboursement expired", async () => {
+    const { chain, payer } = await setup();
+    await chain.lockEscrow({ taskId: "t-10", payer, amount: Y("0.1") });
+    await chain.refundEscrow({ taskId: "t-10", reason: "expired" });
+    expect((await chain.addReputation({ agentId: "a-1", taskId: "t-10", delta: -2, proofHash: "x" })).total).toBe(-2);
+  });
+
   it("solde insuffisant : INSUFFICIENT_FUNDS, rien n'est débité", async () => {
     const { chain, payer } = await setup();
     await expect(chain.transfer({ from: payer, to: "worker.darwin.testnet", amount: Y("50") })).rejects.toMatchObject({ code: "INSUFFICIENT_FUNDS" });
@@ -271,7 +306,13 @@ describe("NearChain, mode dégradé (sans contrat, D-016)", () => {
     await chain.lockEscrow({ taskId: "t-2", payer: payer.accountId, amount: Y("0.1") });
     await chain.refundEscrow({ taskId: "t-2", reason: "expired" });
     expect((await chain.getEscrow("t-2"))?.status).toBe("refunded");
-    await expect(chain.addReputation({ agentId: "a-1", taskId: "t-2", delta: -1, proofHash: "x" })).rejects.toMatchObject({ code: "PROOF_REQUIRED" });
+    expect((await chain.addReputation({ agentId: "a-1", taskId: "t-2", delta: -1, proofHash: "x" })).total).toBe(2); // malus après expiration
+    // même règle de réservation que le contrat
+    await chain.lockEscrow({ taskId: "t-3", payer: payer.accountId, amount: Y("0.1") });
+    expect(chain.ledger.reservations["t-3"]).toBeUndefined(); // consommée
+    await expect(chain.addReputation({ agentId: "a-1", taskId: "t-3", delta: -1, proofHash: "x" })).rejects.toMatchObject({ code: "PROOF_REQUIRED" }); // pas remboursé
+    chain.ledger.reservations["t-9"] = "autre.darwin.testnet";
+    await expect(chain.lockEscrow({ taskId: "t-9", payer: payer.accountId, amount: Y("0.1") })).rejects.toMatchObject({ code: "ESCROW_EXISTS" });
     await chain.markAgentDead({ agentId: "a-1", deathTick: 5, cause: "manual" });
     expect((await chain.getAgentRecord("a-1"))?.alive).toBe(false);
     expect((await chain.registerAgent(rec("a-2", "z"))).hash.startsWith("local_")).toBe(true);

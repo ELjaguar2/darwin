@@ -5,7 +5,8 @@
 //  - "contract"  (contractId fourni) : appels au contrat `contracts/darwin` (lot L3), avec ses écarts documentés :
 //      * register_agent reçoit `genome_json` (JSON canonique) + `genome_hash` ;
 //      * refund_escrow n'accepte que `rejected` ou `expired` ;
-//      * add_reputation exige un séquestre libéré (ou remboursé pour rejet) avec preuve identique ;
+//      * add_reputation exige un séquestre libéré (ou remboursé, rejected ou expired, pour un malus) avec preuve identique ;
+//      * lock_escrow exige une réservation de l'id par l'opérateur (`reserve_task`, enchaîné dans lockEscrow) ;
 //      * statuts transitoires `releasing`/`refunding` : on attend le callback, sinon on les voit comme « locked » ;
 //      * lock_escrow débite le compte qui signe : on signe avec la clé du payeur.
 //  - "degraded"  (pas de contrat, D-016/D-022) : séquestre = sous-compte `escrow.<maître>` piloté par le moteur
@@ -348,10 +349,15 @@ export class NearChain implements Chain {
     this.policy.check(args.payer, amount);
     if (this.mode === "degraded") {
       if (this.ledger.escrows[args.taskId]) throw new ChainError("ESCROW_EXISTS", `Séquestre déjà créé : ${args.taskId}`);
+      // Même règle que le contrat : réservation opérateur de l'id pour ce payeur, consommée au verrouillage.
+      const res = this.ledger.reservations[args.taskId];
+      if (res === undefined) this.ledger.reservations[args.taskId] = args.payer;
+      else if (res !== args.payer) throw new ChainError("ESCROW_EXISTS", `Identifiant de tâche déjà réservé pour un autre payeur : ${args.taskId}`);
       await this.ensureEscrowAccount();
       const st = await this.requireState(args.payer);
       if (st.available < amount) throw new ChainError("INSUFFICIENT_FUNDS", `Solde disponible insuffisant sur ${args.payer}`);
       const hash = await this.o.backend.transfer(await this.signerFor(args.payer), this.escrowAccount, amount);
+      delete this.ledger.reservations[args.taskId];
       this.ledger.escrows[args.taskId] = { taskId: args.taskId, payer: args.payer, amount: amount.toString(), status: "locked" };
       await this.ledger.save();
       this.policy.record(args.payer, amount);
@@ -359,6 +365,14 @@ export class NearChain implements Chain {
     }
     const st = await this.requireState(args.payer);
     if (st.available < amount) throw new ChainError("INSUFFICIENT_FUNDS", `Solde disponible insuffisant sur ${args.payer}`);
+    // Anti-squat (contrat L3) : l'opérateur réserve d'abord l'id pour ce payeur (appel interne, hors interface Chain).
+    // Si une réservation identique existe déjà (échec précédent après réservation), on ne la refait pas.
+    const reserved = (await this.o.backend.view(this.o.contractId!, "get_reservation", { task_id: args.taskId })) as string | null;
+    if (reserved === null || reserved === undefined) {
+      await this.o.backend.call(this.master, this.o.contractId!, "reserve_task", { task_id: args.taskId, payer: args.payer }, { gas: GAS_CALL });
+    } else if (reserved !== args.payer) {
+      throw new ChainError("ESCROW_EXISTS", `Identifiant de tâche déjà réservé pour un autre payeur : ${args.taskId}`);
+    }
     // Le dépôt est prélevé sur le compte qui signe : on signe avec la clé du payeur.
     const hash = await this.o.backend.call(
       await this.signerFor(args.payer),
@@ -467,8 +481,8 @@ export class NearChain implements Chain {
         if (e.status !== "released" || e.payee !== rec.accountId || e.proofHash !== args.proofHash) {
           throw new ChainError("PROOF_REQUIRED", "Crédit refusé : séquestre non libéré vers cet agent avec cette preuve");
         }
-      } else if (e.status !== "refunded" || e.reason !== "rejected") {
-        throw new ChainError("PROOF_REQUIRED", "Malus refusé : séquestre non remboursé pour rejet");
+      } else if (e.status !== "refunded") {
+        throw new ChainError("PROOF_REQUIRED", "Malus refusé : séquestre non remboursé (rejected ou expired)");
       }
       const key = `${args.agentId}|${args.taskId}`;
       if (this.ledger.reputationProofs.includes(key)) throw new ChainError("RPC_ERROR", "Réputation déjà écrite pour cette tâche");

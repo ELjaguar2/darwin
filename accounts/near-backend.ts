@@ -66,7 +66,7 @@ function failureOf(res: AnyRec): string | null {
 /** Traduit un message RPC ou une panique de contrat en ChainError typée. */
 export function mapChainError(msg: string): ChainError {
   const m = msg;
-  if (/ESCROW_EXISTS/.test(m)) return new ChainError("ESCROW_EXISTS", m);
+  if (/ESCROW_EXISTS|TASK_ALREADY_RESERVED/.test(m)) return new ChainError("ESCROW_EXISTS", m);
   if (/ESCROW_UNKNOWN/.test(m)) return new ChainError("ESCROW_UNKNOWN", m);
   if (/ESCROW_SETTLED/.test(m)) return new ChainError("ESCROW_SETTLED", m);
   if (/PROOF_REQUIRED/.test(m)) return new ChainError("PROOF_REQUIRED", m);

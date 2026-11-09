@@ -20,11 +20,12 @@ interface LedgerData {
   reputation: Record<string, number>;
   reputationProofs: string[]; // `${agentId}|${taskId}` déjà comptés (pas de double crédit)
   escrows: Record<string, EscrowRow>;
+  reservations: Record<string, string>; // taskId -> payeur (réservation opérateur, consommée au verrouillage)
   closedAccounts: string[];
 }
 
 export class LocalLedger {
-  private d: LedgerData = { records: {}, reputation: {}, reputationProofs: [], escrows: {}, closedAccounts: [] };
+  private d: LedgerData = { records: {}, reputation: {}, reputationProofs: [], escrows: {}, reservations: {}, closedAccounts: [] };
   private saving: Promise<void> = Promise.resolve();
 
   constructor(private path?: string) {}
@@ -62,6 +63,9 @@ export class LocalLedger {
   }
   get escrows() {
     return this.d.escrows;
+  }
+  get reservations() {
+    return this.d.reservations;
   }
   get closedAccounts() {
     return this.d.closedAccounts;

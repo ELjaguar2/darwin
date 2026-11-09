@@ -12,6 +12,7 @@ export class FakeNearBackend implements NearBackend {
   txCount = 0;
   agents = new Map<string, Record<string, any>>();
   escrows = new Map<string, Record<string, any>>();
+  reservations = new Map<string, string>();
   reputation = new Map<string, number>();
   applied = new Set<string>();
   fcKeys: Array<{ accountId: string; publicKey: string; contractId: string; methodNames: string[]; allowance: bigint }> = [];
@@ -110,8 +111,17 @@ export class FakeNearBackend implements NearBackend {
         a.cause = args.cause;
         break;
       }
+      case "reserve_task": {
+        op();
+        if (this.escrows.has(args.task_id)) this.panic("ESCROW_EXISTS");
+        if (this.reservations.has(args.task_id)) this.panic("TASK_ALREADY_RESERVED");
+        this.reservations.set(args.task_id, args.payer);
+        break;
+      }
       case "lock_escrow": {
         if (!isOp && signer.accountId !== args.payer) this.panic("Reserve a l operateur ou au payeur");
+        if (this.reservations.get(args.task_id) !== args.payer) this.panic("TASK_NOT_RESERVED : id non reserve pour ce payeur");
+        this.reservations.delete(args.task_id);
         if (deposit <= 0n) this.panic("Depot attache requis");
         if (this.escrows.has(args.task_id)) this.panic("ESCROW_EXISTS");
         this.pay(signer.accountId, deposit); // le signataire paie
@@ -147,7 +157,7 @@ export class FakeNearBackend implements NearBackend {
         if (args.delta > 0) {
           if (e.status !== "released") this.panic("PROOF_REQUIRED : sequestre non libere");
           if (e.payee !== a.account_id || e.proof.result_hash !== args.proof_hash) this.panic("PROOF_REQUIRED : proof_hash");
-        } else if (e.status !== "refunded" || e.refund_reason !== "rejected") this.panic("malus seulement apres rejet");
+        } else if (e.status !== "refunded") this.panic("malus seulement apres remboursement rejected ou expired");
         const k = `${args.task_id}|${args.agent_id}`;
         if (this.applied.has(k)) this.panic("reputation deja ecrite");
         this.applied.add(k);
@@ -174,6 +184,8 @@ export class FakeNearBackend implements NearBackend {
         const e = this.escrows.get(args.task_id);
         return e ? { ...structuredClone({ ...e, amount: "0" }), amount: e.amount.toString() } : null;
       }
+      case "get_reservation":
+        return this.reservations.get(args.task_id) ?? null;
       case "get_reputation":
         return this.reputation.get(args.agent_id) ?? 0;
     }
