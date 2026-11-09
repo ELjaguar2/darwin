@@ -82,7 +82,7 @@ export interface Config {
     masterPrivateKey: string | undefined; // SECRET : ne jamais journaliser (utiliser redactConfig)
     contractId: string | undefined;
   };
-  nearai: { baseUrl: string; apiKey: string | undefined; model: string | undefined; timeoutMs: number }; // apiKey SECRET
+  nearai: { baseUrl: string; apiKey: string | undefined; model: string | undefined; timeoutMs: number; maxUsdPerRun: number | undefined; maxUsdPerHour: number | undefined }; // apiKey SECRET ; plafonds USD globaux (undefined = défauts du cerveau)
   intents: { enabled: boolean; baseUrl: string; jwt: string | undefined; dryOnly: boolean }; // jwt SECRET
 }
 
@@ -93,6 +93,14 @@ function num(env: Env, key: string, fallback: number): number {
   if (v === undefined || v.trim() === "") return fallback;
   const n = Number(v);
   if (!Number.isFinite(n)) throw new Error(`Variable ${key} invalide : nombre attendu`);
+  return n;
+}
+/** Nombre optionnel strictement positif (plafonds USD) : absent = undefined, invalide ou <= 0 = erreur claire. */
+function optNum(env: Env, key: string): number | undefined {
+  const v = env[key];
+  if (v === undefined || v.trim() === "") return undefined;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) throw new Error(`Variable ${key} invalide : nombre > 0 attendu`);
   return n;
 }
 const str = (env: Env, key: string): string | undefined => (env[key]?.trim() ? env[key]!.trim() : undefined);
@@ -163,6 +171,8 @@ export function loadConfig(env: Env = process.env): Config {
       apiKey,
       model: str(env, "NEARAI_MODEL"),
       timeoutMs: num(env, "NEARAI_TIMEOUT_MS", 60000),
+      maxUsdPerRun: optNum(env, "NEARAI_MAX_USD_PER_RUN"),
+      maxUsdPerHour: optNum(env, "NEARAI_MAX_USD_PER_HOUR"),
     },
     intents: {
       enabled: str(env, "INTENTS_ENABLED") === "true",
