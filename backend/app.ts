@@ -138,7 +138,7 @@ export function createApp(rt: Runtime, opts: AppOptions = {}): Hono {
       ok: true,
       version: rt.version,
       mode: config.mode,
-      chain: { kind: rt.chain.info().kind, masterId: rt.chain.info().masterId, contractId: rt.chain.info().contractId },
+      chain: { kind: rt.chain.info().kind, masterId: rt.chain.info().masterId, contractId: rt.chain.info().kind === "mock" ? undefined : rt.chain.info().contractId },
       brain: { kind: rt.brain.kind },
       escrow: rt.escrowMode(), // D-022 : "operator-account" = séquestre dégradé (sans contrat), y compris en mock
       mock: config.chain === "mock" || config.brain === "mock",
