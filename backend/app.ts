@@ -22,6 +22,9 @@ export const MAX_OPEN_TASKS_PER_IP = 10;
 /** Plafond global de tâches de visiteurs ouvertes (note SECURITE L6 : le marché n'en a pas). */
 export const MAX_OPEN_VISITOR_TASKS = 100;
 const OPEN_STATUSES: ReadonlySet<Task["status"]> = new Set(["posted", "awarded", "submitted"]);
+/** Fichiers publics de frontend/ : / , index.html, favicon.svg, *.js, *.css à la racine uniquement. */
+export const PUBLIC_STATIC = /^\/(?:index\.html|favicon\.svg|[A-Za-z0-9_-]+\.(?:js|css))?$/;
+const FALLBACK_CSS = "body{font:16px/1.5 system-ui,sans-serif;max-width:40rem;margin:2rem auto;padding:0 1rem}code{background:#8882;padding:0 .3em}";
 const ID_RE = /^[a-z]-\d{1,9}$/;
 
 export const MIN_ADMIN_TOKEN_LENGTH = 24;
@@ -109,7 +112,7 @@ export function createApp(rt: Runtime, opts: AppOptions = {}): Hono {
     c.header("X-Frame-Options", "DENY");
     c.header(
       "Content-Security-Policy",
-      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
     );
     if (c.req.path.startsWith("/api/") && !c.res.headers.has("Cache-Control")) c.header("Cache-Control", "no-store");
   });
@@ -389,14 +392,17 @@ export function createApp(rt: Runtime, opts: AppOptions = {}): Hono {
     await next();
     if (c.res.status === 200 && !c.res.headers.has("Cache-Control")) c.header("Cache-Control", "no-cache");
   });
-  if (hasFrontend) app.use("*", serveStatic({ root: frontendDir }));
+  // Liste blanche : la page, ses scripts et feuilles de style, l'icône (fichiers à la racine de frontend/). Pas de dev/, screens/, .md, etc.
+  const staticFiles = serveStatic({ root: frontendDir });
+  if (hasFrontend) app.use("*", (c, next) => (PUBLIC_STATIC.test(c.req.path) ? staticFiles(c, next) : next()));
+  app.get("/_fallback.css", (c) => c.body(FALLBACK_CSS, 200, { "Content-Type": "text/css; charset=utf-8" }));
   app.get("/", (c) => {
     const s = engine.getState();
     const esc = (v: unknown) => String(v).replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
     return c.html(`<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="refresh" content="5"><title>Darwin</title>
-<style>body{font:16px/1.5 system-ui,sans-serif;max-width:40rem;margin:2rem auto;padding:0 1rem}code{background:#8882;padding:0 .3em}</style></head>
+<link rel="stylesheet" href="/_fallback.css"></head>
 <body><h1>Darwin</h1>
 <p>Le serveur tourne (mode <strong>${esc(config.mode)}</strong>, cerveau <strong>${esc(rt.brain.kind)}</strong>). L'interface graphique n'est pas installée dans ce dossier (<code>frontend/</code>) : voici l'état brut.</p>
 <ul><li>Tick : ${esc(s.tick)} ${s.running ? (s.paused ? "(en pause)" : "(en cours)") : "(arrêtée)"}</li>

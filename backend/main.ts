@@ -6,6 +6,7 @@ import { loadConfig } from "../shared/index.ts";
 import { assertSafeBinding, createApp } from "./app.ts";
 import { safeErrorMessage } from "./redact.ts";
 import { createRuntime } from "./runtime.ts";
+import { checkNodeVersion, checkTestnetEnv } from "./startup.ts";
 import { createStore } from "./store.ts";
 
 const say = (msg: string) => console.log(`[darwin] ${msg}`);
@@ -24,11 +25,19 @@ function loadDotEnv() {
 }
 
 async function main() {
+  const nodeV = process.versions.node;
+  const tooOld = checkNodeVersion(nodeV, "mock").error;
+  if (tooOld) return fail(tooOld, 2); // avant toute lecture de configuration
   loadDotEnv();
   let config;
   try {
     config = loadConfig();
     assertSafeBinding(config.server.host, config.server.adminToken); // R7 : jeton obligatoire hors 127.0.0.1
+    const nv = checkNodeVersion(nodeV, config.mode);
+    if (nv.error) return fail(nv.error, 2);
+    if (nv.warning) console.warn(`[darwin] AVERTISSEMENT : ${nv.warning}`);
+    const envErr = checkTestnetEnv(config);
+    if (envErr) return fail(envErr, 2);
   } catch (e) {
     return fail(safeErrorMessage(e), 2);
   }
