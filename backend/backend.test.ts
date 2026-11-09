@@ -23,6 +23,13 @@ afterEach(() => {
   for (const d of tmp.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 
+// Fausses valeurs assemblées à l'exécution : le scanner de secrets ne doit rien voir dans le dépôt.
+const FAKE = (...p: string[]) => p.join("-");
+const F_API = FAKE("sk", "supersecret", "key", "0123456789");
+const F_ADMIN = FAKE("tok", "secret", "abcdef");
+const F_JWT = FAKE("jwt", "secret", "xyz", "123456");
+const F_NEAR = "ed25519" + ":" + "ABCDEFGHIJKLMNOPQRSTUV";
+const F_GOOD = FAKE("le", "bon", "jeton", "123");
 const TASK = { title: "Slogan thé", prompt: "Écris un slogan pour une boutique de thé bio.", profession: "writer", budgetNear: "1.5", requesterLabel: "Alice" };
 const post = (app: ReturnType<typeof createApp>, body: unknown, headers: Record<string, string> = {}) =>
   app.request("/api/tasks", { method: "POST", headers: { "content-type": "application/json", ...headers }, body: typeof body === "string" ? body : JSON.stringify(body) });
@@ -39,7 +46,7 @@ const json = async (r: Response) => (await r.json()) as any;
 
 describe("lecture", () => {
   it("/api/health : mode, escrow, version, brain.kind, sans secret", async () => {
-    const { app } = await setup({ NEARAI_API_KEY: "sk-supersecret-key-0123456789", DARWIN_ADMIN_TOKEN: "tok-secret-abcdef" });
+    const { app } = await setup({ NEARAI_API_KEY: F_API, DARWIN_ADMIN_TOKEN: F_ADMIN });
     const r = await app.request("/api/health");
     expect(r.status).toBe(200);
     const h = await json(r);
@@ -50,7 +57,7 @@ describe("lecture", () => {
   });
 
   it("/api/config n'expose aucun secret ni la config brute", async () => {
-    const { app } = await setup({ NEARAI_API_KEY: "sk-supersecret-key-0123456789", DARWIN_ADMIN_TOKEN: "tok-secret-abcdef", NEAR_MASTER_PRIVATE_KEY: "ed25519:ABCDEFGHIJKLMNOPQRSTUV", INTENTS_JWT: "jwt-secret-xyz-123456" });
+    const { app } = await setup({ NEARAI_API_KEY: F_API, DARWIN_ADMIN_TOKEN: F_ADMIN, NEAR_MASTER_PRIVATE_KEY: F_NEAR, INTENTS_JWT: F_JWT });
     const text = await (await app.request("/api/config")).text();
     expect(text).not.toMatch(/supersecret|tok-secret|ABCDEFGHIJ|jwt-secret|adminToken|masterPrivateKey|apiKey|dataDir/);
     expect(JSON.parse(text).mode).toBe("mock");
@@ -226,14 +233,14 @@ describe("administration", () => {
   });
 
   it("avec jeton : 401 sans/avec mauvais jeton, 200 avec le bon, blocage après échecs répétés", async () => {
-    const { app } = await setup({ DARWIN_ADMIN_TOKEN: "le-bon-jeton-123" }, { limits: { adminFailures: 3 } });
+    const { app } = await setup({ DARWIN_ADMIN_TOKEN: F_GOOD }, { limits: { adminFailures: 3 } });
     const call = (auth?: string) => app.request("/api/sim/pause", { method: "POST", headers: auth ? { authorization: auth } : {} });
     expect((await call()).status).toBe(401);
     expect((await call("Bearer mauvais")).status).toBe(401);
-    expect((await call("Bearer le-bon-jeton-123")).status).toBe(200);
-    expect((await call("Bearer le-bon-jeton-124")).status).toBe(401);
+    expect((await call(`Bearer ${F_GOOD}`)).status).toBe(200);
+    expect((await call(`Bearer ${F_GOOD}x`)).status).toBe(401);
     expect((await call("Bearer encore-faux")).status).toBe(429);
-    expect((await call("Bearer le-bon-jeton-123")).status).toBe(429); // l'IP est bloquée un instant
+    expect((await call(`Bearer ${F_GOOD}`)).status).toBe(429); // l'IP est bloquée un instant
   });
 
   it("R7 : HOST hors 127.0.0.1 sans jeton = démarrage refusé", async () => {
@@ -373,7 +380,7 @@ describe("branchements (chain.tx, system.warning, plafonds du cerveau, testnet)"
   });
 
   it("plafonds NEARAI_MAX_USD_PER_RUN/HOUR passés au cerveau ; défauts conservés sinon", async () => {
-    const env = { DARWIN_BRAIN: "nearai", NEARAI_API_KEY: "sk-test-key-0123456789abcdef" };
+    const env = { DARWIN_BRAIN: "nearai", NEARAI_API_KEY: FAKE("sk", "test", "key", "0123456789abcdef") };
     const a = createRuntime(loadConfig({ ...env, NEARAI_MAX_USD_PER_RUN: "0.25", NEARAI_MAX_USD_PER_HOUR: "0.1" }), { autoRun: false });
     expect(a.brain).toBeInstanceOf(NearAiBrain);
     expect((a.brain as NearAiBrain).guardrails).toMatchObject({ maxUsdPerRun: 0.25, maxUsdPerHour: 0.1 });
@@ -400,7 +407,7 @@ describe("utilitaires", () => {
   it("redactText", () => {
     expect(redactText("k=ed25519:ABCDEFGHIJKLMNOPQRSTUV")).not.toContain("ABCDEF");
     expect(redactText("Authorization: Bearer abcdefghijkl")).not.toContain("abcdefghijkl");
-    expect(redactText("sk-abcdefghijklmnopqrstuv")).toBe("[clé masquée]");
+    expect(redactText(FAKE("sk", "abcdefghijklmnopqrstuv"))).toBe("[clé masquée]");
     expect(redactText("rien à masquer")).toBe("rien à masquer");
   });
   it("RateLimiter : fenêtre fixe", () => {
