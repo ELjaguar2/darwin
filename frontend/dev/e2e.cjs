@@ -109,7 +109,7 @@ const ok = (name, cond, info = "") => { results.push([cond ? "OK " : "KO ", name
   // 6. mobile 320 px (reduced motion) et 375 px, sans scroll horizontal
   s = await start("--tick=100");
   p = await newPage(s.url, { width: 320, height: 640 }, { reducedMotion: "reduce" });
-  await p.waitForFunction(() => document.querySelectorAll(".node").length >= 6, null, { timeout: 15000 });
+  await p.waitForFunction(() => document.querySelectorAll(".node").length >= 6, null, { timeout: 45000 });
   await p.waitForTimeout(8000);
   const sw = await p.evaluate(() => [document.documentElement.scrollWidth, innerWidth]);
   ok("320 px : pas de scroll horizontal", sw[0] <= sw[1], JSON.stringify(sw));

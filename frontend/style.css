@@ -135,6 +135,8 @@ a { color: var(--accent); }
 @keyframes flash { from { background: color-mix(in srgb, var(--accent) 28%, transparent); } }
 .tx-top, .tx-bot { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; } .tx-label { font-weight: 600; } .tx-amt { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
 .tx-bot { color: var(--muted); font-size: 12px; } .tx-flow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; } .tx-h { display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
+.chk { font-size: 12px; font-weight: 400; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; margin: 0; }
+.chk input { width: auto; min-height: 0; }
 .hash { font: 12px ui-monospace, Consolas, monospace; }
 .badge { display: inline-block; font-size: 11px; font-weight: 700; border-radius: 6px; padding: 1px 7px; line-height: 1.5; vertical-align: middle; }
 .b-mock { background: var(--warn-bg); color: var(--warn); } .b-sim { background: var(--warn-bg); color: var(--warn); border: 1px dashed currentColor; text-transform: uppercase; letter-spacing: .04em; }

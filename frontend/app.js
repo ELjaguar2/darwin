@@ -194,6 +194,9 @@ function renderBanners() {
   items.push(pill("info", "Modèle de confiance", "l'opérateur valide les résultats (« validé par » sur chaque paiement).", ""));
   for (const w of store.warnings.slice(0, 2)) items.push(pill(w.level === "error" ? "danger" : "warn", w.level === "error" ? "Erreur" : "Avertissement", `${w.code} : ${w.message}`, ""));
   ul.replaceChildren(...items);
+  // le résumé (seul visible quand le bloc est replié sur mobile) rappelle l'essentiel
+  const keys = items.slice(0, 4).map((li) => li.firstChild.textContent).filter((t) => !/^Visiteur/.test(t));
+  $("honesty").firstElementChild.textContent = `Transparence : ${keys.join(" · ")}`;
 }
 
 function renderTools() {
@@ -266,8 +269,10 @@ const feedRows = new Map();
 function renderFeed() {
   const ol = $("feed");
   $("feedHint").textContent = store.chain.kind === "near" ? "liens testnet.nearblocks.io" : "hash fictifs (mock), pas d'explorateur";
-  const rows = store.feed.slice(0, 60).map((it) => {
-    let r = feedRows.get(it.key);
+  const shown = store.feed.filter((it) => $("showMinor").checked || !it.minor).slice(0, 60);
+  const rows = shown.map((it) => {
+    const fk = it.key + "|" + it.label;
+    let r = feedRows.get(fk);
     if (!r) {
       const who = (a) => { if (!a) return null; const ag = store.agentByAccount(a); return ag ? ag.name : a.split(".")[0]; };
       const flow = [who(it.from), who(it.to)].filter(Boolean).join(" → ");
@@ -277,13 +282,13 @@ function renderFeed() {
       r = h("li", { class: it.fresh ? "fresh" : "" },
         h("div", { class: "tx-top" }, h("span", { class: "tx-label" }, it.label ?? "Transaction"), it.amount != null ? h("span", { class: "tx-amt" }, formatNear(it.amount, 2), " NEAR") : null),
         h("div", { class: "tx-bot" }, h("span", { class: "tx-flow" }, flow || " "), h("span", { class: "tx-h" }, it.mock ? h("span", { class: "badge b-mock", title: "Hash fictif : transaction simulée" }, "mock") : null, hashEl)));
-      feedRows.set(it.key, r);
+      feedRows.set(fk, r);
       it.fresh = false;
     }
     return r;
   });
   syncList(ol, rows);
-  const keep = new Set(store.feed.slice(0, 60).map((i) => i.key));
+  const keep = new Set(shown.map((i) => i.key + "|" + i.label));
   for (const k of [...feedRows.keys()]) if (!keep.has(k)) feedRows.delete(k);
 }
 
@@ -382,7 +387,7 @@ async function renderLetters() {
   if (!selectedLetter && letters.length) selectedLetter = letters[0].id;
   $("letterList").replaceChildren(...letters.slice(0, 30).map((l) => h("li", null, h("button", { type: "button", class: l.id === selectedLetter ? "sel" : "", "aria-current": l.id === selectedLetter ? "true" : null, onclick: () => { selectedLetter = l.id; markDirty("letters"); } }, `${store.name(l.fromAgentId)} → ${store.name(l.toAgentId)}`, h("small", null, ` g${l.generation}`)))));
   let l = selectedLetter ? store.letters.get(selectedLetter) : null;
-  if (!l && a?.letterId) { try { const r = await api(`/api/letters/${encodeURIComponent(a.letterId)}`); if (r.ok) { store.letters.set(r.body.id, r.body); l = r.body; } } catch { /* ignoré */ } }
+  if (!l && a?.letterId) { try { const r = await api(`/api/letters/${encodeURIComponent(a.letterId)}`); const lt = r.body?.letter ?? r.body; if (r.ok && lt?.id) { store.letters.set(lt.id, lt); l = lt; } } catch { /* ignoré */ } }
   const box = $("letter");
   if (!l) { box.replaceChildren(h("p", { class: "muted" }, letters.length ? "Choisissez une lettre." : "Les lettres apparaissent à chaque naissance.")); return; }
   box.replaceChildren(
@@ -398,6 +403,7 @@ function setStatus(kind, title, lines = []) {
   statusBox.className = `form-status ${kind}`;
   statusBox.replaceChildren(h("strong", null, title), lines.length ? h("ul", null, lines.map((x) => h("li", null, x))) : null);
 }
+$("showMinor").addEventListener("change", () => markDirty("feed"));
 $("fPrompt").addEventListener("input", (e) => { $("fPromptCount").textContent = `${e.target.value.length}/4000`; });
 function lockButton(sec) {
   clearInterval(cooldown);

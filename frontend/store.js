@@ -60,17 +60,19 @@ export class Store {
   agentByAccount(acc) { for (const a of this.agents.values()) if (a.accountId === acc) return a; return null; }
   name(id) { return this.agents.get(id)?.name ?? id; }
 
-  addTx({ hash, seq, tick, label, from, to, amount, explicit, source }) {
+  addTx({ hash, seq, tick, label, from, to, amount, explicit, source, kind }) {
     if (!hash) return;
     const url = explorerUrl(hash, { explicit, chainKind: this.chain.kind, base: this.explorerBase });
     const mock = /^mock_/.test(hash) || this.chain.kind === "mock";
+    const minor = source === "chain.tx" && kind === "transfer" && !!to && to === this.chain.masterId; // métabolisme : même transfert vers le compte maître à chaque tick
     const known = this.feedByHash.get(hash);
-    if (known) { // enrichit l'entrée existante (chain.tx + événement métier partagent le même hash)
+    if (known) {
+      if (source !== "chain.tx") known.minor = false; // enrichit l'entrée existante (chain.tx + événement métier partagent le même hash)
       if (label && source !== "chain.tx") known.label = label;
       known.from ??= from; known.to ??= to; known.amount ??= amount; known.url ??= url;
       return known;
     }
-    const it = { key: hash, hash, seq, tick, label, from, to, amount, url, mock, source, fresh: true };
+    const it = { key: hash, hash, seq, tick, label: minor ? "Coût de vie (métabolisme)" : label, from, to, amount, url, mock, source, minor, fresh: true };
     this.feed.unshift(it);
     this.feedByHash.set(hash, it);
     if (this.feed.length > MAX_FEED) { const old = this.feed.pop(); this.feedByHash.delete(old.hash); }
@@ -173,7 +175,7 @@ export class Store {
         this.addTx({ hash: d.tx, seq: ev.seq, tick: ev.tick, label: d.source === "demo" ? "Financement du compte de démo" : d.source === "faucet" ? "Faucet testnet" : "Financement (compte maître)", to: d.to, amount: d.amount, source: ev.type });
         break;
       case "chain.tx":
-        this.addTx({ hash: d.hash, seq: ev.seq, tick: ev.tick, label: txKindLabel(d.kind), from: d.from, to: d.to, amount: d.amount, explicit: d.explorerUrl, source: "chain.tx" });
+        this.addTx({ hash: d.hash, seq: ev.seq, tick: ev.tick, label: txKindLabel(d.kind), from: d.from, to: d.to, amount: d.amount, explicit: d.explorerUrl, source: "chain.tx", kind: d.kind });
         break;
       case "system.warning": case "system.error":
         if (live) { this.warnings.unshift({ seq: ev.seq, level: ev.type === "system.error" ? "error" : "warning", code: d.code, message: d.message }); this.warnings.length = Math.min(this.warnings.length, 5); }

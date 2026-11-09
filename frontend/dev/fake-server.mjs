@@ -315,18 +315,18 @@ const server = http.createServer(async (req, res) => {
       req.on("close", () => { clearInterval(ping); clients.delete(res); });
       return;
     }
-    if (p === "/api/health") return send(res, 200, { ok: true, mode: TESTNET ? "testnet" : "mock", mock: !TESTNET, chain: { kind: TESTNET ? "near" : "mock" }, brain: { kind: TESTNET ? "nearai" : "mock" }, tick, escrow: DEGRADED ? "operator-account" : "contract", visitors: { spentHourly: "0", hourlyCap: near(30).toString() } });
+    if (p === "/api/health") return send(res, 200, { ok: true, mode: TESTNET ? "testnet" : "mock", mock: !TESTNET, chain: { kind: TESTNET ? "near" : "mock" }, brain: { kind: TESTNET ? "nearai" : "mock" }, tick, escrow: DEGRADED || !TESTNET ? "operator-account" : "contract", visitors: { spentLastHour: "0", hourlyCap: near(30).toString() } });
     if (p === "/api/config") return send(res, 200, { mode: TESTNET ? "testnet" : "mock", preset: "demo", tickMs: TICK_MS, visitorHourlyCapNear: 30, taskBudgetMin: "0.5", taskBudgetMax: "2.5" });
     if (p === "/api/state") return send(res, 200, state());
-    if (p === "/api/agents") return send(res, 200, [...agents.values()].map(pub));
+    if (p === "/api/agents") return send(res, 200, { agents: [...agents.values()].map(pub) });
     let m;
-    if ((m = p.match(/^\/api\/agents\/([\w-]+)\/letter$/))) { const a = agents.get(m[1]); const l = a && letters.get(a.letterId); return l ? send(res, 200, l) : send(res, 404, { error: "not_found" }); }
+    if ((m = p.match(/^\/api\/agents\/([\w-]+)\/letter$/))) { const a = agents.get(m[1]); const l = a && letters.get(a.letterId); return l ? send(res, 200, { letter: l }) : send(res, 404, { error: "not_found" }); }
     if ((m = p.match(/^\/api\/agents\/([\w-]+)$/))) { const a = agents.get(m[1]); return a ? send(res, 200, pub(a)) : send(res, 404, { error: "not_found" }); }
     if (p === "/api/lineage") return send(res, 200, [...agents.values()].map((a) => ({ id: a.id, parentId: a.parentId, generation: a.generation, status: a.status })));
-    if ((m = p.match(/^\/api\/letters\/([\w-]+)$/))) { const l = letters.get(m[1]); return l ? send(res, 200, l) : send(res, 404, { error: "not_found" }); }
+    if ((m = p.match(/^\/api\/letters\/([\w-]+)$/))) { const l = letters.get(m[1]); return l ? send(res, 200, { letter: l }) : send(res, 404, { error: "not_found" }); }
     if (p === "/api/tasks" && req.method === "POST") return postTaskHandler(req, res, await readBody(req));
-    if (p === "/api/tasks") return send(res, 200, [...tasks.values()].map(withBadge));
-    if ((m = p.match(/^\/api\/tasks\/([\w-]+)$/))) { const t = tasks.get(m[1]); return t ? send(res, 200, { ...t, bids: bidsByTask.get(t.id) ?? [], escrow: escrows.get(t.id) }) : send(res, 404, { error: "not_found" }); }
+    if (p === "/api/tasks") return send(res, 200, { tasks: [...tasks.values()].map(withBadge) });
+    if ((m = p.match(/^\/api\/tasks\/([\w-]+)$/))) { const t = tasks.get(m[1]); return t ? send(res, 200, { task: withBadge(t), bids: bidsByTask.get(t.id) ?? [], escrow: escrows.get(t.id) }) : send(res, 404, { error: "not_found" }); }
     if (p === "/api/events") { const since = Number(url.searchParams.get("since") ?? 0), limit = Math.min(1000, Number(url.searchParams.get("limit") ?? 200)); return send(res, 200, { events: journal.filter((e) => e.seq > since).slice(0, limit), lastSeq: journal.length }); }
     if (p.startsWith("/api/")) return send(res, 404, { error: "not_found" });
     // statique
