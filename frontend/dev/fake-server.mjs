@@ -245,6 +245,20 @@ function tickOnce() {
 }
 function stop(reason) { stopped = true; running = false; stopReason = reason; emit("sim.stopped", { reason, generations: Math.max(0, ...[...agents.values()].map((a) => a.generation)) }); }
 
+// --garbage : injecte des messages SSE malformés (hors journal) pour tester la robustesse du client.
+let garbageN = 0;
+function garbage() {
+  const frames = [
+    "event: agent.born\ndata: null\n\n", "event: balance.changed\ndata: 42\n\n", "event: sim.tick\ndata: {pas du json\n\n",
+    'event: sim.tick\ndata: ["x"]\n\n', 'event: type.inconnu\ndata: {"seq":5,"type":"type.inconnu","data":{}}\n\n',
+    'event: balance.changed\ndata: {"seq":3,"type":"balance.changed","data":{"agentId":"a-0001","balance":"abc","delta":"1.5x","reason":"task"}}\n\n',
+    'event: agent.born\ndata: {"seq":4,"type":"agent.born","data":{"agent":null}}\n\n',
+    'event: escrow.released\ndata: {"seq":1e99,"type":"escrow.released","data":{}}\n\n',
+  ];
+  garbageN++;
+  for (const c of clients) { for (const f of frames) c.write(f); if (garbageN % 60 === 0) c.write('event: sim.tick\ndata: {"seq":99999999,"ts":"x","tick":1,"type":"sim.tick","data":{}}\n\n'); }
+}
+
 function start() {
   emit("sim.started", { mode: TESTNET ? "testnet" : "mock", preset: "demo", seed: Number(args.seed ?? 7), chain: TESTNET ? "near" : "mock", brain: TESTNET ? "nearai" : "mock" });
   if (!TESTNET) emit("system.warning", { code: "MOCK_MODE", message: "Chaîne et IA simulées en mémoire." });
@@ -253,7 +267,7 @@ function start() {
   for (let i = 0; i < 4; i++) birth(null, near(10), newGenome(null));
   // garantit la diversité des métiers parmi les fondateurs
   [...agents.values()].forEach((a, i) => { a.genome.profession = PROFS[i % PROFS.length]; });
-  setInterval(() => { if (running && !paused) tickOnce(); }, TICK_MS);
+  setInterval(() => { if (running && !paused) tickOnce(); if (args.garbage) garbage(); }, TICK_MS);
 }
 
 // ---- HTTP ----

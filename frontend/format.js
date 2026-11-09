@@ -1,6 +1,14 @@
 // Utilitaires purs (aucun accès au DOM sauf `h`). Jamais d'innerHTML : tout texte passe par textContent.
 const YOCTO = 10n ** 24n;
 
+/** BigInt tolérant : une valeur non numérique donne 0n au lieu de lever. */
+export function big(v) { try { return BigInt(v ?? 0); } catch { return 0n; } }
+
+const EXPLORER_HOSTS = new Set(["testnet.nearblocks.io", "nearblocks.io"]);
+function allowedExplorerUrl(u) {
+  try { const x = new URL(u); return x.protocol === "https:" && EXPLORER_HOSTS.has(x.hostname) && !x.username && !x.password ? x.href : null; } catch { return null; }
+}
+
 /** yoctoNEAR (chaîne ou bigint) -> nombre de NEAR lisible. */
 export function formatNear(y, digits = 2) {
   let v;
@@ -36,7 +44,8 @@ export const TESTNET_EXPLORER = "https://testnet.nearblocks.io";
  * `${base}/txns/<hash>` (même format que accounts/near-chain.ts). Aucun lien pour les hashes mock ou locaux.
  */
 export function explorerUrl(hash, { explicit, chainKind, base } = {}) {
-  if (explicit && /^https:\/\//.test(explicit)) return explicit;
+  const ok = explicit ? allowedExplorerUrl(explicit) : null; // URL d'événement hors liste blanche : ignorée, on reconstruit depuis le hash
+  if (ok) return ok;
   if (!hash || chainKind !== "near") return null;
   if (/^(mock_|local_)/.test(hash)) return null;
   return `${(base || TESTNET_EXPLORER).replace(/\/$/, "")}/txns/${encodeURIComponent(hash)}`;

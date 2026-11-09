@@ -1,6 +1,6 @@
 // État client reconstruit depuis /api/state puis le flux d'événements. Aucune logique métier : pur reflet du journal.
 // Types (recopiés en JSDoc, voir shared/types.ts) : Agent, Task, Letter, DarwinEvent {seq, ts, tick, type, data}.
-import { explorerUrl, txKindLabel } from "./format.js";
+import { explorerUrl, txKindLabel, big } from "./format.js";
 
 export const EVENT_TYPES = [
   "sim.started", "sim.paused", "sim.resumed", "sim.stopped", "sim.tick",
@@ -13,6 +13,7 @@ export const EVENT_TYPES = [
 
 const MAX_FEED = 120;
 const MAX_CHRONICLE = 120;
+const MAX_TASKS = 200;
 
 export class Store {
   constructor() { this.reset(); this.subs = new Set(); }
@@ -52,9 +53,15 @@ export class Store {
     this.totals = state.totals ?? this.totals;
     for (const a of state.agents ?? []) this.agents.set(a.id, a);
     for (const t of state.tasks ?? []) this.tasks.set(t.id, t);
+    this.trimTasks();
     for (const l of state.letters ?? []) this.letters.set(l.id, l);
     this.lastSeq = state.lastSeq ?? 0;
     this.notify({ type: "__loaded" });
+  }
+
+  /** Borne la mémoire : on garde les MAX_TASKS tâches les plus récentes (Map = ordre d'insertion). */
+  trimTasks() {
+    while (this.tasks.size > MAX_TASKS) { const k = this.tasks.keys().next().value; this.tasks.delete(k); this.bidCount.delete(k); }
   }
 
   agentByAccount(acc) { for (const a of this.agents.values()) if (a.accountId === acc) return a; return null; }
@@ -131,7 +138,7 @@ export class Store {
           this.chron(ev, "letter", `${this.name(d.letter.fromAgentId)} écrit à ${this.name(d.letter.toAgentId)}.`, { letterId: d.letter.id }); }
         break;
       case "task.posted":
-        if (live && d.task) this.tasks.set(d.task.id, d.task);
+        if (live && d.task && d.task.id) { this.tasks.set(d.task.id, d.task); this.trimTasks(); }
         break;
       case "bid.placed": if (live) this.bidCount.set(d.bid.taskId, (this.bidCount.get(d.bid.taskId) ?? 0) + 1); break;
       case "task.awarded":
@@ -150,7 +157,7 @@ export class Store {
         break;
       case "escrow.released":
         if (live) { const t = this.tasks.get(d.taskId); if (t) { t.status = "settled"; t.escrow = { ...(t.escrow ?? {}), status: "released", payee: d.payee, amount: d.amount, settleTx: d.tx }; }
-          const a = this.agentByAccount(d.payee); if (a) { a.tasksDone = (a.tasksDone ?? 0) + 1; a.earned = (BigInt(a.earned ?? 0) + BigInt(d.amount)).toString(); }
+          const a = this.agentByAccount(d.payee); if (a) { a.tasksDone = (a.tasksDone ?? 0) + 1; a.earned = (big(a.earned ?? 0) + big(d.amount)).toString(); }
           this.totals = { ...this.totals, tasksSettled: (this.totals.tasksSettled ?? 0) + 1 };
           const tk = this.tasks.get(d.taskId);
           this.chron(ev, "pay", `${a?.name ?? d.payee} est payé pour « ${tk?.title ?? d.taskId} ».`, { agentId: a?.id, taskId: d.taskId }); }
@@ -165,7 +172,7 @@ export class Store {
         this.addTx({ hash: d.tx, seq: ev.seq, tick: ev.tick, label: `Réputation ${d.delta > 0 ? "+" : ""}${d.delta}`, source: ev.type });
         break;
       case "brain.charged":
-        if (live) { const a = A(d.agentId); if (a) a.spentBrain = (BigInt(a.spentBrain ?? 0) + BigInt(d.cost)).toString(); }
+        if (live) { const a = A(d.agentId); if (a) a.spentBrain = (big(a.spentBrain ?? 0) + big(d.cost)).toString(); }
         this.addTx({ hash: d.tx, seq: ev.seq, tick: ev.tick, label: `Cerveau IA payé (${d.model}${d.mock ? ", mock" : ""})`, from: A(d.agentId)?.accountId, amount: d.cost, source: ev.type });
         break;
       case "balance.changed":
@@ -192,7 +199,7 @@ export class Store {
       let total = 0, alive = 0, balance = 0n, maxGen = r.generation;
       const stack = [r];
       while (stack.length) {
-        const a = stack.pop(); total++; if (a.status === "alive") { alive++; balance += BigInt(a.balance ?? 0); }
+        const a = stack.pop(); total++; if (a.status === "alive") { alive++; balance += big(a.balance ?? 0); }
         maxGen = Math.max(maxGen, a.generation);
         for (const cid of a.childrenIds ?? []) { const c = this.agents.get(cid); if (c) stack.push(c); }
       }

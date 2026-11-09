@@ -2,7 +2,7 @@
 // Aucune logique métier ici : la page reflète le journal d'événements. Aucun innerHTML (tout via textContent / h()).
 import { Store, EVENT_TYPES } from "./store.js";
 import { Tree } from "./tree.js";
-import { formatNear, signedNear, nearNumber, shortHash, profOf, requesterBadge, STATUS_LABEL, h, errorMessages, TESTNET_EXPLORER } from "./format.js";
+import { big, formatNear, signedNear, nearNumber, shortHash, profOf, requesterBadge, STATUS_LABEL, h, errorMessages, TESTNET_EXPLORER } from "./format.js";
 
 const $ = (id) => document.getElementById(id);
 const store = new Store();
@@ -23,9 +23,15 @@ $("themeBtn").addEventListener("click", () => {
 });
 
 // ---------------------------------------------------------------- réseau
+const API_TIMEOUT_MS = 10000;
 async function api(path, opts) {
-  const r = await fetch(path, { headers: { Accept: "application/json" }, ...opts });
-  const text = await r.text();
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), API_TIMEOUT_MS); // jamais d'attente infinie
+  let r, text;
+  try {
+    r = await fetch(path, { headers: { Accept: "application/json" }, signal: ctl.signal, ...opts });
+    text = await r.text();
+  } finally { clearTimeout(timer); }
   let body = null;
   try { body = text ? JSON.parse(text) : null; } catch { body = text; }
   return { status: r.status, ok: r.ok, body, headers: r.headers };
@@ -63,6 +69,12 @@ let es = null;
 let retries = 0;
 let reconnectTimer = 0;
 let wasDown = false;
+let gapStreak = 0, okStreak = 0, invalidMsgs = 0;
+const KNOWN = new Set(EVENT_TYPES);
+function isValidEvent(ev) {
+  return !!ev && typeof ev === "object" && !Array.isArray(ev) && Number.isSafeInteger(ev.seq) && ev.seq > 0
+    && typeof ev.type === "string" && KNOWN.has(ev.type) && (ev.data == null || (typeof ev.data === "object" && !Array.isArray(ev.data)));
+}
 function setConn(state, text) {
   const c = $("conn");
   c.dataset.state = state;
@@ -79,10 +91,17 @@ function connect() {
   };
   const onMsg = (m) => {
     let ev;
-    try { ev = JSON.parse(m.data); } catch { return; }
-    if (ev.seq > store.lastSeq + 1 && store.lastSeq > 0) { // trou : on rouvre depuis le dernier seq connu
-      connect(); return;
+    try { ev = JSON.parse(m.data); } catch { invalidMsgs++; return; }
+    if (!isValidEvent(ev)) { invalidMsgs++; return; } // null, non-objet, type inconnu, seq invalide : ignoré sans effet
+    if (ev.seq > store.lastSeq + 1 && store.lastSeq > 0) { // trou : on rouvre depuis le dernier seq connu, avec attente croissante
+      gapStreak++;
+      clearTimeout(reconnectTimer);
+      if (es) es.close();
+      reconnectTimer = setTimeout(connect, Math.min(10000, 500 * 2 ** Math.min(gapStreak, 5)));
+      setConn("retry", "Resynchronisation…");
+      return;
     }
+    if (ev.seq > store.lastSeq && ++okStreak >= 20) { gapStreak = 0; okStreak = 0; }
     handleEvent(ev);
   };
   for (const t of EVENT_TYPES) es.addEventListener(t, onMsg);
@@ -116,6 +135,9 @@ async function resyncIfRestarted() {
 
 // ---------------------------------------------------------------- événements -> effets visuels
 function handleEvent(ev) {
+  try { applyEvent(ev); } catch (e) { console.warn("événement ignoré", ev?.type, e?.message); }
+}
+function applyEvent(ev) {
   store.apply(ev);
   const d = ev.data ?? {};
   switch (ev.type) {
@@ -123,7 +145,7 @@ function handleEvent(ev) {
       tree.schedule(); markDirty("agents", "lineages", "header", "letters"); break;
     case "balance.changed":
       tree.schedule(); markDirty("agents");
-      if (d.reason === "task" || d.reason === "brain" || d.reason === "birth") tree.float(d.agentId, signedNear(d.delta), BigInt(d.delta) >= 0n ? "up" : "down");
+      if (d.reason === "task" || d.reason === "brain" || d.reason === "birth") tree.float(d.agentId, signedNear(d.delta), big(d.delta) >= 0n ? "up" : "down");
       break;
     case "escrow.released": { const a = store.agentByAccount(d.payee); if (a) tree.pulse(a.id); markDirty("tasks", "chron", "feed", "header"); break; }
     case "letter.written": markDirty("letters", "chron"); break;
@@ -162,7 +184,7 @@ function renderHeader() {
   $("stBorn").textContent = store.agents.size;
   $("stSettled").textContent = t.tasksSettled ?? 0;
   let total = 0n;
-  for (const a of store.agents.values()) if (a.status === "alive") total += BigInt(a.balance ?? 0);
+  for (const a of store.agents.values()) if (a.status === "alive") total += big(a.balance ?? 0);
   $("stTotal").textContent = formatNear(total, 1);
   const g = store.generations;
   const el = $("genNum");
@@ -260,7 +282,7 @@ function renderLineages() {
       h("span", { class: "lin-name" }, `Lignée ${s.root.name}`),
       h("span", { class: "lin-bar", role: "img", "aria-label": `${s.alive} vivants sur ${s.total}` },
         h("span", { class: "lin-total", css: { width: `${(s.total / max) * 100}%` } }, h("span", { class: "lin-alive", css: { width: `${(s.alive / s.total) * 100}%` } }))),
-      h("span", { class: "lin-txt" }, `${s.alive}/${s.total} · gén. ${s.maxGen} · `, h("b", null, st)));
+      h("span", { class: "lin-txt" }, `${s.alive}/${s.total} vivants${s.total - s.alive ? ` · ${s.total - s.alive} mort${s.total - s.alive > 1 ? "s" : ""}` : ""} · gén. ${s.maxGen} · `, h("b", null, st)));
   }));
 }
 
@@ -466,7 +488,7 @@ form.addEventListener("submit", async (e) => {
 // ---------------------------------------------------------------- démarrage
 function boot() {
   tree = new Tree($("tree"), store, { onSelect: selectAgent });
-  window.__darwin = { store, tree }; // inspection manuelle / tests
+  if (/[?&]debug\b/.test(location.search)) window.__darwin = { store, tree, stats: () => ({ invalidMsgs, gapStreak }) }; // réservé au mode ?debug
   if (innerWidth < 700) $("honesty").open = false;
   loadState().then(() => { connect(); }).catch((e) => {
     setConn("down", "Backend injoignable");
