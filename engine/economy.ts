@@ -44,12 +44,14 @@ export async function flushAgent(ctx: Ctx, a: Agent): Promise<void> {
   if (p <= 0n) return;
   const onChain = BigInt(await ctx.deps.chain.getBalance(a.accountId));
   const amount = p < onChain ? p : onChain;
+  if (amount > 0n) {
+    // La dette n'est effacée qu'après un transfert réussi : en cas d'échec elle reste due (l'exception remonte).
+    const r = await ctx.deps.chain.transfer({ from: a.accountId, to: masterId(ctx), amount: amount.toString(), memo: "settle" });
+    emitTx(ctx, r, a.accountId, masterId(ctx), amount);
+  }
+  // Reliquat éventuel (solde on-chain inférieur à la dette) : l'agent est à sec, le solde ne peut pas payer plus.
   ctx.pending.set(a.id, 0n);
-  if (amount <= 0n) return;
-  const r = await ctx.deps.chain.transfer({ from: a.accountId, to: masterId(ctx), amount: amount.toString(), memo: "settle" });
-  emitTx(ctx, r, a.accountId, masterId(ctx), amount);
 }
-
 export async function flushAll(ctx: Ctx, force = false): Promise<void> {
   const every = ctx.deps.config.sim.settleEveryTicks;
   if (!force && ctx.tick % every !== 0) return;
