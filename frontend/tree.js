@@ -13,7 +13,7 @@ const svgEl = (tag, attrs = {}, text) => {
 const SLOT = 62; // largeur d'une feuille
 const ROW = 82; // hauteur d'une génération
 const PAD_X = 34;
-const PAD_Y = 34;
+const PAD_Y = 48;
 const radiusFor = (bal) => Math.max(11, Math.min(25, 10 + Math.sqrt(Math.max(0, nearNumber(bal))) * 3.4));
 
 export class Tree {
@@ -164,7 +164,7 @@ export class Tree {
   // ---------- effets ----------
   fxAt(n, cls, text) {
     const g = svgEl("g", { transform: `translate(${n.cx} ${n.cy})`, class: "fxg" });
-    if (text != null) g.append(svgEl("text", { class: `float ${cls}`, "text-anchor": "middle", y: -n.r - 6 }, text));
+    if (text != null) g.append(svgEl("text", { class: `float ${cls}`, "text-anchor": "start", x: Math.round(n.r * 0.55), y: -n.r - 3 }, text));
     else g.append(svgEl("circle", { class: `ring ${cls}`, r: n.r + 2 }));
     this.gFx.append(g);
     setTimeout(() => g.remove(), 1700);

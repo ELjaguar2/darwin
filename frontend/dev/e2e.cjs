@@ -123,6 +123,33 @@ const ok = (name, cond, info = "") => { results.push([cond ? "OK " : "KO ", name
   await p.screenshot({ path: path.join(out, "mobile-full.png"), fullPage: true });
   await p.context().close(); s.srv.kill();
 
+  // 7. messages SSE malformés (null, non objet, JSON cassé, type inconnu, deltas non numériques, trou de seq)
+  s = await start("--tick=100", "--garbage");
+  p = await newPage(s.url + "?debug");
+  await p.waitForFunction(() => document.querySelectorAll(".node").length >= 4, null, { timeout: 20000 });
+  const t0 = await p.evaluate(() => window.__darwin.store.tick);
+  await p.waitForTimeout(12000);
+  const st = await p.evaluate(() => ({ tick: window.__darwin.store.tick, agents: window.__darwin.store.agents.size, ...window.__darwin.stats() }));
+  ok("SSE malformé : le flux continue d'avancer", st.tick > t0 + 10, JSON.stringify(st));
+  ok("SSE malformé : messages invalides ignorés et comptés", st.invalidMsgs > 20, String(st.invalidMsgs));
+  ok("SSE malformé : l'arbre reste affiché", (await p.$$(".node")).length >= 4);
+  await p.context().close();
+  p = await newPage(s.url);
+  ok("window.__darwin absent hors ?debug", await p.evaluate(() => window.__darwin === undefined));
+  const exp = await p.evaluate(async () => {
+    const m = await import("/format.js");
+    return [
+      m.explorerUrl("abc123", { explicit: "https://evil.example/txns/abc123", chainKind: "near" }),
+      m.explorerUrl("abc123", { explicit: "https://testnet.nearblocks.io/txns/abc123", chainKind: "near" }),
+      m.explorerUrl("abc123", { explicit: "javascript:alert(1)", chainKind: "mock" }),
+      m.explorerUrl("abc123", { explicit: "https://testnet.nearblocks.io.evil.com/x", chainKind: "near" }),
+      String(m.big("1.5x")), String(m.big(null)), String(m.big("12")),
+    ];
+  });
+  ok("liste blanche d'explorateur", exp[0] === "https://testnet.nearblocks.io/txns/abc123" && exp[1] === "https://testnet.nearblocks.io/txns/abc123" && exp[2] === null && exp[3] === "https://testnet.nearblocks.io/txns/abc123", JSON.stringify(exp.slice(0, 4)));
+  ok("big() tolérant", exp[4] === "0" && exp[5] === "0" && exp[6] === "12", JSON.stringify(exp.slice(4)));
+  await p.context().close(); s.srv.kill();
+
   console.log("ERREURS CONSOLE:", errs.length ? errs : "aucune");
   await b.close();
   const ko = results.filter((r) => r[0] === "KO ").length;

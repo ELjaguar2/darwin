@@ -108,7 +108,7 @@ a { color: var(--accent); }
 @keyframes ring { from { transform: scale(.6); opacity: 1; } to { transform: scale(3.6); opacity: 0; } }
 .float { font: 800 13px ui-monospace, Consolas, monospace; paint-order: stroke; stroke: var(--bg); stroke-width: 3px; animation: float 1.5s ease-out forwards; }
 .float.up { fill: var(--up); } .float.down { fill: var(--down); }
-@keyframes float { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-26px); opacity: 0; } }
+@keyframes float { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-12px); opacity: 0; } }
 
 .lineages { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 6px 14px; }
 .lin { display: grid; grid-template-columns: 12px minmax(0, 1fr); gap: 2px 8px; align-items: center; font-size: 13px; }
@@ -172,6 +172,7 @@ textarea { resize: vertical; } input:focus-visible, textarea:focus-visible, sele
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } @media (max-width: 420px) { .row2 { grid-template-columns: 1fr; } }
 .primary { margin-top: 8px; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 10px; padding: 11px 14px; font: inherit; font-weight: 700; cursor: pointer; min-height: 44px; }
 .primary:hover:not(:disabled) { filter: brightness(1.1); } .primary:disabled { opacity: .65; cursor: not-allowed; }
+.notice { margin-top: 6px; font-size: 13px; background: var(--warn-bg); color: var(--warn); border-radius: 8px; padding: 6px 10px; }
 .form-status { border-radius: 10px; padding: 0; font-size: 13px; } .form-status:not(:empty) { padding: 8px 10px; margin-top: 6px; }
 .form-status ul { margin: 4px 0 0 18px; list-style: disc; }
 .form-status.ok { background: var(--ok-bg); color: var(--ok); } .form-status.err { background: var(--danger-bg); color: var(--danger); } .form-status.warn { background: var(--warn-bg); color: var(--warn); } .form-status.info { background: var(--info-bg); color: var(--info); }
