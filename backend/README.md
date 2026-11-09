@@ -55,7 +55,7 @@ Corps JSON (`Content-Type: application/json`, 16 Ko max) : `{title (3-120), prom
 | 503 | `SIM_NOT_RUNNING` ; `VALIDATION_PENDING` = **état d'attente non fatal** (`retryable:true`, `Retry-After: 5`, rien n'est journalisé comme erreur) |
 | autres | `MarketError.httpStatus` tel quel ; erreur inconnue = 500 sans détail |
 
-Les tâches ouvertes d'une IP = statuts `posted`, `awarded`, `submitted`. L'IP est celle de la socket (X-Forwarded-For est ignoré car falsifiable : derrière un proxy, toutes les IP se confondent, voir « Reste »).
+Les tâches ouvertes d'une IP = statuts `posted`, `awarded`, `submitted`. L'IP est celle de la socket (X-Forwarded-For est ignoré car falsifiable : derrière un proxy ou un tunnel, toutes les IP se confondent, voir « Reste »).
 
 ### Flux SSE `GET /api/stream`
 
@@ -64,6 +64,8 @@ Chaque message : `id: <seq>`, `event: <type>` (ex. `agent.born`, `chain.tx`), `d
 ## Administration et sécurité
 
 - Routes `POST /api/sim/*` : `Authorization: Bearer <DARWIN_ADMIN_TOKEN>` (comparaison à temps constant, 10 échecs/min/IP puis 429). Sans jeton configuré, elles sont ouvertes **uniquement** parce que le serveur n'écoute que sur 127.0.0.1.
+- **Anti rebond DNS** : l'en-tête `Host` doit être `localhost`, `127.0.0.1` ou `[::1]` (avec ou sans port), le `HOST` configuré, ou un nom listé dans `DARWIN_ALLOWED_HOSTS` (liste séparée par des virgules, ex. le nom d'un tunnel de démo ; `*` désactive le contrôle). Sinon 403 `FORBIDDEN_HOST`, sur toutes les routes (lecture, écriture, SSE, statique). Avec `HOST=0.0.0.0`, renseigner `DARWIN_ALLOWED_HOSTS` avec le nom public.
+- **Jeton admin** : 24 caractères minimum dès qu'il est renseigné (démarrage refusé sinon) ; obligatoire si `HOST` n'est pas `127.0.0.1`.
 - Anti-CSRF : toute requête non-GET portant un en-tête `Origin` différent de `Host` est refusée (403).
 - Limitation de débit : 240 requêtes/min/IP sur `/api/*` (hors flux SSE).
 - En-têtes : `Content-Security-Policy` (`default-src 'self'`, scripts et connexions de même origine uniquement : **le frontend ne doit charger aucune ressource externe ni de script inline**), `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store` sur l'API. Fichiers cachés (`.xxx`) jamais servis.
@@ -80,7 +82,7 @@ Chaque message : `id: <seq>`, `event: <type>` (ex. `agent.born`, `chain.tx`), `d
 ## Reste / limites connues
 
 - Pas de route `reset` (relancer le processus) : `Engine` n'en expose pas.
-- Derrière un proxy inverse (tunnel de démo), l'IP vue est celle du proxy : le plafond « 10 tâches ouvertes par IP » devient global. Une option `trust proxy` demanderait une variable dans `shared/config.ts`.
+- **Proxy / tunnel (option `trust proxy` non implémentée)** : derrière un proxy inverse, l'IP vue est celle du proxy, donc les plafonds par IP (10 tâches ouvertes, 6 publications/min, 8 flux, 240 requêtes/min, échecs admin) deviennent globaux : acceptable pour une démo, le plafond horaire du compte de démo et le plafond global de 100 tâches bornent de toute façon la dépense. Pour une vraie option, il faudrait une variable (ex. `DARWIN_TRUST_PROXY`) dans `shared/config.ts` et ne lire `X-Forwarded-For` que si la socket vient du proxy ; non faite car sans variable on ne peut pas distinguer un proxy de confiance d'un client qui falsifie l'en-tête.
 - Le journal complet reste en mémoire (`shared/bus.ts`) : suffisant pour le preset `demo` (900 ticks) ; en `normal` infini il grossit sans borne.
 - Arrêt propre vérifié par test (`shutdown()`) mais pas par signal sous Windows (Node n'y émet pas SIGINT à un `kill`).
 - Le mode testnet n'a été exercé qu'avec le faux backend NEAR (pas de clé ni de réseau dans cet environnement).

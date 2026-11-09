@@ -61,6 +61,10 @@ describe("config", () => {
     expect(() => loadConfig({ NEARAI_MAX_USD_PER_RUN: "0" })).toThrow(/NEARAI_MAX_USD_PER_RUN/);
     expect(() => loadConfig({ NEARAI_MAX_USD_PER_HOUR: "abc" })).toThrow(/NEARAI_MAX_USD_PER_HOUR/);
   });
+  it("DARWIN_ALLOWED_HOSTS : liste normalisée, vide par défaut", () => {
+    expect(loadConfig({}).server.allowedHosts).toEqual([]);
+    expect(loadConfig({ DARWIN_ALLOWED_HOSTS: " Demo.Example.org, ,b.test:8080 " }).server.allowedHosts).toEqual(["demo.example.org", "b.test:8080"]);
+  });
   it("presets cohérents (minVital < capital)", () => {
     for (const m of ["mock", "testnet"] as const)
       for (const p of ["normal", "demo"] as const) expect(PRESETS[m][p].minVital).toBeLessThan(PRESETS[m][p].birthCapital);
