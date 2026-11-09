@@ -63,7 +63,8 @@ export class StubMarket implements Market {
 
   private async expire(t: Task, reason: "no_bids" | "deadline") {
     if (t.escrowId) {
-      const tx = await this.chain.refundEscrow({ taskId: t.id, reason });
+      // La chaîne n'accepte que `rejected` ou `expired` (règles du contrat) : `no_bids` et `deadline` sont des expirations.
+      const tx = await this.chain.refundEscrow({ taskId: t.id, reason: "expired" });
       const e = await this.chain.getEscrow(t.id);
       this.deps.journal.emit({ type: "escrow.refunded", data: { taskId: t.id, payer: e!.payer, amount: e!.amount, tx: tx.hash } });
     }

@@ -65,6 +65,9 @@ describe("cycle complet", () => {
 
   it("égalité de prix : la meilleure réputation gagne", async () => {
     const s = await setup();
+    // MockChain suit les règles du contrat : la réputation exige un séquestre libéré avec la même preuve.
+    await s.chain.lockEscrow({ taskId: "x", payer: s.agents["a-0001"]!, amount: N("0.1") });
+    await s.chain.releaseEscrow({ taskId: "x", payee: s.agents["a-0003"]!, proof: { resultHash: "h", verdict: "accepted", validator: "test" } });
     await s.chain.addReputation({ agentId: "a-0003", taskId: "x", delta: 3, proofHash: "h" });
     const t = await post(s.market);
     await s.market.placeBid({ taskId: t.id, agentId: "a-0001", price: N("0.5"), etaTicks: 1 });
