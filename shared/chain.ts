@@ -25,7 +25,9 @@ export class ChainError extends Error {
   constructor(
     public code:
       | "INSUFFICIENT_FUNDS" | "UNKNOWN_ACCOUNT" | "ACCOUNT_DELETED" | "ESCROW_EXISTS" | "ESCROW_UNKNOWN"
-      | "ESCROW_SETTLED" | "PROOF_REQUIRED" | "ALREADY_REGISTERED" | "UNKNOWN_AGENT" | "RPC_ERROR",
+      | "ESCROW_SETTLED" | "PROOF_REQUIRED" | "ALREADY_REGISTERED" | "UNKNOWN_AGENT" | "REPUTATION_EXISTS"
+      // Plafond de dépense (SpendPolicy de NearChain) dépassé : ce n'est PAS un manque de fonds, ne doit jamais tuer un agent.
+      | "SPEND_CAP_EXCEEDED" | "RPC_ERROR",
     message: string,
   ) {
     super(message);

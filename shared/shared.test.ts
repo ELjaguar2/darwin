@@ -78,7 +78,7 @@ describe("MockChain", () => {
       chain.releaseEscrow({ taskId: "t-1", payee: parent.accountId, proof: { resultHash: "", verdict: "rejected" as never, validator: "" } }),
     ).rejects.toMatchObject({ code: "PROOF_REQUIRED" });
     await chain.releaseEscrow({ taskId: "t-1", payee: parent.accountId, proof: { resultHash: "h", verdict: "accepted", validator: "rule:test" } });
-    await expect(chain.refundEscrow({ taskId: "t-1", reason: "x" })).rejects.toBeInstanceOf(ChainError);
+    await expect(chain.refundEscrow({ taskId: "t-1", reason: "rejected" })).rejects.toMatchObject({ code: "ESCROW_SETTLED" });
     expect(await chain.getBalance(parent.accountId)).toBe(parseNear("12").toString());
 
     await chain.markAgentDead({ agentId: "a-0001", deathTick: 9, cause: "starvation" });
@@ -86,6 +86,34 @@ describe("MockChain", () => {
     expect(closed.swept).toBe(parseNear("12").toString());
     expect((await chain.getAgentRecord("a-0001"))?.alive).toBe(false); // lignée conservée
     expect(chain.totalSupply()).toBe(supply);
+  });
+  it("règles du contrat : motifs de remboursement, réputation liée au séquestre, une écriture par (tâche, agent)", async () => {
+    const chain = new MockChain();
+    const cap = parseNear("10").toString();
+    const a = await chain.createAccount({ label: "a-0001", initialFunding: cap });
+    const client = await chain.createAccount({ label: "client", initialFunding: cap });
+    await chain.registerAgent({ agentId: "a-0001", accountId: a.accountId, parentId: null, generation: 1, genomeHash: hashObject(genome), genome, birthTick: 0 });
+    const amount = parseNear("1").toString();
+    const proof = { resultHash: "h1", verdict: "accepted" as const, validator: "rule:test" };
+    const rep = (taskId: string, delta: number, proofHash: string) => chain.addReputation({ agentId: "a-0001", taskId, delta, proofHash });
+
+    await chain.lockEscrow({ taskId: "t-1", payer: client.accountId, amount });
+    await expect(chain.refundEscrow({ taskId: "t-1", reason: "deadline" })).rejects.toMatchObject({ code: "RPC_ERROR" });
+    await expect(rep("t-1", 1, "h1")).rejects.toMatchObject({ code: "PROOF_REQUIRED" }); // pas encore libéré
+    await expect(rep("inconnu", 1, "h1")).rejects.toMatchObject({ code: "ESCROW_UNKNOWN" });
+    await chain.releaseEscrow({ taskId: "t-1", payee: a.accountId, proof });
+    await expect(rep("t-1", 1, "autre")).rejects.toMatchObject({ code: "PROOF_REQUIRED" });
+    await expect(rep("t-1", 1.5, "h1")).rejects.toMatchObject({ code: "RPC_ERROR" });
+    await expect(rep("t-1", 101, "h1")).rejects.toMatchObject({ code: "RPC_ERROR" });
+    await expect(rep("t-1", -1, "h1")).rejects.toMatchObject({ code: "PROOF_REQUIRED" }); // malus seulement après remboursement
+    expect((await rep("t-1", 2, "h1")).total).toBe(2);
+    await expect(rep("t-1", 2, "h1")).rejects.toMatchObject({ code: "REPUTATION_EXISTS" });
+
+    await chain.lockEscrow({ taskId: "t-2", payer: client.accountId, amount });
+    await chain.refundEscrow({ taskId: "t-2", reason: "expired" });
+    await expect(rep("t-2", 1, "h")).rejects.toMatchObject({ code: "PROOF_REQUIRED" });
+    expect((await rep("t-2", -1, "h")).total).toBe(1);
+    await expect(chain.lockEscrow({ taskId: "t-2", payer: client.accountId, amount })).rejects.toMatchObject({ code: "ESCROW_EXISTS" });
   });
   it("solde insuffisant refusé", async () => {
     const chain = new MockChain();

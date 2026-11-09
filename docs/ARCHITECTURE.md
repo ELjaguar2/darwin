@@ -106,8 +106,9 @@ Tout est défini dans `shared/` (code compilé et testé). Résumé ; le détail
 ### 6.1 `Chain` (`shared/chain.ts`)
 - Comptes : `createAccount({label, initialFunding, fundFrom?})` -> sous-compte `label.<maître>` ; `getBalance` ; `transfer` ; `closeAccount` (mort : solde restant renvoyé au bénéficiaire, compte clos).
 - Registre : `registerAgent` (génome + hash, lignée), `markAgentDead`, `getAgentRecord`, `listAgentRecords` : la lignée est conservée après la mort.
-- Séquestre : `lockEscrow` -> `releaseEscrow` (preuve obligatoire, sinon `ChainError PROOF_REQUIRED`) ou `refundEscrow`.
-- Réputation : `addReputation` (exige `proofHash`), `getReputation`.
+- Séquestre : `lockEscrow` -> `releaseEscrow` (preuve obligatoire, sinon `ChainError PROOF_REQUIRED`) ou `refundEscrow` (motifs `rejected` ou `expired` uniquement, comme le contrat).
+- Réputation : `addReputation` (delta entier non nul, |delta| <= 100 ; crédit seulement après séquestre libéré vers cet agent avec `proofHash` = `resultHash` ; malus seulement après remboursement ; une écriture par tâche et agent, sinon `REPUTATION_EXISTS`), `getReputation`. `MockChain` applique ces règles (D-031).
+- Codes d'erreur notables : `SPEND_CAP_EXCEEDED` (plafond de dépense de `NearChain`, distinct de `INSUFFICIENT_FUNDS`).
 - `AgentRecord.accountId` est le compte payeur (coûts, séquestre) et bénéficiaire (paiements) de l'agent. `getEscrow(taskId)` renvoie `{taskId, payer, amount, status}` (D-030).
 - Toute opération d'écriture renvoie un `TxReceipt` (`hash`, `explorerUrl?`) ; les erreurs sont des `ChainError` typées.
 - Implémentations : `MockChain` (fait ; invariant testé : somme comptes + séquestres constante) ; `NearChain` (L2/L3). Fabrique unique `createChain(config)` dans `accounts/index.ts`.
@@ -287,7 +288,11 @@ Les scripts `start*` pointent vers `backend/main.ts`, créé au lot L7 : avant L
 
 ## 15. Intents (V2, hors V1)
 
-`intents/` fournit un mock et un client 1Click limité à `GET /v0/tokens` et `POST /v0/quote` avec `dry:true`. Désactivé si `INTENTS_ENABLED!=true`. `dry:false`, dépôt et signature mainnet exigent un feu vert écrit dans `docs/BESOINS_HUMAIN.md` et `INTENTS_DRY_ONLY=false`. Aucune interaction avec la V1.
+`intents/` (lot L9) : `types.ts`, `base.ts`, `oneclick.ts` (client 1Click complet : `GET /v0/tokens`, `POST /v0/quote` en `dry:true` puis `dry:false`, `POST /v0/deposit/submit`, `GET /v0/status`), `guard.ts` (verrous), `proof.ts` (preuve de dépôt), `mock-intents.ts`, `demo.ts` (CLI : `tokens`, `dry`, `run`, `status`), `intents.test.ts`. Procédure humaine : `intents/DEMO_MAINNET.md`. Mainnet uniquement (Intents n'a pas de testnet) ; le code ne signe jamais, l'humain envoie le dépôt depuis son wallet.
+
+Verrous : `INTENTS_ENABLED=false` par défaut ; `dry:false` et `deposit/submit` refusés tant que `INTENTS_DRY_ONLY` n'est pas `false` (et feu vert écrit dans `docs/BESOINS_HUMAIN.md`) ; un devis `dry:true` identique est obligatoire avant `dry:false` ; plafond de 5 USD par opération (`maxUsd`) ; clé partenaire optionnelle `INTENTS_JWT` (en-tête `X-API-Key`, jamais journalisée).
+
+Preuve de dépôt : `verifyDeposit` n'émet une preuve que si `/v0/status` indique `SUCCESS` et recoupe NOTRE devis (correlationId, adresse de dépôt, destinataire, actifs, `amountOut >= minAmountOut`, hash de destination présent, aucun remboursement). Un crédit n'est possible qu'une fois par dépôt et jamais sans preuve émise par `verifyDeposit`. Aucune interaction avec la V1.
 
 ## 16. Qualité et sécurité transverses
 

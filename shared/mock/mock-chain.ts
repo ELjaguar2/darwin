@@ -6,7 +6,10 @@ import type { CauseOfDeath } from "../types.ts";
 import type { Yocto } from "../money.ts";
 
 interface Account { balance: bigint; deleted: boolean }
-interface EscrowRow { taskId: string; payer: string; amount: bigint; status: "locked" | "released" | "refunded" }
+interface EscrowRow {
+  taskId: string; payer: string; amount: bigint; status: "locked" | "released" | "refunded";
+  payee?: string; resultHash?: string; refundReason?: "rejected" | "expired";
+}
 
 export interface MockChainOptions {
   masterId?: string;
@@ -20,6 +23,7 @@ export class MockChain implements Chain {
   private escrows = new Map<string, EscrowRow>();
   private records = new Map<string, AgentRecord>();
   private reputation = new Map<string, number>();
+  private repWrites = new Set<string>();
   private counter = 0;
   private now: () => Date;
   /** Journal des transactions mock (utile aux tests et à /api/state). */
@@ -140,15 +144,22 @@ export class MockChain implements Chain {
     if (e.status !== "locked") throw new ChainError("ESCROW_SETTLED", `Séquestre déjà ${e.status} : ${args.taskId}`);
     this.acc(args.payee).balance += e.amount;
     e.status = "released";
+    e.payee = args.payee;
+    e.resultHash = args.proof.resultHash;
     return this.tx("escrow_release", `${args.taskId}|${args.payee}|${args.proof.resultHash}`);
   }
 
+  /** Comme le contrat : seuls les motifs `rejected` et `expired` sont admis. */
   async refundEscrow(args: { taskId: string; reason: string }) {
+    if (args.reason !== "rejected" && args.reason !== "expired") {
+      throw new ChainError("RPC_ERROR", `Motif de remboursement invalide : ${String(args.reason)} (rejected | expired)`);
+    }
     const e = this.escrows.get(args.taskId);
     if (!e) throw new ChainError("ESCROW_UNKNOWN", `Séquestre inconnu : ${args.taskId}`);
     if (e.status !== "locked") throw new ChainError("ESCROW_SETTLED", `Séquestre déjà ${e.status} : ${args.taskId}`);
     this.acc(e.payer).balance += e.amount;
     e.status = "refunded";
+    e.refundReason = args.reason;
     return this.tx("escrow_refund", `${args.taskId}|${args.reason}`);
   }
 
@@ -157,8 +168,30 @@ export class MockChain implements Chain {
     return e ? { taskId: e.taskId, payer: e.payer, amount: e.amount.toString(), status: e.status } : null;
   }
 
+  /**
+   * Mêmes règles que le contrat : delta entier non nul, |delta| <= 100 ; crédit (delta > 0) seulement si le séquestre
+   * est libéré vers le compte de CET agent avec `proofHash` = `resultHash` de la preuve ; malus (delta < 0) seulement
+   * après un remboursement `rejected` ou `expired` ; une écriture par (tâche, agent).
+   */
   async addReputation(args: { agentId: string; taskId: string; delta: number; proofHash: string }) {
     if (!args.proofHash) throw new ChainError("PROOF_REQUIRED", "Réputation sans preuve refusée");
+    if (!Number.isInteger(args.delta) || args.delta === 0 || Math.abs(args.delta) > 100) {
+      throw new ChainError("RPC_ERROR", `delta invalide : ${args.delta} (entier non nul, |delta| <= 100)`);
+    }
+    const rec = this.records.get(args.agentId);
+    if (!rec) throw new ChainError("UNKNOWN_AGENT", `Agent inconnu : ${args.agentId}`);
+    const e = this.escrows.get(args.taskId);
+    if (!e) throw new ChainError("ESCROW_UNKNOWN", `Séquestre inconnu : ${args.taskId}`);
+    if (args.delta > 0) {
+      if (e.status !== "released") throw new ChainError("PROOF_REQUIRED", `Crédit refusé : séquestre ${e.status}, il doit être libéré (${args.taskId})`);
+      if (e.payee !== rec.accountId) throw new ChainError("PROOF_REQUIRED", `Crédit refusé : séquestre libéré vers ${e.payee}, pas vers ${rec.accountId}`);
+      if (e.resultHash !== args.proofHash) throw new ChainError("PROOF_REQUIRED", "Crédit refusé : proofHash différent du resultHash de la preuve");
+    } else if (e.status !== "refunded") {
+      throw new ChainError("PROOF_REQUIRED", `Malus refusé : séquestre ${e.status}, il doit être remboursé (rejected ou expired) (${args.taskId})`);
+    }
+    const key = `${args.taskId}|${args.agentId}`;
+    if (this.repWrites.has(key)) throw new ChainError("REPUTATION_EXISTS", `Réputation déjà écrite pour ${args.taskId} / ${args.agentId}`);
+    this.repWrites.add(key);
     const total = (this.reputation.get(args.agentId) ?? 0) + args.delta;
     this.reputation.set(args.agentId, total);
     return { total, tx: this.tx("add_reputation", `${args.agentId}|${args.taskId}|${args.delta}`) };
