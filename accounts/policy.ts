@@ -12,8 +12,8 @@ export interface SpendLimit {
 
 export class SpendCapError extends ChainError {
   constructor(public capKind: "per_tx" | "per_window", message: string) {
-    // Pas de code dédié dans shared/ : RPC_ERROR (et non INSUFFICIENT_FUNDS, pour ne pas faire mourir un agent par erreur).
-    super("RPC_ERROR", `SPEND_CAP_EXCEEDED(${capKind}): ${message}`);
+    // Code dédié de shared/ (D-031) : distinct d'INSUFFICIENT_FUNDS pour ne pas faire mourir un agent.
+    super("SPEND_CAP_EXCEEDED", `SPEND_CAP_EXCEEDED(${capKind}): ${message}`);
     this.name = "SpendCapError";
   }
 }

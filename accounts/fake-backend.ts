@@ -19,6 +19,9 @@ export class FakeNearBackend implements NearBackend {
   /** true : release/refund restent `releasing`/`refunding` jusqu'à settle(). */
   deferCallbacks = false;
   failDelete = false;
+  /** Fait échouer les prochains transferts signés par ce compte (nombre de fois). */
+  failTransfersFrom: { accountId: string; times: number } | null = null;
+  onTransfer?: (from: string, to: string, amount: bigint) => void;
   calls: Array<{ method: string; args: Record<string, unknown>; deposit: bigint; signer: string }> = [];
 
   constructor(public operator: string, public contractId = "darwin.test.testnet") {
@@ -54,6 +57,12 @@ export class FakeNearBackend implements NearBackend {
     a.total -= amount;
   }
   async transfer(signer: NearSigner, to: string, amount: bigint) {
+    this.onTransfer?.(signer.accountId, to, amount);
+    const f = this.failTransfersFrom;
+    if (f && f.accountId === signer.accountId && f.times > 0) {
+      f.times--;
+      throw new ChainError("RPC_ERROR", "transfer failed");
+    }
     this.acc(to);
     this.pay(signer.accountId, amount);
     this.acc(to).total += amount;
