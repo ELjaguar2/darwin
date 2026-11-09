@@ -27,12 +27,17 @@
 ## Tests
 `engine/simulation.test.ts` : 3+ générations en preset demo (naissances, travail, reproduction, morts, lettres), invariant de conservation de l'argent, catalogue d'événements, déterminisme par graine, règlement groupé, mutations. Durée : quelques secondes.
 
-## Calibrage (mock, preset demo, tel que dans `shared/config.ts`, aucun changement de preset)
-| Graine | 1re reproduction | 1re naissance de génération 3 | 1re mort | Générations à 900 ticks |
-|---|---|---|---|---|
-| 1 | tick 22 | tick 205 | tick 131 | 4 |
-| 42 | tick 30 | tick 84 | tick 137 | 7 |
-| 99 | tick 41 | tick 96 | tick 150 | 6 |
+## Calibrage (mock, preset demo, 900 ticks)
+Mesuré avec `nearUsdRate=0.01` (valeur du preset demo décidée par l'architecte ; reproduite ici par `DARWIN_NEAR_USD_RATE=0.01` car ces changements de `shared/` n'étaient pas encore commités sur `main`). Avec l'ancien taux de 3, le coût IA était négligeable ; à 0.01 il pèse 2 à 7 NEAR cumulés sur la population, donc le gène « modèle » devient sélectif.
 
-Cibles ARCHITECTURE §12 tenues (reproduction avant tick 60, génération 3 avant tick 300). Population stabilisée vers 9-10 vivants (plafond 16), sélection active (40-58 morts sur 900 ticks).
-Limite constatée : le coût IA est négligeable (~0.01-0.03 NEAR cumulés sur 900 ticks, contre 0.08 NEAR de métabolisme par agent et par tick) : le gène « modèle » n'a quasi aucun effet sélectif. Voir demandes au chef de projet.
+| Graine | 1re reproduction | 1re naissance de génération 3 | 1re mort | Morts | Générations |
+|---|---|---|---|---|---|
+| 1 | tick 22 | tick 135 | tick 131 | 23 | 6 |
+| 42 | tick 30 | tick 84 | tick 137 | 54 | 12 |
+| 99 | tick 41 | tick 96 | tick 150 | 44 | 6 |
+
+Cibles ARCHITECTURE §12 tenues (reproduction avant tick 60, génération 3 avant tick 300). Avec 0.02 : génération 3 aux ticks 199, 84, 96, également conforme.
+
+## Robustesse
+- Règlement groupé : la dette n'est effacée qu'après un transfert réussi (sinon elle reste due et l'erreur remonte). Test dans `failures.test.ts`.
+- `registerAgent` en échec : la naissance est annulée, le compte orphelin est clos et ses fonds retournent à celui qui les a donnés (parent ou maître), avec `system.warning BIRTH_ABORTED` (ou `system.error BIRTH_ORPHAN_ACCOUNT` si le rapatriement échoue aussi). Le parent n'est pas débité et la lettre n'est pas écrite.
