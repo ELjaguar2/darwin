@@ -24,7 +24,7 @@ import type { Yocto } from "../shared/money.ts";
 import type { CauseOfDeath, Genome } from "../shared/types.ts";
 import { MemoryArchive, type AccountArchive } from "./archive.ts";
 import { generateKey, MemoryKeyStore, type KeyStore, type Secret } from "./keys.ts";
-import { LocalLedger } from "./ledger.ts";
+import { LocalLedger, type EscrowRow } from "./ledger.ts";
 import type { NearBackend, NearSigner } from "./near-backend.ts";
 import { SpendPolicy } from "./policy.ts";
 
@@ -126,6 +126,7 @@ export class NearChain implements Chain {
   /** Vérifie RPC (réseau testnet) et existence du compte maître. À appeler au démarrage. */
   async checkReady(): Promise<{ masterBalance: Yocto }> {
     await this.ledger.load();
+    await this.recover();
     const st = await this.o.backend.status();
     if (st.chainId !== "testnet") throw new ChainError("RPC_ERROR", `Réseau inattendu : ${st.chainId} (testnet attendu ; le mainnet est interdit)`);
     const m = await this.o.backend.getState(this.o.masterId);
@@ -394,6 +395,71 @@ export class NearChain implements Chain {
     return (await this.o.backend.view(this.o.contractId!, "get_escrow", { task_id: taskId })) as ContractEscrow | null;
   }
 
+  // --- mode dégradé : règlement sûr (statut transitoire écrit avant le transfert, verrou par taskId) ---
+  private locks = new Map<string, Promise<unknown>>();
+
+  /** Sérialise les opérations sur un même taskId (deux appels concurrents ne paient jamais deux fois). */
+  private withLock<T>(taskId: string, fn: () => Promise<T>): Promise<T> {
+    const prev = this.locks.get(taskId) ?? Promise.resolve();
+    const run = prev.then(fn, fn);
+    const tail = run.catch(() => undefined);
+    this.locks.set(taskId, tail);
+    void tail.then(() => {
+      if (this.locks.get(taskId) === tail) this.locks.delete(taskId);
+    });
+    return run;
+  }
+
+  /** Passe en `releasing`/`refunding` et persiste AVANT le transfert ; en cas d'échec, retour à `locked`. */
+  private async settleLocal(e: EscrowRow, transient: "releasing" | "refunding", to: string, prepare: () => void): Promise<string> {
+    const signer = await this.signerFor(this.escrowAccount);
+    const before = (await this.requireState(this.escrowAccount)).total;
+    prepare();
+    e.status = transient;
+    e.escrowBefore = before.toString();
+    await this.ledger.save();
+    try {
+      return await this.o.backend.transfer(signer, to, BigInt(e.amount));
+    } catch (err) {
+      e.status = "locked";
+      delete e.payee;
+      delete e.proofHash;
+      delete e.reason;
+      delete e.escrowBefore;
+      await this.ledger.save();
+      throw err;
+    }
+  }
+
+  /**
+   * Reprise après plantage (mode dégradé) : pour chaque séquestre resté `releasing`/`refunding`, compare le solde
+   * du compte escrow à celui noté avant le transfert. Solde baissé d'au moins le montant : le transfert a eu lieu
+   * (état final) ; sinon retour à `locked`. Hypothèse : le compte escrow ne sert qu'à ces règlements. Renvoie les taskId repris.
+   */
+  async recover(): Promise<string[]> {
+    if (this.mode !== "degraded") return [];
+    const out: string[] = [];
+    for (const e of Object.values(this.ledger.escrows)) {
+      if (e.status !== "releasing" && e.status !== "refunding") continue;
+      await this.withLock(e.taskId, async () => {
+        if (e.status !== "releasing" && e.status !== "refunding") return;
+        const now = (await this.requireState(this.escrowAccount)).total;
+        const paid = e.escrowBefore !== undefined && now <= BigInt(e.escrowBefore) - BigInt(e.amount);
+        if (paid) e.status = e.status === "releasing" ? "released" : "refunded";
+        else {
+          e.status = "locked";
+          delete e.payee;
+          delete e.proofHash;
+          delete e.reason;
+        }
+        delete e.escrowBefore;
+        await this.ledger.save();
+        out.push(e.taskId);
+      });
+    }
+    return out;
+  }
+
   /** Attend la fin du callback (releasing/refunding -> état final). Rend l'état final observé. */
   private async awaitFinal(taskId: string): Promise<ContractEscrow> {
     const polls = this.o.settlePolls ?? 10;
@@ -413,15 +479,18 @@ export class NearChain implements Chain {
       throw new ChainError("PROOF_REQUIRED", "Libération refusée : preuve de validation absente ou non acceptée");
     }
     if (this.mode === "degraded") {
-      const e = this.ledger.escrows[args.taskId];
-      if (!e) throw new ChainError("ESCROW_UNKNOWN", `Séquestre inconnu : ${args.taskId}`);
-      if (e.status !== "locked") throw new ChainError("ESCROW_SETTLED", `Séquestre déjà ${e.status} : ${args.taskId}`);
-      const hash = await this.o.backend.transfer(await this.signerFor(this.escrowAccount), args.payee, BigInt(e.amount));
-      e.status = "released";
-      e.payee = args.payee;
-      e.proofHash = p.resultHash;
-      await this.ledger.save();
-      return this.receipt("escrow_release", hash, { from: this.escrowAccount, to: args.payee, amount: e.amount });
+      return this.withLock(args.taskId, async () => {
+        const e = this.ledger.escrows[args.taskId];
+        if (!e) throw new ChainError("ESCROW_UNKNOWN", `Séquestre inconnu : ${args.taskId}`);
+        if (e.status !== "locked") throw new ChainError("ESCROW_SETTLED", `Séquestre déjà ${e.status} : ${args.taskId}`);
+        const hash = await this.settleLocal(e, "releasing", args.payee, () => {
+          e.payee = args.payee;
+          e.proofHash = p.resultHash;
+        });
+        e.status = "released";
+        await this.ledger.save();
+        return this.receipt("escrow_release", hash, { from: this.escrowAccount, to: args.payee, amount: e.amount });
+      });
     }
     const hash = await this.o.backend.call(
       this.master,
@@ -438,14 +507,17 @@ export class NearChain implements Chain {
   async refundEscrow(args: { taskId: string; reason: string }) {
     const reason = refundReasonOf(args.reason);
     if (this.mode === "degraded") {
-      const e = this.ledger.escrows[args.taskId];
-      if (!e) throw new ChainError("ESCROW_UNKNOWN", `Séquestre inconnu : ${args.taskId}`);
-      if (e.status !== "locked") throw new ChainError("ESCROW_SETTLED", `Séquestre déjà ${e.status} : ${args.taskId}`);
-      const hash = await this.o.backend.transfer(await this.signerFor(this.escrowAccount), e.payer, BigInt(e.amount));
-      e.status = "refunded";
-      e.reason = reason;
-      await this.ledger.save();
-      return this.receipt("escrow_refund", hash, { from: this.escrowAccount, to: e.payer, amount: e.amount });
+      return this.withLock(args.taskId, async () => {
+        const e = this.ledger.escrows[args.taskId];
+        if (!e) throw new ChainError("ESCROW_UNKNOWN", `Séquestre inconnu : ${args.taskId}`);
+        if (e.status !== "locked") throw new ChainError("ESCROW_SETTLED", `Séquestre déjà ${e.status} : ${args.taskId}`);
+        const hash = await this.settleLocal(e, "refunding", e.payer, () => {
+          e.reason = reason;
+        });
+        e.status = "refunded";
+        await this.ledger.save();
+        return this.receipt("escrow_refund", hash, { from: this.escrowAccount, to: e.payer, amount: e.amount });
+      });
     }
     const hash = await this.o.backend.call(this.master, this.o.contractId!, "refund_escrow", { task_id: args.taskId, reason }, { gas: GAS_SETTLE });
     const fin = await this.awaitFinal(args.taskId);
@@ -456,7 +528,9 @@ export class NearChain implements Chain {
   async getEscrow(taskId: string) {
     if (this.mode === "degraded") {
       const e = this.ledger.escrows[taskId];
-      return e ? { taskId: e.taskId, payer: e.payer, amount: e.amount, status: e.status } : null;
+      if (!e) return null;
+      const status = e.status === "released" ? "released" : e.status === "refunded" ? "refunded" : "locked"; // en cours = locked
+      return { taskId: e.taskId, payer: e.payer, amount: e.amount, status } as const;
     }
     const e = await this.contractEscrow(taskId);
     if (!e) return null;

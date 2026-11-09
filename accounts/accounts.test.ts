@@ -76,7 +76,7 @@ describe("plafonds de dépense", () => {
     try {
       p.check("a", N("100"));
     } catch (e) {
-      expect((e as ChainError).code).toBe("RPC_ERROR");
+      expect((e as ChainError).code).toBe("SPEND_CAP_EXCEEDED");
     }
   });
 });
@@ -316,5 +316,87 @@ describe("NearChain, mode dégradé (sans contrat, D-016)", () => {
     await chain.markAgentDead({ agentId: "a-1", deathTick: 5, cause: "manual" });
     expect((await chain.getAgentRecord("a-1"))?.alive).toBe(false);
     expect((await chain.registerAgent(rec("a-2", "z"))).hash.startsWith("local_")).toBe(true);
+  });
+});
+
+describe("mode dégradé : règlement sûr du séquestre (statut avant transfert, verrou, reprise)", () => {
+  async function degraded() {
+    const t = newChain({ contract: false });
+    const payer = await t.chain.createAccount({ label: "payer", initialFunding: Y("1") });
+    const worker = await t.chain.createAccount({ label: "worker", initialFunding: Y("0.3") });
+    await t.chain.lockEscrow({ taskId: "t-1", payer: payer.accountId, amount: Y("0.2") });
+    return { ...t, payer: payer.accountId, worker: worker.accountId, esc: "escrow.darwin.testnet" };
+  }
+
+  it("le statut releasing est écrit (et sauvegardé) AVANT le transfert", async () => {
+    const { chain, backend, worker, esc } = await degraded();
+    const seen: string[] = [];
+    backend.onTransfer = (from) => {
+      if (from === esc) seen.push(chain.ledger.escrows["t-1"]!.status);
+    };
+    await chain.releaseEscrow({ taskId: "t-1", payee: worker, proof });
+    expect(seen).toEqual(["releasing"]);
+    expect(chain.ledger.escrows["t-1"]!.status).toBe("released");
+  });
+
+  it("appels concurrents : un seul paiement, l'autre refusé", async () => {
+    const { chain, backend, worker, esc } = await degraded();
+    let paid = 0;
+    backend.onTransfer = (from) => {
+      if (from === esc) paid++;
+    };
+    const r = await Promise.allSettled([
+      chain.releaseEscrow({ taskId: "t-1", payee: worker, proof }),
+      chain.releaseEscrow({ taskId: "t-1", payee: worker, proof }),
+      chain.refundEscrow({ taskId: "t-1", reason: "expired" }),
+    ]);
+    expect(r.filter((x) => x.status === "fulfilled")).toHaveLength(1);
+    expect(r.filter((x) => x.status === "rejected").every((x) => (x as PromiseRejectedResult).reason.code === "ESCROW_SETTLED")).toBe(true);
+    expect(paid).toBe(1);
+    expect(await chain.getBalance(worker)).toBe(Y("0.5"));
+  });
+
+  it("double libération séquentielle refusée", async () => {
+    const { chain, worker } = await degraded();
+    await chain.releaseEscrow({ taskId: "t-1", payee: worker, proof });
+    await expect(chain.releaseEscrow({ taskId: "t-1", payee: worker, proof })).rejects.toMatchObject({ code: "ESCROW_SETTLED" });
+  });
+
+  it("transfert en échec : retour à locked, nouvel essai possible, aucun montant perdu", async () => {
+    const { chain, backend, worker, esc } = await degraded();
+    backend.failTransfersFrom = { accountId: esc, times: 1 };
+    await expect(chain.releaseEscrow({ taskId: "t-1", payee: worker, proof })).rejects.toThrow(/transfer failed/);
+    expect(chain.ledger.escrows["t-1"]).toMatchObject({ status: "locked" });
+    expect(chain.ledger.escrows["t-1"]!.payee).toBeUndefined();
+    expect((await chain.getEscrow("t-1"))?.status).toBe("locked");
+    await chain.refundEscrow({ taskId: "t-1", reason: "rejected" });
+    expect((await chain.getEscrow("t-1"))?.status).toBe("refunded");
+  });
+
+  it("reprise après plantage : transfert effectué -> état final ; non effectué -> locked", async () => {
+    const a = await degraded();
+    // plantage APRÈS le transfert : statut resté releasing, solde escrow déjà baissé
+    const rowA = a.chain.ledger.escrows["t-1"]!;
+    const before = await a.chain.getBalance(a.esc);
+    rowA.status = "releasing";
+    rowA.payee = a.worker;
+    rowA.proofHash = "h1";
+    rowA.escrowBefore = before;
+    await a.backend.transfer({ accountId: a.esc, secretKey: generateKey().secretKey }, a.worker, BigInt(rowA.amount));
+    await expect(a.chain.releaseEscrow({ taskId: "t-1", payee: a.worker, proof })).rejects.toMatchObject({ code: "ESCROW_SETTLED" }); // en cours : pas de second paiement
+    expect((await a.chain.getEscrow("t-1"))?.status).toBe("locked");
+    expect(await a.chain.recover()).toEqual(["t-1"]);
+    expect(a.chain.ledger.escrows["t-1"]).toMatchObject({ status: "released", payee: a.worker });
+
+    // plantage AVANT le transfert : solde inchangé -> retour à locked, puis paiement possible
+    const b = await degraded();
+    const rowB = b.chain.ledger.escrows["t-1"]!;
+    rowB.status = "refunding";
+    rowB.reason = "expired";
+    rowB.escrowBefore = await b.chain.getBalance(b.esc);
+    expect(await b.chain.recover()).toEqual(["t-1"]);
+    expect(b.chain.ledger.escrows["t-1"]!.status).toBe("locked");
+    await b.chain.releaseEscrow({ taskId: "t-1", payee: b.worker, proof });
+    expect(await b.chain.getBalance(b.worker)).toBe(Y("0.5"));
   });
 });

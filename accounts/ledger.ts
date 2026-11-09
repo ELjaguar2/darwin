@@ -9,7 +9,9 @@ export interface EscrowRow {
   taskId: string;
   payer: string;
   amount: string; // yocto
-  status: "locked" | "released" | "refunded";
+  /** `releasing`/`refunding` : transfert décidé, pas encore confirmé (écrit AVANT le transfert, reprise par recover()). */
+  status: "locked" | "releasing" | "released" | "refunding" | "refunded";
+  escrowBefore?: string; // solde du compte escrow avant le transfert (sert à la reprise après plantage)
   payee?: string;
   proofHash?: string; // result_hash de la preuve de libération
   reason?: "rejected" | "expired";
