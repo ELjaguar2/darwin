@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createJournal, loadConfig } from "../shared/index.ts";
 import {
@@ -222,5 +225,66 @@ describe("client HTTP 1Click (fetch simulé, aucun réseau)", () => {
     expect((f.mock.calls[0] as unknown as [string])[0]).toBe("https://1click.chaindefuser.com/v0/status?depositAddress=addr+1&depositMemo=memo");
     f.mockImplementationOnce(async () => json(200, { correlationId: "c", status: "WEIRD" }));
     await expect(i.getStatus("a")).rejects.toThrow();
+  });
+});
+
+describe("correctifs sécurité passe 2", () => {
+  it("devis dry:true expiré : refus ; usage unique", async () => {
+    let t = Date.parse("2026-11-09T10:00:00Z");
+    const c = new MockIntents(cfgOf(LIVE).intents, { now: () => new Date(t), dryTtlMs: 60_000 });
+    const p = await params(c);
+    await c.dryQuote(p);
+    t += 61_000;
+    await expect(c.requestDepositQuote(p)).rejects.toThrow(/expiré/);
+    await c.dryQuote(p);
+    await c.requestDepositQuote(p);
+    await expect(c.requestDepositQuote(p)).rejects.toThrow(/dry:true/); // dry consommé
+  });
+  it("plafond USD aussi sur le devis dry:false, et correspondance stricte", async () => {
+    const c = new MockIntents(cfgOf(LIVE).intents, { maxUsd: 5 });
+    const p = await params(c, "1000000000000000000000000");
+    await c.dryQuote(p);
+    const post = (c as unknown as { postQuote(b: unknown): Promise<unknown> }).postQuote.bind(c);
+    const spy = (mut: (r: any) => void) => { (c as any).postQuote = async (b: any) => { const r: any = await post(b); if (!b.dry) mut(r); return r; }; };
+    spy((r) => { r.quote.amountInUsd = "50"; });
+    await expect(c.requestDepositQuote(p)).rejects.toThrow(/plafond/);
+    await c.dryQuote(p);
+    spy((r) => { r.quoteRequest.recipient = "0xAutre"; });
+    await expect(c.requestDepositQuote(p)).rejects.toThrow(/ne correspond pas/);
+    await c.dryQuote(p);
+    spy((r) => { r.quote.amountIn = "1"; });
+    await expect(c.requestDepositQuote(p)).rejects.toThrow(/ne correspond pas/);
+  });
+  it("correlationId : les deux doivent correspondre, aucun ne peut manquer", async () => {
+    const c = new MockIntents(cfgOf(LIVE).intents);
+    const p = await params(c);
+    await c.dryQuote(p);
+    const q = await c.requestDepositQuote(p);
+    c.simulateDeposit(q.depositAddress);
+    const final = await c.waitForTerminal(q, { sleep: noSleep });
+    expect(verifyDeposit(q, final, { mock: true }).accepted).toBe(true);
+    const a = { ...final, correlationId: "autre" };
+    expect(verifyDeposit(q, a, { mock: true }).accepted).toBe(false);
+    const b = { ...final, quoteResponse: { ...final.quoteResponse, correlationId: "autre" } };
+    expect(verifyDeposit(q, b, { mock: true }).accepted).toBe(false);
+    const d = { ...final, correlationId: "" };
+    expect(verifyDeposit(q, d, { mock: true })).toMatchObject({ accepted: false, reason: "correlationId manquant" });
+  });
+  it("DepositLedger persistant : pas de recrédit après redémarrage", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "darwin-led-"));
+    try {
+      const file = join(dir, "data", "credits.json");
+      const c = new MockIntents(cfgOf(LIVE).intents);
+      const p = await params(c);
+      await c.dryQuote(p);
+      const q = await c.requestDepositQuote(p);
+      c.simulateDeposit(q.depositAddress);
+      const r = verifyDeposit(q, await c.waitForTerminal(q, { sleep: noSleep }), { mock: true });
+      if (!r.accepted) throw new Error("preuve attendue");
+      expect(new DepositLedger(file).credit(r.proof)).toMatchObject({ credited: true });
+      const reborn = new DepositLedger(file); // redémarrage
+      expect(reborn.has(q.depositAddress, q.response.correlationId)).toBe(true);
+      expect(reborn.credit(r.proof)).toMatchObject({ credited: false, reason: "déjà crédité" });
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });

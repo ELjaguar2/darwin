@@ -15,6 +15,8 @@ export interface BaseOptions {
   defaultRefundTo?: string;
   defaultRecipient?: string;
   now?: () => Date;
+  /** Durée de validité du devis dry:true préalable (défaut 5 min). */
+  dryTtlMs?: number;
 }
 
 export interface QuoteRequestBody {
@@ -61,7 +63,7 @@ export abstract class BaseIntents implements IntentsClient {
   readonly enabled: boolean;
   protected readonly maxUsd: number;
   protected readonly now: () => Date;
-  private readonly dryUsd = new Map<string, number>();
+  private readonly dryUsd = new Map<string, { usd: number; at: number }>();
   private readonly issuedAddresses = new Set<string>();
 
   constructor(protected readonly cfg: Config["intents"], protected readonly opts: BaseOptions = {}) {
@@ -85,7 +87,7 @@ export abstract class BaseIntents implements IntentsClient {
     assertEnabled(this.cfg);
     const response = await this.postQuote(buildQuoteRequest(params, true, this.now()));
     const usd = Number(response.quote.amountInUsd);
-    this.dryUsd.set(quoteKey(params), Number.isFinite(usd) ? usd : Number.NaN);
+    this.dryUsd.set(quoteKey(params), { usd: Number.isFinite(usd) ? usd : Number.NaN, at: this.now().getTime() });
     const appFeeBps = (response.quoteRequest.appFees ?? []).reduce((s, f) => s + f.fee, 0);
     this.opts.journal?.emit({
       type: "intents.quote",
@@ -110,10 +112,22 @@ export abstract class BaseIntents implements IntentsClient {
     assertLive(this.cfg);
     const key = quoteKey(params);
     if (!this.dryUsd.has(key)) throw new IntentsGuardError("Un devis dry:true identique doit précéder le devis dry:false.");
-    const usd = this.dryUsd.get(key)!;
+    const { usd, at } = this.dryUsd.get(key)!;
+    this.dryUsd.delete(key); // usage unique : un dry:true ne sert qu'un seul dry:false
+    if (this.now().getTime() - at > (this.opts.dryTtlMs ?? 300_000)) throw new IntentsGuardError("Devis dry:true expiré : refaire un dry:true.");
     if (!Number.isFinite(usd)) throw new IntentsGuardError("Valeur USD du devis dry illisible : refus par prudence.");
     if (usd > this.maxUsd) throw new IntentsGuardError(`Montant ${usd} USD > plafond ${this.maxUsd} USD.`);
     const response = await this.postQuote(buildQuoteRequest(params, false, this.now()));
+    // Le devis réel doit correspondre strictement à la demande et respecter le plafond lui aussi.
+    const rq = response.quoteRequest;
+    if (rq.dry !== false || rq.originAsset !== params.originAsset || rq.destinationAsset !== params.destinationAsset
+      || rq.amount !== params.amountIn || rq.recipient !== params.recipient || rq.refundTo !== params.refundTo
+      || response.quote.amountIn !== params.amountIn) {
+      throw new IntentsGuardError("Le devis dry:false ne correspond pas à la demande (actifs, montant, destinataire).");
+    }
+    const liveUsd = Number(response.quote.amountInUsd);
+    if (!Number.isFinite(liveUsd)) throw new IntentsGuardError("Valeur USD du devis dry:false illisible : refus par prudence.");
+    if (liveUsd > this.maxUsd) throw new IntentsGuardError(`Devis réel ${liveUsd} USD > plafond ${this.maxUsd} USD.`);
     const depositAddress = response.quote.depositAddress;
     if (!depositAddress) throw new IntentsGuardError("Réponse dry:false sans depositAddress.");
     this.issuedAddresses.add(depositAddress);

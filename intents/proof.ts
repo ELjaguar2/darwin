@@ -1,5 +1,7 @@
 // Preuve de dépôt : aucun crédit sans preuve vérifiée (CLAUDE.md, D-015).
 // La preuve ne vient JAMAIS de l'utilisateur (hash annoncé) : elle vient de /v0/status, recoupée avec le devis qu'on a nous-mêmes obtenu.
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import type { DepositQuote, ProofResult, StatusResponse, VerifiedDeposit } from "./types.ts";
 
 const issued = new WeakSet<object>();
@@ -21,7 +23,9 @@ function big(v: string | undefined): bigint | undefined {
 export function verifyDeposit(quote: DepositQuote, status: StatusResponse, opts: { mock: boolean }): ProofResult {
   const no = (reason: string): ProofResult => ({ accepted: false, reason });
   if (status.status !== "SUCCESS") return no(`statut ${status.status} != SUCCESS`);
-  if (status.correlationId !== quote.response.correlationId && status.quoteResponse.correlationId !== quote.response.correlationId) {
+  // Tous les identifiants doivent être présents ET égaux à ceux de notre devis.
+  if (!status.correlationId || !status.quoteResponse?.correlationId || !quote.response.correlationId) return no("correlationId manquant");
+  if (status.correlationId !== quote.response.correlationId || status.quoteResponse.correlationId !== quote.response.correlationId) {
     return no("correlationId différent du devis");
   }
   if (status.quoteResponse.quote.depositAddress !== quote.depositAddress) return no("adresse de dépôt différente du devis");
@@ -62,11 +66,28 @@ export function isIssuedProof(p: unknown): p is VerifiedDeposit {
 export class DepositLedger {
   private readonly credited = new Map<string, { amountOut: string; mock: boolean }>();
 
+  /** `file` (ex. data/intents-credits.json, ignoré par git) : persistance atomique, l'idempotence survit au redémarrage. */
+  constructor(private readonly file?: string) {
+    if (file && existsSync(file)) {
+      const raw = JSON.parse(readFileSync(file, "utf8")) as Record<string, { amountOut: string; mock: boolean }>;
+      for (const [k, v] of Object.entries(raw)) this.credited.set(k, v);
+    }
+  }
+
+  private persist(): void {
+    if (!this.file) return;
+    mkdirSync(dirname(this.file), { recursive: true });
+    const tmp = `${this.file}.${process.pid}.tmp`;
+    writeFileSync(tmp, JSON.stringify(Object.fromEntries(this.credited)), "utf8");
+    renameSync(tmp, this.file);
+  }
+
   credit(proof: VerifiedDeposit): { credited: boolean; amountOut: string; reason?: string } {
     if (!isIssuedProof(proof)) throw new Error("Crédit refusé : preuve non émise par verifyDeposit.");
     const key = `${proof.depositAddress}|${proof.correlationId}`;
     if (this.credited.has(key)) return { credited: false, amountOut: proof.amountOut, reason: "déjà crédité" };
     this.credited.set(key, { amountOut: proof.amountOut, mock: proof.mock });
+    try { this.persist(); } catch (e) { this.credited.delete(key); throw e; } // pas de crédit non persisté
     return { credited: true, amountOut: proof.amountOut };
   }
 
