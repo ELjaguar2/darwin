@@ -26,10 +26,10 @@ afterEach(() => {
 // Fausses valeurs assemblées à l'exécution : le scanner de secrets ne doit rien voir dans le dépôt.
 const FAKE = (...p: string[]) => p.join("-");
 const F_API = FAKE("sk", "supersecret", "key", "0123456789");
-const F_ADMIN = FAKE("tok", "secret", "abcdef");
+const F_ADMIN = FAKE("tok", "secret", "abcdef", "0123456789");
 const F_JWT = FAKE("jwt", "secret", "xyz", "123456");
 const F_NEAR = "ed25519" + ":" + "ABCDEFGHIJKLMNOPQRSTUV";
-const F_GOOD = FAKE("le", "bon", "jeton", "123");
+const F_GOOD = FAKE("le", "bon", "jeton", "123", "abcdefghijklmnop");
 const TASK = { title: "Slogan thé", prompt: "Écris un slogan pour une boutique de thé bio.", profession: "writer", budgetNear: "1.5", requesterLabel: "Alice" };
 const post = (app: ReturnType<typeof createApp>, body: unknown, headers: Record<string, string> = {}) =>
   app.request("/api/tasks", { method: "POST", headers: { "content-type": "application/json", ...headers }, body: typeof body === "string" ? body : JSON.stringify(body) });
@@ -245,11 +245,47 @@ describe("administration", () => {
 
   it("R7 : HOST hors 127.0.0.1 sans jeton = démarrage refusé", async () => {
     expect(() => assertSafeBinding("0.0.0.0", undefined)).toThrow(/DARWIN_ADMIN_TOKEN/);
-    expect(() => assertSafeBinding("0.0.0.0", "x")).not.toThrow();
+    expect(() => assertSafeBinding("0.0.0.0", F_ADMIN)).not.toThrow();
     expect(() => assertSafeBinding("127.0.0.1", undefined)).not.toThrow();
     const config = loadConfig({ HOST: "0.0.0.0" });
     const rt = createRuntime(config, { autoRun: false });
     expect(() => createApp(rt)).toThrow(/obligatoire/);
+  });
+});
+
+describe("anti rebond DNS et jeton", () => {
+  const at = (host: string, path: string, init: RequestInit = {}) => new Request(`http://${host}${path}`, init);
+  it("Host forgé refusé (lecture, écriture admin, publication, SSE, statique) ; hôtes locaux acceptés", async () => {
+    const { app } = await setup();
+    for (const bad of ["evil.example", "evil.example:3000", "127.0.0.1.evil.example", "localhost.evil.example:3000"]) {
+      expect((await app.request(at(bad, "/api/health"))).status, bad).toBe(403);
+      expect((await app.request(at(bad, "/api/sim/stop", { method: "POST" }))).status, bad).toBe(403);
+      expect((await app.request(at(bad, "/api/tasks", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(TASK) }))).status, bad).toBe(403);
+      expect((await app.request(at(bad, "/api/stream"))).status, bad).toBe(403);
+      expect((await app.request(at(bad, "/"))).status, bad).toBe(403);
+    }
+    // l'Origin forgé avec le même Host forgé ne passe pas non plus
+    expect((await app.request(at("evil.example", "/api/sim/stop", { method: "POST", headers: { origin: "http://evil.example" } }))).status).toBe(403);
+    for (const ok of ["localhost", "localhost:3000", "127.0.0.1", "127.0.0.1:3000", "[::1]:3000", "LOCALHOST:3000"]) {
+      expect((await app.request(at(ok, "/api/health"))).status, ok).toBe(200);
+    }
+  });
+  it("DARWIN_ALLOWED_HOSTS ajoute des hôtes ; HOST configuré accepté ; * désactive", async () => {
+    const a = await setup({ DARWIN_ALLOWED_HOSTS: "demo.example.org", PORT: "4000" });
+    expect((await a.app.request(at("demo.example.org", "/api/health"))).status).toBe(200);
+    expect((await a.app.request(at("demo.example.org:4000", "/api/health"))).status).toBe(200);
+    expect((await a.app.request(at("other.example.org", "/api/health"))).status).toBe(403);
+    const b = await setup({ HOST: "0.0.0.0", DARWIN_ADMIN_TOKEN: F_ADMIN });
+    expect((await b.app.request(at("0.0.0.0", "/api/health"))).status).toBe(403); // joker réseau, pas un nom
+    const c = await setup({ DARWIN_ALLOWED_HOSTS: "*" });
+    expect((await c.app.request(at("nimporte.quoi", "/api/health"))).status).toBe(200);
+  });
+  it("jeton admin trop court : démarrage refusé", async () => {
+    expect(() => assertSafeBinding("127.0.0.1", "court")).toThrow(/trop court/);
+    expect(() => assertSafeBinding("127.0.0.1", "x".repeat(23))).toThrow(/24/);
+    expect(() => assertSafeBinding("127.0.0.1", "x".repeat(24))).not.toThrow();
+    const rt = createRuntime(loadConfig({ DARWIN_ADMIN_TOKEN: "court" }), { autoRun: false });
+    expect(() => createApp(rt)).toThrow(/trop court/);
   });
 });
 

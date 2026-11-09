@@ -74,7 +74,7 @@ export interface Config {
   brain: "mock" | "nearai";
   seed: number;
   sim: SimParams;
-  server: { host: string; port: number; dataDir: string; adminToken: string | undefined };
+  server: { host: string; port: number; dataDir: string; adminToken: string | undefined; allowedHosts: string[] }; // allowedHosts : noms d'hôte supplémentaires acceptés dans l'en-tête Host (anti rebond DNS) ; "*" = tous
   near: {
     network: "testnet";
     rpcUrl: string;
@@ -158,6 +158,7 @@ export function loadConfig(env: Env = process.env): Config {
       port: num(env, "PORT", 3000),
       dataDir: str(env, "DARWIN_DATA_DIR") ?? "data",
       adminToken: str(env, "DARWIN_ADMIN_TOKEN"),
+      allowedHosts: (str(env, "DARWIN_ALLOWED_HOSTS") ?? "").split(",").map((h) => h.trim().toLowerCase()).filter(Boolean),
     },
     near: {
       network: "testnet",

@@ -24,11 +24,28 @@ export const MAX_OPEN_VISITOR_TASKS = 100;
 const OPEN_STATUSES: ReadonlySet<Task["status"]> = new Set(["posted", "awarded", "submitted"]);
 const ID_RE = /^[a-z]-\d{1,9}$/;
 
-/** D-023 / R7 : hors boucle locale, le jeton d'administration est obligatoire (le démarrage est refusé sinon). */
+export const MIN_ADMIN_TOKEN_LENGTH = 24;
+
+/** D-023 / R7 : hors boucle locale, le jeton d'administration est obligatoire ; tout jeton fait au moins 24 caractères (démarrage refusé sinon). */
 export function assertSafeBinding(host: string, adminToken: string | undefined): void {
   if (host !== LOOPBACK && !adminToken) {
     throw new Error(`HOST=${host} exige DARWIN_ADMIN_TOKEN (obligatoire dès que HOST n'est pas ${LOOPBACK}) : démarrage refusé.`);
   }
+  if (adminToken !== undefined && adminToken.length < MIN_ADMIN_TOKEN_LENGTH) {
+    throw new Error(`DARWIN_ADMIN_TOKEN trop court (minimum ${MIN_ADMIN_TOKEN_LENGTH} caractères) : démarrage refusé.`);
+  }
+}
+
+/** Valeurs d'en-tête Host acceptées (anti rebond DNS) : boucle locale avec ou sans port, HOST configuré, DARWIN_ALLOWED_HOSTS. */
+export function allowedHostSet(host: string, port: number, extra: readonly string[]): Set<string> {
+  const names = ["localhost", "127.0.0.1", "[::1]", host.toLowerCase(), ...extra].filter((h) => h !== "0.0.0.0" && h !== "::");
+  const out = new Set<string>();
+  for (const n of names) {
+    out.add(n);
+    const hasPort = /:\d+$/.test(n.replace(/^\[.*\]/, "")); // [::1] ne compte pas comme un port
+    if (n !== "*" && !hasPort) out.add(`${n}:${port}`);
+  }
+  return out;
 }
 
 export interface AppOptions {
@@ -96,6 +113,13 @@ export function createApp(rt: Runtime, opts: AppOptions = {}): Hono {
     );
     if (c.req.path.startsWith("/api/") && !c.res.headers.has("Cache-Control")) c.header("Cache-Control", "no-store");
   });
+  // Anti rebond DNS : l'en-tête Host doit être un nom attendu (routes de lecture, SSE, écriture, statique).
+  const hosts = allowedHostSet(config.server.host, config.server.port, config.server.allowedHosts);
+  const reqHost = (c: Context) => new URL(c.req.url).host.toLowerCase();
+  app.use("*", async (c, next) => {
+    if (!hosts.has("*") && !hosts.has(reqHost(c))) return c.json(errBody("FORBIDDEN_HOST", "hôte non autorisé (voir DARWIN_ALLOWED_HOSTS)"), 403);
+    await next();
+  });
   const sameOrigin: MiddlewareHandler = async (c, next) => {
     if (c.req.method !== "GET" && c.req.method !== "HEAD") {
       const origin = c.req.header("origin");
@@ -106,7 +130,7 @@ export function createApp(rt: Runtime, opts: AppOptions = {}): Hono {
         } catch {
           /* origine illisible : refusée plus bas */
         }
-        if (!host || host !== c.req.header("host")) return c.json(errBody("FORBIDDEN_ORIGIN", "origine non autorisée"), 403);
+        if (!host || host !== reqHost(c)) return c.json(errBody("FORBIDDEN_ORIGIN", "origine non autorisée"), 403);
       }
     }
     await next();
