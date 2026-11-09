@@ -88,7 +88,7 @@ export class Tree {
     const H = PAD_Y * 2 + (maxGen - 1) * ROW + 30;
     const cw = this.host.clientWidth || 600, ch = this.host.clientHeight || 400;
     const fit = Math.min(cw / W, ch / H);
-    this.scale = Math.max(0.55, Math.min(1.5, fit));
+    this.scale = Math.max(cw < 600 ? 0.85 : 0.55, Math.min(1.5, fit));
     this.W = W; this.H = H;
     this.svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
     this.svg.setAttribute("width", Math.round(W * this.scale));

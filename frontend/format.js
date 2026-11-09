@@ -58,7 +58,8 @@ const TX_KIND = {
 };
 export const txKindLabel = (k) => TX_KIND[k] ?? String(k ?? "transaction");
 
-export function requesterBadge(r) {
+export function requesterBadge(r, serverBadge) {
+  if (serverBadge && r?.kind) return { ...requesterBadge(r), text: serverBadge }; // libellé normalisé fourni par le backend
   if (!r) return { text: "?", cls: "b-neutral" };
   if (r.kind === "simulated") return { text: "simulé", title: "Client artificiel : ces tâches ne viennent pas d'un humain.", cls: "b-sim" };
   if (r.kind === "visitor") return { text: "Visiteur (financé par le compte de démo)", title: "Le visiteur ne paie pas : le compte de démonstration finance la tâche.", cls: "b-visitor" };
@@ -74,6 +75,7 @@ export function h(tag, attrs, ...kids) {
     if (v == null || v === false) continue;
     if (k.startsWith("on") && typeof v === "function") el.addEventListener(k.slice(2), v);
     else if (k === "class") el.className = v;
+    else if (k === "css") Object.assign(el.style, v);
     else if (k === "dataset") Object.assign(el.dataset, v);
     else el.setAttribute(k, v === true ? "" : String(v));
   }

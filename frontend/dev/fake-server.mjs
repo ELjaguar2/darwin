@@ -262,12 +262,22 @@ const state = () => ({
   chain: { kind: TESTNET ? "near" : "mock", masterId: MASTER, contractId: DEGRADED || !TESTNET ? undefined : "darwin." + MASTER },
   brain: { kind: TESTNET ? "nearai" : "mock" },
   generations: Math.max(0, ...[...agents.values()].map((a) => a.generation)),
-  agents: [...agents.values()].map(pub), tasks: [...tasks.values()].slice(-40), letters: [...letters.values()],
+  agents: [...agents.values()].map(pub), tasks: [...tasks.values()].slice(-40).map(withBadge), letters: [...letters.values()],
   lastSeq: journal.length,
   totals: { alive: alive().length, dead: agents.size - alive().length, born: agents.size, tasksSettled: [...tasks.values()].filter((t) => t.status === "settled").length, totalBalance: alive().reduce((x, a) => x + BigInt(a.balance), 0n).toString() },
 });
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".mjs": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".json": "application/json" };
-const send = (res, code, body, headers = {}) => { res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...headers }); res.end(JSON.stringify(body)); };
+const CSP = "default-src 'self'; img-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'";
+/** Forme d'erreur du vrai backend : {error:{code,message,retryable?}} (+ issues de validation pour 400). */
+function normErr(code, body) {
+  if (code < 400 || (body && typeof body.error === "object")) return body;
+  const c = String(body?.error ?? "error").toUpperCase();
+  const retryable = code === 429 || code === 503;
+  return { error: { code: code === 503 && FORCE_TASK_STATUS === 503 ? "VALIDATION_PENDING" : c, message: body?.message ?? body?.issues?.map((i) => i.message).join(" ; ") ?? "Erreur", retryable: retryable || undefined, issues: body?.issues } };
+}
+const badgeOf = (r) => (r.kind === "simulated" ? "simulé" : r.kind === "visitor" ? "Visiteur (financé par le compte de démo)" : "sous-traitance");
+const withBadge = (t) => ({ ...t, badge: badgeOf(t.requester), validatedBy: t.validation?.validator });
+const send = (res, code, body, headers = {}) => { body = normErr(code, body); if (body && body.id && body.requester) body = withBadge(body); res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...headers }); res.end(JSON.stringify(body)); };
 
 function readBody(req) { return new Promise((ok) => { let b = ""; req.on("data", (c) => { b += c; if (b.length > 1e5) req.destroy(); }); req.on("end", () => ok(b)); }); }
 
@@ -295,16 +305,17 @@ const server = http.createServer(async (req, res) => {
   const p = url.pathname;
   try {
     if (p === "/api/stream") {
-      const since = Number(req.headers["last-event-id"] ?? url.searchParams.get("since") ?? 0) || 0;
+      let since = Number(req.headers["last-event-id"] ?? url.searchParams.get("since") ?? 0) || 0;
       res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-store", Connection: "keep-alive", "X-Accel-Buffering": "no" });
       res.write("retry: 1500\n\n");
+      if (since > journal.length) res.write(`event: reset\ndata: ${JSON.stringify({ lastSeq: journal.length })}\n\n`), (since = 0); // serveur redémarré : rejeu complet
       for (const ev of journal) if (ev.seq > since) res.write(`id: ${ev.seq}\nevent: ${ev.type}\ndata: ${JSON.stringify(ev)}\n\n`);
       clients.add(res);
       const ping = setInterval(() => res.write(": ping\n\n"), 15000);
       req.on("close", () => { clearInterval(ping); clients.delete(res); });
       return;
     }
-    if (p === "/api/health") return send(res, 200, { ok: true, mode: TESTNET ? "testnet" : "mock", chain: TESTNET ? "near" : "mock", brain: TESTNET ? "nearai" : "mock", tick, escrow: DEGRADED ? "operator-account" : "contract" });
+    if (p === "/api/health") return send(res, 200, { ok: true, mode: TESTNET ? "testnet" : "mock", mock: !TESTNET, chain: { kind: TESTNET ? "near" : "mock" }, brain: { kind: TESTNET ? "nearai" : "mock" }, tick, escrow: DEGRADED ? "operator-account" : "contract", visitors: { spentHourly: "0", hourlyCap: near(30).toString() } });
     if (p === "/api/config") return send(res, 200, { mode: TESTNET ? "testnet" : "mock", preset: "demo", tickMs: TICK_MS, visitorHourlyCapNear: 30, taskBudgetMin: "0.5", taskBudgetMax: "2.5" });
     if (p === "/api/state") return send(res, 200, state());
     if (p === "/api/agents") return send(res, 200, [...agents.values()].map(pub));
@@ -314,7 +325,7 @@ const server = http.createServer(async (req, res) => {
     if (p === "/api/lineage") return send(res, 200, [...agents.values()].map((a) => ({ id: a.id, parentId: a.parentId, generation: a.generation, status: a.status })));
     if ((m = p.match(/^\/api\/letters\/([\w-]+)$/))) { const l = letters.get(m[1]); return l ? send(res, 200, l) : send(res, 404, { error: "not_found" }); }
     if (p === "/api/tasks" && req.method === "POST") return postTaskHandler(req, res, await readBody(req));
-    if (p === "/api/tasks") return send(res, 200, [...tasks.values()]);
+    if (p === "/api/tasks") return send(res, 200, [...tasks.values()].map(withBadge));
     if ((m = p.match(/^\/api\/tasks\/([\w-]+)$/))) { const t = tasks.get(m[1]); return t ? send(res, 200, { ...t, bids: bidsByTask.get(t.id) ?? [], escrow: escrows.get(t.id) }) : send(res, 404, { error: "not_found" }); }
     if (p === "/api/events") { const since = Number(url.searchParams.get("since") ?? 0), limit = Math.min(1000, Number(url.searchParams.get("limit") ?? 200)); return send(res, 200, { events: journal.filter((e) => e.seq > since).slice(0, limit), lastSeq: journal.length }); }
     if (p.startsWith("/api/")) return send(res, 404, { error: "not_found" });
@@ -323,7 +334,7 @@ const server = http.createServer(async (req, res) => {
     if (!f.startsWith(ROOT) || f.includes(path.sep + "dev" + path.sep)) { res.writeHead(403); return res.end(); }
     fs.readFile(f, (err, buf) => {
       if (err) { res.writeHead(404); return res.end("not found"); }
-      res.writeHead(200, { "Content-Type": MIME[path.extname(f)] ?? "application/octet-stream", "Cache-Control": "no-store" });
+      res.writeHead(200, { "Content-Type": MIME[path.extname(f)] ?? "application/octet-stream", "Cache-Control": "no-store", "Content-Security-Policy": CSP });
       res.end(buf);
     });
   } catch (e) { send(res, 500, { error: "internal", message: String(e?.message ?? e) }); }

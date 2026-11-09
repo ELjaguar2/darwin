@@ -87,6 +87,15 @@ function connect() {
   };
   for (const t of EVENT_TYPES) es.addEventListener(t, onMsg);
   es.onmessage = onMsg;
+  es.addEventListener("reset", () => { // le serveur a redémarré : on vide l'affichage, le rejeu depuis le début suit sur ce même flux
+    const keep = { mode: store.mode, chain: store.chain, brain: store.brain, health: store.health };
+    store.reset(); Object.assign(store, keep);
+    for (const [, n] of tree.nodes) n.g.remove();
+    tree.nodes.clear(); tree.gEdges.replaceChildren(); tree.edges.clear(); tree.gFx.replaceChildren();
+    selectedAgent = null; selectedLetter = null; agentRows.clear(); feedRows.clear(); chronRows.clear(); $("chron").replaceChildren();
+    $("agents").replaceChildren(); $("feed").replaceChildren();
+    tree.schedule(); markDirty("all");
+  });
   es.onerror = () => {
     wasDown = true;
     retries++;
@@ -169,7 +178,7 @@ function pill(cls, strong, rest, title) {
 function renderBanners() {
   const ul = $("banners");
   const mode = store.mode;
-  const mockChain = store.chain.kind === "mock";
+  const mockChain = store.health?.mock ?? store.chain.kind === "mock";
   const mockBrain = store.brain.kind === "mock";
   const esc = store.health?.escrow;
   const items = [];
@@ -188,7 +197,7 @@ function renderBanners() {
 }
 
 function renderTools() {
-  const near = store.chain.kind === "near";
+  const near = store.chain.kind === "near" && !store.health?.mock;
   const esc = store.health?.escrow;
   const tools = [
     ["NEAR testnet (RPC FastNEAR)", near ? "actif : comptes, transferts, preuves en chaîne" : "simulé (mock) : aucun appel réseau", near],
@@ -247,7 +256,7 @@ function renderLineages() {
       h("span", { class: "lin-dot", "aria-hidden": "true" }),
       h("span", { class: "lin-name" }, `Lignée ${s.root.name}`),
       h("span", { class: "lin-bar", role: "img", "aria-label": `${s.alive} vivants sur ${s.total}` },
-        h("span", { class: "lin-total", style: `width:${(s.total / max) * 100}%` }, h("span", { class: "lin-alive", style: `width:${(s.alive / s.total) * 100}%` }))),
+        h("span", { class: "lin-total", css: { width: `${(s.total / max) * 100}%` } }, h("span", { class: "lin-alive", css: { width: `${(s.alive / s.total) * 100}%` } }))),
       h("span", { class: "lin-txt" }, `${s.alive}/${s.total} · gén. ${s.maxGen} · `, h("b", null, st)));
   }));
 }
@@ -273,18 +282,33 @@ function renderFeed() {
     }
     return r;
   });
-  ol.replaceChildren(...rows);
+  syncList(ol, rows);
   const keep = new Set(store.feed.slice(0, 60).map((i) => i.key));
   for (const k of [...feedRows.keys()]) if (!keep.has(k)) feedRows.delete(k);
 }
 
+// Remplace les enfants seulement si l'ordre/le contenu change : un replaceChildren inutile relance les animations CSS.
+function syncList(ul, rows) {
+  const cur = ul.children;
+  if (cur.length === rows.length && rows.every((r, i) => cur[i] === r)) return;
+  const want = new Set(rows);
+  for (const c of [...cur]) if (!want.has(c)) c.remove();
+  rows.forEach((r, i) => { if (ul.children[i] !== r) ul.insertBefore(r, ul.children[i] ?? null); });
+}
+const chronRows = new Map();
 function renderChron() {
-  $("chron").replaceChildren(...store.chronicle.slice(0, 60).map((c) => {
+  const items = store.chronicle.slice(0, 60);
+  syncList($("chron"), items.map((c) => {
+    const ck = c.seq + c.text;
+    if (chronRows.has(ck)) return chronRows.get(ck);
     const icon = { birth: "✦", death: "✝", pay: "◆", letter: "✉", mut: "≈", sys: "•" }[c.kind] ?? "•";
     const li = h("li", { class: `ch-${c.kind}` }, h("span", { class: "ch-i", "aria-hidden": "true" }, icon), h("span", { class: "ch-t" }, c.text), h("span", { class: "ch-tick" }, `t${c.tick}`));
     if (c.agentId) { li.tabIndex = 0; li.classList.add("click"); li.addEventListener("click", () => selectAgent(c.agentId)); li.addEventListener("keydown", (e) => { if (e.key === "Enter") selectAgent(c.agentId); }); }
+    chronRows.set(ck, li);
     return li;
   }));
+  const keep = new Set(items.map((c) => c.seq + c.text));
+  for (const k of [...chronRows.keys()]) if (!keep.has(k)) chronRows.delete(k);
 }
 
 // --- tâches
@@ -292,7 +316,7 @@ function renderTasks() {
   const list = [...store.tasks.values()].sort((a, b) => b.id.localeCompare(a.id)).slice(0, 14);
   $("tasksHint").textContent = store.tasksOpen != null ? `${store.tasksOpen} ouvertes` : "";
   $("tasks").replaceChildren(...list.map((t) => {
-    const rb = requesterBadge(t.requester);
+    const rb = requesterBadge(t.requester, t.badge);
     const win = t.winnerId ? store.name(t.winnerId) : null;
     const price = t.awardPrice ?? t.escrow?.amount;
     const det = h("details", { class: "task", open: openTaskIds.has(t.id) || null, ontoggle: (e) => { e.target.open ? openTaskIds.add(t.id) : openTaskIds.delete(t.id); } },
@@ -306,7 +330,7 @@ function renderTasks() {
         h("p", { class: "t-prompt" }, t.prompt),
         win ? h("p", { class: "small" }, `Attribuée à `, h("b", null, win), price ? ` pour ${formatNear(price, 2)} NEAR` : "", t.bids ? ` (${t.bids} offres)` : "") : null,
         t.expiredReason ? h("p", { class: "small muted" }, `Expirée : ${{ no_bids: "aucune offre", deadline: "délai dépassé", unfunded: "payeur sans fonds", winner_dead: "le gagnant est mort" }[t.expiredReason] ?? t.expiredReason}.`) : null,
-        t.validation ? h("p", { class: "small" }, h("b", null, t.validation.verdict === "accepted" ? "Accepté" : "Rejeté"), ` · validé par : `, h("code", null, t.validation.validator), ` · score ${Number(t.validation.score).toFixed(2)}`, t.validation.reason ? ` · ${t.validation.reason}` : "") : null,
+        t.validation ? h("p", { class: "small" }, h("b", null, t.validation.verdict === "accepted" ? "Accepté" : "Rejeté"), ` · validé par : `, h("code", null, t.validatedBy ?? t.validation.validator), ` · score ${Number(t.validation.score).toFixed(2)}`, t.validation.reason ? ` · ${t.validation.reason}` : "") : null,
         t.result?.text ? h("p", { class: "t-result" }, t.result.text) : null,
         t.result?.resultHash ? h("p", { class: "small muted" }, "Empreinte du résultat : ", h("code", null, shortHash(t.result.resultHash))) : null,
         txLink(t.escrow?.lockTx, "Verrouillage"), txLink(t.escrow?.settleTx, t.escrow?.status === "refunded" ? "Remboursement" : "Paiement")));
@@ -331,7 +355,7 @@ function selectAgent(id) {
 }
 function bar(label, v, lo, hi) {
   const pct = Math.round(((v - lo) / (hi - lo)) * 100);
-  return h("li", null, h("span", null, label), h("span", { class: "gbar", role: "img", "aria-label": `${label} : ${Number(v).toFixed(2)}` }, h("span", { style: `width:${Math.max(3, Math.min(100, pct))}%` })), h("b", null, Number(v).toFixed(2)));
+  return h("li", null, h("span", null, label), h("span", { class: "gbar", role: "img", "aria-label": `${label} : ${Number(v).toFixed(2)}` }, h("span", { css: { width: `${Math.max(3, Math.min(100, pct))}%` } })), h("b", null, Number(v).toFixed(2)));
 }
 async function renderLetters() {
   const fiche = $("fiche");
@@ -419,7 +443,12 @@ form.addEventListener("submit", async (e) => {
       setStatus("warn", "Trop de demandes (429)", [...(m.length ? m : ["Limite atteinte : trop de tâches ouvertes ou plafond horaire du compte de démo."]), retry ? `Réessayez dans ${retry} s.` : "Réessayez dans un moment."]); lockButton(retry || 15);
     } else if (r.status === 503) {
       const m = errorMessages(r.body);
-      setStatus("warn", "Service indisponible (503)", [...(m.length ? m : ["La simulation n'accepte pas de tâche pour le moment."]), "Réessayez dans quelques secondes."]); lockButton(retry || 5);
+      const pending = r.body?.error?.code === "VALIDATION_PENDING"; // état d'attente (validation en cours), pas une panne
+      setStatus("warn", pending ? "Validation en cours : patientez (503)" : "Service indisponible (503)", [...(m.length ? m : ["La simulation n'accepte pas de tâche pour le moment."]), pending ? "Ce n'est pas une panne : réessayez dans un instant." : "Réessayez dans quelques secondes."]); lockButton(retry || 5);
+    } else if (r.status === 413 || r.status === 415) {
+      setStatus("err", r.status === 413 ? "Message trop volumineux (413)" : "Format non accepté (415)", errorMessages(r.body)); lockButton(0);
+    } else if (r.status === 403) {
+      setStatus("err", "Requête refusée (403)", ["Ouvrez la page depuis la même adresse que le serveur (protection anti-CSRF).", ...errorMessages(r.body)]); lockButton(0);
     } else {
       setStatus("err", `Erreur inattendue (${r.status})`, errorMessages(r.body)); lockButton(0);
     }
