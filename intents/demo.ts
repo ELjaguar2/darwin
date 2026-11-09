@@ -42,7 +42,7 @@ async function main() {
     const r = verifyDeposit(q, final, { mock: false });
     console.log(`Statut final : ${final.status}`);
     if (!r.accepted) { console.log(`Preuve REFUSÉE : ${r.reason}`); process.exitCode = 2; return; }
-    new DepositLedger().credit(r.proof);
+    new DepositLedger("data/intents-credits.json").credit(r.proof);
     console.log(`Preuve acceptée. amountOut=${r.proof.amountOut} hashes=${r.proof.txHashes.join(",")}`);
   } else if (cmd === "status") {
     if (!a[0]) throw new Error("depositAddress manquant");
