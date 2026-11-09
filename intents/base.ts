@@ -73,7 +73,7 @@ export abstract class BaseIntents implements IntentsClient {
   // --- transport (à fournir) ---
   protected abstract fetchTokens(): Promise<Token[]>;
   protected abstract postQuote(body: QuoteRequestBody): Promise<QuoteResponse>;
-  protected abstract postSubmit(body: { txHash: string; depositAddress: string; memo?: string }): Promise<StatusResponse>;
+  protected abstract postSubmit(body: { txHash: string; depositAddress: string; memo?: string; nearSenderAccount?: string }): Promise<StatusResponse>;
   protected abstract fetchStatus(depositAddress: string, depositMemo?: string): Promise<StatusResponse>;
 
   async listTokens(): Promise<Token[]> {
@@ -120,11 +120,11 @@ export abstract class BaseIntents implements IntentsClient {
     return { params, response, depositAddress, depositMemo: response.quote.depositMemo, mock: this.mock };
   }
 
-  async submitDeposit(q: DepositQuote, txHash: string): Promise<StatusResponse> {
+  async submitDeposit(q: DepositQuote, txHash: string, o: { nearSenderAccount?: string } = {}): Promise<StatusResponse> {
     assertLive(this.cfg);
     if (!this.issuedAddresses.has(q.depositAddress)) throw new IntentsGuardError("Adresse de dépôt inconnue de cette instance.");
     if (!txHash.trim()) throw new IntentsGuardError("txHash vide.");
-    return this.postSubmit({ txHash: txHash.trim(), depositAddress: q.depositAddress, ...(q.depositMemo ? { memo: q.depositMemo } : {}) });
+    return this.postSubmit({ txHash: txHash.trim(), depositAddress: q.depositAddress, ...(q.depositMemo ? { memo: q.depositMemo } : {}), ...(o.nearSenderAccount ? { nearSenderAccount: o.nearSenderAccount } : {}) });
   }
 
   async getStatus(depositAddress: string, depositMemo?: string): Promise<StatusResponse> {

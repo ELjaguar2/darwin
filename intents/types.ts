@@ -136,7 +136,7 @@ export interface IntentsClient extends Intents {
   /** Devis dry:false (adresse de dépôt). Exige un dry:true identique avant + verrou live. */
   requestDepositQuote(params: QuoteParams): Promise<DepositQuote>;
   /** Informe 1Click du hash de dépôt (le dépôt lui-même est fait par l'humain, jamais par ce code). Verrou live. */
-  submitDeposit(q: DepositQuote, txHash: string): Promise<StatusResponse>;
+  submitDeposit(q: DepositQuote, txHash: string, opts?: { nearSenderAccount?: string }): Promise<StatusResponse>;
   getStatus(depositAddress: string, depositMemo?: string): Promise<StatusResponse>;
   /** Interroge /v0/status jusqu'à un état terminal (ou expiration). */
   waitForTerminal(q: DepositQuote, opts?: { timeoutMs?: number; intervalMs?: number; sleep?: (ms: number) => Promise<void> }): Promise<StatusResponse>;

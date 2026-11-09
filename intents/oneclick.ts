@@ -61,7 +61,7 @@ export class OneClickIntents extends BaseIntents {
     return QuoteResponseSchema.parse(await this.call("POST", "/v0/quote", body)); // renvoie 201 en pratique
   }
 
-  protected async postSubmit(body: { txHash: string; depositAddress: string; memo?: string }): Promise<StatusResponse> {
+  protected async postSubmit(body: { txHash: string; depositAddress: string; memo?: string; nearSenderAccount?: string }): Promise<StatusResponse> {
     return StatusResponseSchema.parse(await this.call("POST", "/v0/deposit/submit", body));
   }
 
