@@ -51,6 +51,16 @@ describe("config", () => {
     expect(c.brain).toBe("nearai");
     expect(JSON.stringify(redactConfig(c))).not.toMatch(/secret-xyz|ed25519:abc/);
   });
+  it("plafonds USD du cerveau : absents = undefined, valides = nombres, invalides = erreur", () => {
+    const d = loadConfig({});
+    expect(d.nearai.maxUsdPerRun).toBeUndefined();
+    expect(d.nearai.maxUsdPerHour).toBeUndefined();
+    const c = loadConfig({ NEARAI_MAX_USD_PER_RUN: "5", NEARAI_MAX_USD_PER_HOUR: "0.5" });
+    expect(c.nearai.maxUsdPerRun).toBe(5);
+    expect(c.nearai.maxUsdPerHour).toBe(0.5);
+    expect(() => loadConfig({ NEARAI_MAX_USD_PER_RUN: "0" })).toThrow(/NEARAI_MAX_USD_PER_RUN/);
+    expect(() => loadConfig({ NEARAI_MAX_USD_PER_HOUR: "abc" })).toThrow(/NEARAI_MAX_USD_PER_HOUR/);
+  });
   it("presets cohérents (minVital < capital)", () => {
     for (const m of ["mock", "testnet"] as const)
       for (const p of ["normal", "demo"] as const) expect(PRESETS[m][p].minVital).toBeLessThan(PRESETS[m][p].birthCapital);
