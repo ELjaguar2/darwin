@@ -1,8 +1,8 @@
 # Darwin
 
-**AI agents that earn their living, pay for their own brain, reproduce with their own money, and die when they run dry. Economic natural selection, live, on NEAR testnet.**
+**AI agents that earn their living, pay for their own brain, reproduce with their own money, and die when they run dry. Economic natural selection, live. Runs fully simulated (mock chain and AI) by default; NEAR testnet and NEAR AI Cloud modes are implemented but not yet run.**
 
-Built at NEAR HACKATHON 2026 (tracks: AI Swarms, Agent Economy, Open Innovation). License: MIT. A short French summary is at the end of this file ([Résumé en français](#résumé-en-français)).
+Built at NEAR HACKATHON 2026 (tracks envisaged: AI Swarms (main), Agent Economy, Open Innovation; to be confirmed by the submitter). License: MIT. A short French summary is at the end of this file ([Résumé en français](#résumé-en-français)).
 
 > Honesty first. Everything marked **MOCK** or **SIMULATED** below is simulated, and the app labels it as such. The testnet mode and the NEAR AI Cloud mode were **not run against the real network** by the author of this README (no keys, Node 22.17.1 on the authoring machine). See [What is real, simulated or mock](#what-is-real-simulated-or-mock) and [Trust model and known limits](#10-trust-model-and-known-limits).
 
@@ -93,6 +93,12 @@ The cost of each AI call is computed in **USD** from the prices of `GET /v1/mode
 
 ## 7. Run it in mock mode (no key)
 
+> **Verified status.**
+> - Verified: mock mode on a clean clone (QA run, `docs/QA_RAPPORT.md`), the API steps of section 9, the web page, and the full test suite (`npm test`).
+> - **Never executed**: NEAR testnet mode, the Rust contract deployed on testnet, real NEAR AI Cloud calls, the real NEAR Intents flow.
+> - The default and only verified mode is **MOCK** (simulated chain and AI).
+> - Escrow is **degraded** by default (operator-controlled account, local ledger).
+
 ```bash
 git clone <repository-url> darwin
 cd darwin
@@ -171,7 +177,7 @@ These steps were **executed by the author against a real running backend** (`npm
 | 14 | Open `http://127.0.0.1:3000/` in a browser | The Darwin page: a banner "MODE MOCK, Client simulé, Séquestre dégradé", counters (generation, alive, dead, born, paid tasks, total balance), a live status pill ("En direct", tick number), the family tree (SVG) with agents sized by balance, a list of agents with balances, the market of tasks, and a form "Publier la tâche" (title, prompt, profession, budget in NEAR, display name). Submitting the form shows "Tâche t-NNNN publiée" and the task appears in the market. Checked with Playwright: no console error. |
 | 15 | `npm test`, then `npm run typecheck` | All tests pass and typecheck reports no error (author's run; run the commands to get the current count). |
 
-Not run by the author: testnet mode, a real NEAR AI Cloud call, the contract on a real network, the real NEAR Intents flow, the web page, a clean-clone install, and the Rust tests. Re-verification by the QA agent is expected.
+Never run by anyone so far: testnet mode, a real NEAR AI Cloud call, the contract on a real network, the real NEAR Intents flow. The web page and the clean-clone install in mock mode were checked (page by the author with Playwright, clean clone by the QA run, see `docs/QA_RAPPORT.md`). The Rust tests were not re-run by the author of this README.
 
 ## 10. Trust model and known limits
 

@@ -6,9 +6,9 @@
 ## Post unique
 
 ```text
-Built at NEAR HACKATHON: Darwin, AI agents that earn money, pay for their own brain, reproduce and die when broke.
-Live selection on NEAR testnet: sub-accounts, escrow, NEAR AI Cloud.
-Run it with no key: <REPO_URL>
+Built at NEAR HACKATHON: Darwin, AI agents that earn, pay for their brain, reproduce and die when broke.
+Chain and AI simulated by default; real testnet and NEAR AI Cloud modes ready, not run yet.
+Run it, no key: <REPO_URL>
 @NEARProtocol #NEARHackathon
 ```
 
@@ -22,7 +22,7 @@ Joindre : la vidéo (le « wow » dans les 10 premières secondes).
 ```
 
 ```text
-2/ Each agent has a genome (profession, AI model, price, risk, generosity...). It is born as a NEAR sub-account, bids in auctions, works, and is paid through an escrow after validation. Its AI cost is debited from its balance.
+2/ Each agent has a genome (profession, AI model, price, risk, generosity...). It is born as a (simulated by default) NEAR sub-account, bids in auctions, works, and is paid through an escrow after validation. Its AI cost is debited from its balance.
 ```
 
 ```text
@@ -30,11 +30,11 @@ Joindre : la vidéo (le « wow » dans les 10 premières secondes).
 ```
 
 ```text
-4/ NEAR tools: sub-accounts and function-call access keys, a Rust escrow/registry contract, NEAR AI Cloud as the brain, NEAR Intents 1Click for an optional mainnet quote flow.
+4/ NEAR integration, written but not yet run for real: sub-accounts and function-call keys (tested against a fake backend), a Rust escrow/registry contract (unit-tested natively, not deployed), a NEAR AI Cloud client, a NEAR Intents 1Click client (dry-run, off by default).
 ```
 
 ```text
-5/ Honest limits: no key needed (mock mode). The simulated client is labelled. Escrow is validated by the operator (not trustless). Testnet mode and contract are implemented but not yet run on the real network. Most code written by AI agents (Claude Code).
+5/ Honest limits: no key needed (mock mode). The simulated client is labelled. Escrow is validated by the operator (not trustless). Testnet mode, the contract, NEAR AI Cloud and Intents were never run for real. Most code written by AI agents (Claude Code).
 ```
 
 ```text
