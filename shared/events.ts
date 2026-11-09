@@ -20,7 +20,7 @@ export interface EventCatalog {
   "task.posted": { task: Task };
   "bid.placed": { bid: Bid };
   "task.awarded": { taskId: string; bidId: string; winnerId: string; price: Yocto; bids: number };
-  "task.expired": { taskId: string; reason: "no_bids" | "deadline" };
+  "task.expired": { taskId: string; reason: "no_bids" | "deadline" | "unfunded" | "winner_dead" };
   "escrow.locked": { taskId: string; payer: string; amount: Yocto; tx: string };
   "task.submitted": { taskId: string; agentId: string; resultHash: string };
   "task.validated": { taskId: string; validation: Validation };

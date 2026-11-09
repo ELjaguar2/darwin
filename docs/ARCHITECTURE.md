@@ -108,6 +108,7 @@ Tout est défini dans `shared/` (code compilé et testé). Résumé ; le détail
 - Registre : `registerAgent` (génome + hash, lignée), `markAgentDead`, `getAgentRecord`, `listAgentRecords` : la lignée est conservée après la mort.
 - Séquestre : `lockEscrow` -> `releaseEscrow` (preuve obligatoire, sinon `ChainError PROOF_REQUIRED`) ou `refundEscrow`.
 - Réputation : `addReputation` (exige `proofHash`), `getReputation`.
+- `AgentRecord.accountId` est le compte payeur (coûts, séquestre) et bénéficiaire (paiements) de l'agent. `getEscrow(taskId)` renvoie `{taskId, payer, amount, status}` (D-030).
 - Toute opération d'écriture renvoie un `TxReceipt` (`hash`, `explorerUrl?`) ; les erreurs sont des `ChainError` typées.
 - Implémentations : `MockChain` (fait ; invariant testé : somme comptes + séquestres constante) ; `NearChain` (L2/L3). Fabrique unique `createChain(config)` dans `accounts/index.ts`.
 
@@ -121,6 +122,11 @@ Tout est défini dans `shared/` (code compilé et testé). Résumé ; le détail
 - `Market` : `postTask`, `placeBid`, `step(tick)`, `submitResult` (valide puis libère ou rembourse), `getTask`, `listTasks`, `openTasks`.
 - `Engine` : `start/pause/resume/stop`, `tick()` (un tick sans horloge, pour les tests), `getState(): SimState`.
 - `Intents` : `quoteDry` seulement.
+
+### 6.3b Propriété des comptes de service et temps (D-027 à D-029)
+- `chain.tx` en mock : `MockChain` n'a pas de journal ; c'est le moteur (`createEngine(deps, market, { emitChainTx: true })`, type `EngineOptions`) qui émet `chain.tx` pour ses transferts. Le backend n'enveloppe pas `MockChain`. Avec `NearChain`, `accounts/` émet déjà : option à false.
+- (D-029) Le marché possède, crée et finance les comptes `sim-client` et `visitors` (`Chain.createAccount`, financement depuis le maître, `funding.received` source `master`/`demo`). Il déduit le tick courant du dernier `step(tick)` ou du journal (pas d'horloge injectée en plus).
+- Calibrage demo : `nearUsdRate` = 0.01 pour que le gène « modèle » pèse dans l'économie (un appel `mock/large` ≈ 0,07 NEAR, `mock/small` ≈ 0,01 NEAR, contre un métabolisme de 0,08/tick). Voir D-028.
 
 ### 6.4 Division du travail agent <-> marché
 L'agent (engine) décide : enchérir ou non, à quel prix (`askRatio` du génome x budget, borné par son coût IA estimé), exécuter (appel `Brain`, coût débité), sous-traiter (créer une tâche fille via `Market.postTask` avec `requester:{kind:"agent"}`). Le marché ne connaît que des identifiants d'agents et des comptes.
@@ -160,7 +166,7 @@ Journal append-only, `seq` croissant sans trou. Ajouter un type exige de modifie
 | `task.posted` | market | task |
 | `bid.placed` | market | bid |
 | `task.awarded` | market | taskId, bidId, winnerId, price, bids |
-| `task.expired` | market | taskId, reason (no_bids/deadline) |
+| `task.expired` | market | taskId, reason (no_bids/deadline/unfunded/winner_dead) |
 | `escrow.locked` | market | taskId, payer, amount, tx |
 | `task.submitted` | market | taskId, agentId, resultHash |
 | `task.validated` | market | taskId, validation |
@@ -171,7 +177,7 @@ Journal append-only, `seq` croissant sans trou. Ajouter un type exige de modifie
 | `brain.charged` | engine | agentId, purpose, model, promptTokens, completionTokens, reasoningTokens, cost, costUsd, nearUsdRate, priceSource (`models`/`mock`), mock, tx |
 | `balance.changed` | engine | agentId, balance, delta, reason (metabolism/brain/task/birth/...) |
 | `funding.received` | engine/backend | to, amount, source (master/faucet/demo), tx |
-| `chain.tx` | accounts (via journal injecté) | kind, from, to, amount, hash, explorerUrl : alimente le « flux de transactions » de l'UI |
+| `chain.tx` | accounts (NearChain, journal injecté) ; engine en mock (`emitChainTx`, D-027) | kind, from, to, amount, hash, explorerUrl : alimente le « flux de transactions » de l'UI |
 | `intents.quote` | intents | devis `dry:true` seulement |
 | `system.warning` / `system.error` | tous | code, message (jamais de secret) |
 
@@ -215,7 +221,7 @@ Détail commenté dans `.env.example` ; valeurs par défaut dans `shared/config.
 | Groupe | Variables |
 |---|---|
 | Mode | `DARWIN_MODE` (mock/testnet), `DARWIN_PRESET` (normal/demo), `DARWIN_CHAIN` (mock/near), `DARWIN_BRAIN` (mock/nearai), `DARWIN_SEED` |
-| Serveur | `HOST`, `PORT`, `DARWIN_DATA_DIR`, `DARWIN_ADMIN_TOKEN` (SECRET, obligatoire si `HOST` != `127.0.0.1`), `DARWIN_VISITOR_HOURLY_CAP_NEAR` (plafond horaire du compte de démo, à ajouter à `shared/config.ts` au lot L6/L7, D-025) |
+| Serveur | `HOST`, `PORT`, `DARWIN_DATA_DIR`, `DARWIN_ADMIN_TOKEN` (SECRET, obligatoire si `HOST` != `127.0.0.1`), `DARWIN_VISITOR_HOURLY_CAP_NEAR` (plafond horaire du compte de démo, en NEAR ; lu dans `sim.visitorHourlyCap: bigint`, défauts : mock normal 20 / demo 30, testnet 0,5 ; D-025, D-026) |
 | NEAR | `NEAR_NETWORK`, `NEAR_RPC_URL`, `NEAR_MASTER_ACCOUNT_ID`, `NEAR_MASTER_PRIVATE_KEY` (SECRET), `NEAR_CONTRACT_ID` |
 | NEAR AI Cloud | `NEARAI_API_KEY` (SECRET), `NEARAI_BASE_URL`, `NEARAI_MODEL`, `NEARAI_TIMEOUT_MS` |
 | Simulation | voir §12 |
@@ -242,9 +248,10 @@ Cible : **3 générations complètes en 3 à 5 minutes** avec `DARWIN_PRESET=dem
 | `DARWIN_BID_WINDOW_TICKS` | 2 | 1 | durée des enchères |
 | `DARWIN_TASK_DEADLINE_TICKS` | 8 | 5 | délai d'exécution |
 | `DARWIN_MUTATION_RATE` / `_SD` | 0.3 / 0.15 | 0.4 / 0.2 | mutation par gène / amplitude relative |
-| `DARWIN_NEAR_USD_RATE` | 3 | 3 | USD par NEAR pour convertir le coût IA |
+| `DARWIN_NEAR_USD_RATE` | 3 | 0.01 (D-028) | USD par NEAR pour convertir le coût IA |
 | `DARWIN_MAX_TOKENS_PER_CALL` | 400 | 300 | plafond de tokens par appel IA |
 | `DARWIN_SETTLE_EVERY_TICKS` | 1 | 1 | regroupement des débits on-chain (4 en testnet) |
+| `DARWIN_VISITOR_HOURLY_CAP_NEAR` | 20 | 30 | plafond horaire du compte `visitors` (testnet : 0,5) ; 429 au-delà |
 
 Ordre de grandeur voulu (à calibrer par dev-moteur, avec la QA) : un fondateur sans revenu meurt en environ (10 - 1,5) / 0,08 = 106 ticks ; un agent qui gagne en moyenne plus de 0,08 + coût IA par tick atteint le seuil de reproduction (`reproThreshold` x capital) avant le tick 60 ; la 3e génération naît avant le tick 300. Si le calibrage échoue, ajuster les presets (fichier `shared/config.ts`), pas le moteur.
 

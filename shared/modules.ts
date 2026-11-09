@@ -50,6 +50,11 @@ export interface SimState {
   totals: { alive: number; dead: number; born: number; tasksSettled: number; totalBalance: Yocto };
 }
 
+/** Options du moteur (D-027). En mock, `emitChainTx: true` : le moteur émet lui-même `chain.tx` pour ses transferts (MockChain n'a pas de journal) ; avec NearChain (accounts/ émet déjà), laisser false. */
+export interface EngineOptions {
+  emitChainTx?: boolean;
+}
+
 /** Moteur d'évolution (dev-moteur-evolution, dossier engine/) : boucle de ticks, cycle de vie, économie des agents. */
 export interface Engine {
   start(): Promise<void>; // crée les fondateurs puis lance la boucle (période config.sim.tickMs)

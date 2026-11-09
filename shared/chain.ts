@@ -36,7 +36,7 @@ export class ChainError extends Error {
 /** Enregistrement du registre on-chain (lignée conservée même après la mort). */
 export interface AgentRecord {
   agentId: string;
-  accountId: string;
+  accountId: string; // compte payeur (coûts, séquestre) ET bénéficiaire (paiements) de l'agent : le marché s'en sert tel quel
   parentId: string | null;
   generation: number;
   genomeHash: string; // sha256 hex du génome JSON canonique
@@ -76,6 +76,7 @@ export interface Chain {
   /** Exige une preuve `accepted` ; sinon ChainError PROOF_REQUIRED. */
   releaseEscrow(args: { taskId: string; payee: string; proof: ReleaseProof }): Promise<TxReceipt>;
   refundEscrow(args: { taskId: string; reason: string }): Promise<TxReceipt>;
+  /** Renvoie le montant et le payeur : suffisant au marché pour rembourser/relire sans état propre. */
   getEscrow(taskId: string): Promise<{ taskId: string; payer: string; amount: Yocto; status: "locked" | "released" | "refunded" } | null>;
 
   // --- réputation ---

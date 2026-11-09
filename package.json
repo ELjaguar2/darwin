@@ -13,7 +13,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "contracts:build": "cd contracts/darwin && cargo near build non-reproducible-wasm",
-    "scan-secrets": "node scripts/scan-secrets.mjs"
+    "scan-secrets": "node scripts/scan-secrets.mjs",
+    "scan:secrets": "node scripts/scan-secrets.mjs"
   },
   "dependencies": {
     "@hono/node-server": "2.1.6",

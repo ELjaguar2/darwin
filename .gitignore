@@ -10,3 +10,5 @@ target/
 .near-credentials/
 data/
 *.log
+# worktrees des agents
+.claude/worktrees/
