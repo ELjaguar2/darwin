@@ -1,3 +1,3 @@
 # Darwin
 
-Placeholder â€” le README final est rÃ©digÃ© par l'agent `redacteur`.
+Placeholder — le README final est rédigé par l'agent `redacteur`.
