@@ -1,6 +1,6 @@
 # SECURITE
 
-> Propriétaire : agent securite. Revue L10 : première passe (L3-L6) puis deuxième passe (L2, L7, L9 et vérification des correctifs), 2026-11-09, sur `main` au commit `98a30a3`. Lecture seule sur le code des autres lots : les constats sont des signalements au chef de projet, rien n'a été corrigé. Aucune valeur secrète n'apparaît dans ce document.
+> Propriétaire : agent securite. Revue L10 : première passe (L3-L6) puis deuxième passe (L2, L7, L9 et vérification des correctifs, `main` au commit `98a30a3`), troisième passe (L8 `frontend/`, après fusion dans `main`), 2026-11-09. Lecture seule sur le code des autres lots : les constats sont des signalements au chef de projet, rien n'a été corrigé. Aucune valeur secrète n'apparaît dans ce document.
 
 ## 1. Modèle de menace (court)
 
@@ -15,7 +15,7 @@
 | API publique (formulaire) | spam, épuisement du compte de démo | plafond horaire visiteurs, 10 tâches ouvertes par IP (backend, L7) |
 | Opérateur (modèle de confiance D-024) | l'opérateur est oracle : ce n'est pas du trustless | divulgation, `validator` et `resultHash` journalisés |
 
-Deuxième passe : `accounts/` (L2), `intents/` (L9) et `backend/` (L7) sont revus au §3.5 à 3.7. Reste hors périmètre : `frontend/` (L8, branche `lot/L8-frontend` non fusionnée : XSS, `innerHTML`, CSP effective à revoir à la fusion).
+Deuxième passe : `accounts/` (L2), `intents/` (L9) et `backend/` (L7) sont revus au §3.5 à 3.7. `frontend/` (L8) est revu au §3.8 (troisième passe, après fusion).
 
 ## 2. État du scan de secrets
 
@@ -169,6 +169,31 @@ Points conformes : `DARWIN_ADMIN_TOKEN` obligatoire dès que `HOST` n'est pas `1
 | NOTE | `app.ts:368` : `serveStatic` n'est monté que si `frontend/index.html` existe ; `frontend/` n'est pas dans `main`. La protection contre la traversée de chemin repose alors sur `@hono/node-server` 2.x (D-007) et sur le rejet des segments cachés. | À tester à la fusion de L8 (`/..%2f`, `/%2e%2e/`, fichiers `.env`). |
 | NOTE | Injection par texte visiteur : le texte n'atteint les modèles qu'en message `user` (JSON pour le juge et `taskMessages`, bloc délimité pour les enchères) ; aucune clé ni donnée sensible n'est dans le contexte d'un modèle. Le pire effet d'une injection est un résultat de mauvaise qualité ou un juge trompé (D-024), pas une fuite. | Accepté, divulgué. |
 
+### 3.8 `frontend/` (L8) : FUSIONNABLE (aucun bloquant ; trois points faibles à corriger avant le déploiement public)
+
+Méthode : lecture de `index.html`, `app.js`, `store.js`, `format.js`, `tree.js`, `theme-init.js`, `favicon.svg` ; backend lancé en mock sur le port 39871 (arrêté ensuite) ; tâches visiteurs réelles publiées par `POST /api/tasks` ; page ouverte avec Playwright (Chromium) sous la CSP réelle du backend, dialogues et erreurs console surveillés ; pages « forgées » (`/api/state` et `/api/stream` simulés) pour injecter lettres, noms d'agents, personnalités, modèles, labels, hashes et URL hostiles et des flux malformés.
+
+Points conformes (vérifiés, pas seulement lus) :
+- **Aucun `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `document.write`, `eval`, `new Function`** (recherche `grep` sur tous les fichiers). Le seul constructeur DOM est `h()` (`format.js:72-87` : `setAttribute` avec des noms d'attributs fixes dans le code, textes via `createTextNode`) et `textContent` pour le SVG (`tree.js:6-11`). Le SVG de l'arbre est construit par `createElementNS` : pas de `foreignObject`, pas de `<use href>` ; les noms d'agents n'entrent que dans `textContent`, `aria-label` et `<title>`.
+- **Charges utiles hostiles inertes** : titre `<img src=x onerror=...>`, consigne `</script><script>...`, `javascript:`, entités `&lt;` et `&#60;`, label `<svg onload=...>`, publiés pour de vrai (201) puis rendus : 0 dialogue, `window.__pwn` jamais défini, 0 `img`/`script`/`svg` injecté, texte affiché littéralement. Même résultat avec une page forgée (nom d'agent, personnalité, modèle, lettre, titre, résultat, validateur, raison, badge serveur, hash de résultat, avertissement système, `kind` de transaction hostiles).
+- **Liens d'explorateur** : seuls deux endroits créent un `<a href>` (`app.js:280`, `349`), les deux avec `target="_blank" rel="noopener noreferrer"`. Une URL explicite n'est acceptée que si elle commence par `https://` (`format.js:39`) ; sinon l'URL est construite sur `testnet.nearblocks.io/txns/` + `encodeURIComponent(hash)` : un hash `javascript:alert(1)` donne `.../txns/javascript%3Aalert(1)`. Aucun lien pour les hashes `mock_`/`local_`. Aucun autre `href`/`src` dynamique.
+- **CSP** : `index.html` n'a ni script ni style inline, ni attribut `style=`, ni gestionnaire `on...=` ; un `<script src>` (`theme-init.js`) et un module (`app.js`) ; styles dynamiques par `el.style.width` (CSSOM, non bloqué par la CSP). Aucune violation CSP ni erreur console sous `script-src 'self'` pendant tous les tests. Aucune ressource externe (pas de CDN, de police, d'image distante).
+- **Dépendances vendorisées : aucune** (pas de bibliothèque copiée, pas de police), donc aucune licence à vérifier ; `favicon.svg` est statique (cercles), sans script.
+- **Stockage local** : seulement `darwin-theme`, relu avec liste blanche `light`/`dark` (`theme-init.js:2`), accès dans `try/catch` (`app.js:22`). Aucun jeton ni donnée de tâche stockés.
+- **Formulaire** (`app.js:417-464`) : `preventDefault`, validation locale (longueurs, budget `^\d+(\.\d{1,6})?$`), bouton désactivé pendant l'envoi (pas de double envoi ; l'envoi implicite par Entrée est aussi bloqué), verrouillage sur 429/503 avec `Retry-After` plafonné à 60 s, corps JSON seul, statuts 400/403/413/415/429/503 affichés via `textContent`. Aucun secret ni information interne exposé (messages venant du backend, déjà filtrés par `safeErrorMessage`). Budget hors bornes : le serveur renvoie 400 `BUDGET_OUT_OF_RANGE` (testé).
+- **Statique côté backend** : traversée impossible. Testé sur le serveur lancé : `/%2e%2e/package.json`, `/..%2fpackage.json`, `/%2e%2e%2f%2e%2e%2f.env`, `/..%5cpackage.json`, `/dev/../../package.json`, `/..\..\package.json`, `/.env` : tous 404. Un `Host: evil.com` reçoit 403 (liste blanche `allowedHostSet`, `app.ts:40-49,117-122`) : le constat « rebond DNS » du §3.7 est donc corrigé pour toutes les routes.
+
+| Gravité | Constat | Correctif proposé |
+|---|---|---|
+| À CORRIGER (faible) | `backend/app.ts:~375-376` : `serveStatic({ root: frontendDir })` sert TOUT `frontend/` hors fichiers cachés. Vérifié en HTTP 200 : `/dev/e2e.cjs`, `/dev/fake-server.mjs`, `/dev/real.cjs`, `/dev/shot.cjs`, `/screens/*.png` (277 Ko), `/README.md`. Aucun secret dans ces fichiers (relus), pas de traversée, mais des scripts de test et un faux serveur n'ont rien à faire sur une instance publique. | Dans `app.ts` (dev-backend) : refuser `/dev/` et `/screens/`, ou ne servir qu'une liste blanche (`index.html`, `app.js`, `store.js`, `tree.js`, `format.js`, `theme-init.js`, `style.css`, `favicon.svg`) ; ou sortir `dev/` et `screens/` de `frontend/` (dev-frontend). Test : `GET /dev/e2e.cjs` = 404. |
+| À CORRIGER (faible, avant déploiement public) | `backend/app.ts:112` : `style-src 'self' 'unsafe-inline'` reste alors que le frontend n'a plus de style inline (NOTE du §3.7 : « retirer quand L8 n'en a plus besoin »). Seule la page de repli de `/` (balise `<style>`, utilisée quand `frontend/index.html` est absent) l'exige. | Retirer `'unsafe-inline'` ; pour la page de repli, un hachage `'sha256-...'` ou une CSP propre à cette route. Non testé sans `unsafe-inline` : à valider avec `frontend/dev/real.cjs` (console). |
+| À CORRIGER (faible) | `frontend/index.html:97` : le formulaire n'avertit toujours pas que titre, consigne et nom affiché sont **publics** (visibles via `/api/state`, `/api/events`, SSE) ; reprise du NOTE §3.7. | Ajouter : « Ne saisissez aucune donnée personnelle : tout est public. » (dev-frontend). |
+| NOTE | `frontend/format.js:39` : une `explorerUrl` fournie par un événement `chain.tx` est acceptée sur n'importe quel hôte `https://` (testé : `https://evil.example/x` devient un lien cliquable). Pas de XSS (`https` seulement, `noopener noreferrer`) et l'événement vient du backend, mais ce serait un hameçonnage discret si un texte visiteur atteignait ce champ. | Liste d'hôtes (`testnet.nearblocks.io`, `nearblocks.io`) ou construction locale de l'URL. |
+| NOTE | `frontend/app.js:80-87` : (1) un message SSE `null` (JSON valide) lève `TypeError` (`ev.seq`, `:83`) ; (2) un message illisible ne consomme pas son `seq` : l'événement suivant déclenche `connect()` aussitôt, sans délai (`:83-85`), et le rejeu depuis `lastSeq` renvoie le même message, d'où une boucle de reconnexions serrée si le serveur émettait durablement un événement non analysable (testé : seconde requête `/api/stream` immédiate). Le backend n'en produit pas (tous les types du journal sont dans `EVENT_TYPES`, vérifié) ; (3) `BigInt(d.delta)` (`app.js:126`, `store.js:153,168`) lève sur une valeur non numérique après `store.apply`, sans rafraîchissement. Aucun cas n'exécute de code ni ne casse la page (testé). | `if (!ev \|\| typeof ev !== "object") return;` ; backoff sur la reconnexion de rattrapage ; `try/catch` autour de `handleEvent` ; conversion `BigInt` tolérante. |
+| NOTE | `frontend/store.js` : `tasks`, `letters`, `bidCount`, `agents` non bornés (5 000 `task.posted` envoyés : 5 000 entrées, rendu limité à 14 lignes ; flux et chronique bornés à 120). Message de 3 Mo accepté. Pas de gel observé ; flux de confiance et plafonné côté serveur (§3.7). | Limiter `tasks` à environ 300 entrées ; ignorer un `m.data` trop long. |
+| NOTE | `frontend/app.js:469` : `window.__darwin = { store, tree }` exposé « pour tests ». Aucun secret dans le store. | Derrière `?debug=1` ou supprimé pour la démo publique. |
+| NOTE | `frontend/app.js:26-32` : `api()` sans délai (`AbortController`) ; une réponse bloquée gèle `loadState`. | Délai de 10 s. |
+
 ## 4. Verdicts
 
 BLOQUANT = interdit la fusion ; À CORRIGER = avant l'étape indiquée ; FUSIONNABLE = aucun bloquant.
@@ -182,7 +207,7 @@ BLOQUANT = interdit la fusion ; À CORRIGER = avant l'étape indiquée ; FUSIONN
 | L2-comptes | fusionné | FUSIONNABLE | aucun | testnet : double paiement possible en séquestre dégradé (`near-chain.ts:415-448`), code `SPEND_CAP_EXCEEDED` |
 | L9-intents | fusionné | FUSIONNABLE | aucun | démo mainnet : recontrôle du devis live, durée de validité du dry, `correlationId`, registre persistant |
 | L7-backend | fusionné | FUSIONNABLE | aucun | testnet public : liste blanche `Host`, jeton fort, IP derrière proxy |
-| L8-frontend | non fusionné | NON REVU | - | à revoir à la fusion (XSS, `innerHTML`) |
+| L8-frontend | fusionné | FUSIONNABLE | aucun | déploiement public : ne pas servir `frontend/dev` ni `screens`, retirer `style-src 'unsafe-inline'`, avertissement « données publiques » dans le formulaire |
 
 **Historique git : 7 valeurs factices détectées par le scan (§2.1).** Ce n'est pas un secret, mais le scan de publication reste en échec tant que l'option B (réécriture) n'est pas faite ou que l'option A n'est pas actée par l'humain. À traiter AVANT la publication du dépôt.
 
@@ -202,7 +227,7 @@ Aucun secret réel détecté, aucun crédit sans preuve constaté (le module Int
 - [ ] Plafonds en place : tokens par appel, budget par appel, budget global IA, plafond horaire visiteurs, tâches ouvertes.
 - [ ] Mainnet et `dry:false` désactivés (`INTENTS_ENABLED` absent ou faux, `INTENTS_DRY_ONLY` vrai) ; aucune dépense réelle sans feu vert écrit dans `docs/BESOINS_HUMAIN.md`.
 - [ ] Routes d'administration derrière `DARWIN_ADMIN_TOKEN` dès que `HOST` n'est pas `127.0.0.1` ; aucune route ne renvoie la configuration brute.
-- [ ] Frontend : aucun `innerHTML` sur du contenu d'agent ou de visiteur.
+- [ ] Frontend : aucun `innerHTML` sur du contenu d'agent ou de visiteur (vérifié sur L8 par `grep` et test Playwright, §3.8).
 
 ### 5.2 Avant la publication du dépôt (par l'humain, règle 5)
 
@@ -222,6 +247,7 @@ Aucun secret réel détecté, aucun crédit sans preuve constaté (le module Int
 - [ ] `NEARAI_MAX_USD_PER_RUN` et `NEARAI_MAX_USD_PER_HOUR` fixés (défauts 2 USD et 1 USD) et consignés dans `docs/BESOINS_HUMAIN.md` ; `NEARAI_BASE_URL` en https.
 - [ ] Backend : `HOST=127.0.0.1` derrière un proxy TLS, ou `DARWIN_ADMIN_TOKEN` d'au moins 24 caractères ; liste blanche `Host` ajoutée ; adresses IP du proxy gérées ; `data/` hors dépôt, dossier `data/keys` protégé.
 - [ ] `DARWIN_VISITOR_HOURLY_CAP_NEAR` en accord avec le faucet (défaut testnet 0,5 NEAR par heure).
+- [ ] `GET /dev/e2e.cjs` et `/screens/...` renvoient 404 ; CSP sans `style-src 'unsafe-inline'` (§3.8).
 - [ ] Le formulaire prévient que les textes sont publics ; badge « dégradé » / « mock » visible (D-022).
 - [ ] `npm test`, `npm run typecheck` verts ; scan de secrets propre sur l'arbre.
 

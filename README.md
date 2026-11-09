@@ -36,7 +36,7 @@ Tasks come from three sources, always labelled: a **simulated client** ("Client 
 One Node process (TypeScript, Hono) assembles independent modules behind interfaces (`Chain`, `Brain`, `Market`). Mock and real implementations are interchangeable.
 
 ```
-                        browser (frontend/, planned: see section 12)
+                        browser (frontend/, static page, see section 12)
                               |  HTTP + SSE (/api/stream)
  +----------------------------v-----------------------------------+
  | backend/  Hono API, SSE, rate limits, journal, persistence      |
@@ -151,7 +151,7 @@ All variables and defaults: `.env.example`. Keep keys in `.env` only.
 
 ## 9. Test steps: "Do X, you will see Y"
 
-These steps were **executed by the author against a real running backend** (`npm run start:mock` and `npm run start:demo`, on port 3100 instead of 3000, Windows 11, Node 22.17.1, 2026-11-09). Ids, hashes and timings vary between runs. Steps that need the web page are marked *(to verify once the frontend is merged)*; no other step needs it.
+These steps were **executed by the author against a real running backend** (`npm run start:mock` and `npm run start:demo`, on port 3100 instead of 3000, Windows 11, Node 22.17.1, 2026-11-09). Ids, hashes and timings vary between runs. Step 14 (the web page) was checked by opening the page with Playwright (headless Chromium) against the running demo preset.
 
 | # | Do | You will see |
 |---|---|---|
@@ -164,12 +164,12 @@ These steps were **executed by the author against a real running backend** (`npm
 | 7 | About 15 seconds later: `curl http://127.0.0.1:3000/api/tasks/<id from step 6>` | `"status":"settled"`, a `winnerId`, a `bids` list, a `validation` with `"verdict":"accepted"` and `"validatedBy":"brain:mock/small"`, and an `escrow` with `"status":"released"` and a `proof` (`resultHash`, `verdict`, `validator`). The result text starts with `[mock]`: it comes from the mock brain. |
 | 8 | Same POST with `"title":"x","prompt":"short"` | `{"error":{"code":"INVALID_INPUT",...}}` (HTTP 400). |
 | 9 | `curl http://127.0.0.1:3000/api/lineage` | `generations` (2 or more after a minute), `roots` (the 4 founders) and `nodes` with `parentId`, `status`, `balance`. |
-| 10 | `curl "http://127.0.0.1:3000/api/events?limit=1000"`, find `"type":"letter.written"` and its `toAgentId`, then `curl http://127.0.0.1:3000/api/agents/<toAgentId>/letter` | `{"letter":{"fromAgentId":...,"toAgentId":...,"text":"[mock] Cher enfant, ...","mock":true,...}}`. A founder has no letter (404). |
+| 10 | `curl "http://127.0.0.1:3000/api/events?limit=1000"`, find an event `"type":"letter.written"` (the ids are nested: `data.letter.toAgentId`; `/api/events` returns at most 1000 events per call, use `since=<lastSeq>` to page further), then `curl http://127.0.0.1:3000/api/agents/<toAgentId>/letter` | `{"letter":{"fromAgentId":...,"toAgentId":...,"text":"[mock] Cher enfant, ...","mock":true,...}}`. A founder has no letter (404). |
 | 11 | `curl "http://127.0.0.1:3000/api/tasks?limit=50"` | Tasks with `badge` `"simulé"` (`"requester":{"kind":"simulated","label":"Client simulé"}`), `"sous-traitance"` (agent to agent), and your visitor task. |
 | 12 | `curl -X POST http://127.0.0.1:3000/api/sim/pause`, then `.../api/sim/resume` | `{"ok":true,"running":true,"paused":true,"tick":N}`, then `"paused":false`. (With no `DARWIN_ADMIN_TOKEN` these routes are open only because the server listens on 127.0.0.1.) |
 | 13 | Stop the server (Ctrl+C), run `npm run start:demo`, wait about 90 seconds, then `curl "http://127.0.0.1:3000/api/agents?status=dead"` and `curl http://127.0.0.1:3000/api/lineage` | Dead agents with `"causeOfDeath":"starvation"` (15 dead and 5 generations at tick 238 in the author's run, about 95 s). |
-| 14 | Open `http://127.0.0.1:3000/` in a browser | Until the frontend is merged: a minimal fallback page ("Darwin", raw state, auto-refresh). Once merged, it should show the family tree, balances, births, deaths, the transaction flow and the task form *(to verify once the frontend is merged)*. |
-| 15 | `npm test`, then `npm run typecheck` | Author's run: 8 test files, 161 tests passed; typecheck with no error. |
+| 14 | Open `http://127.0.0.1:3000/` in a browser | The Darwin page: a banner "MODE MOCK, Client simulé, Séquestre dégradé", counters (generation, alive, dead, born, paid tasks, total balance), a live status pill ("En direct", tick number), the family tree (SVG) with agents sized by balance, a list of agents with balances, the market of tasks, and a form "Publier la tâche" (title, prompt, profession, budget in NEAR, display name). Submitting the form shows "Tâche t-NNNN publiée" and the task appears in the market. Checked with Playwright: no console error. |
+| 15 | `npm test`, then `npm run typecheck` | All tests pass and typecheck reports no error (author's run; run the commands to get the current count). |
 
 Not run by the author: testnet mode, a real NEAR AI Cloud call, the contract on a real network, the real NEAR Intents flow, the web page, a clean-clone install, and the Rust tests. Re-verification by the QA agent is expected.
 
@@ -197,7 +197,16 @@ Not run by the author: testnet mode, a real NEAR AI Cloud call, the contract on 
 
 ## 12. Frontend (web page)
 
-The web page would live in `frontend/` and is **being built in a separate work package; it is not merged yet**. It is meant to show, live, the family tree, balances, births and deaths, the transaction flow and a task form, reading only `/api/*` and `/api/stream`. Until it is merged, the backend serves a minimal fallback page at `/` and everything above works through the API. *(To verify once the frontend is merged.)* The server sends a strict Content-Security-Policy, so the page must load no external resource and no inline script.
+The web page is in `frontend/` (plain HTML, CSS and ES modules, no build step, no external resource) and is served by the backend at `/`. It shows, live: the family tree, balances, births and deaths, the transaction flow, the task market ("validé par : ..."), parent-to-child letters, and a form to post a task. It reads only `/api/*` and `/api/stream`. It also displays the honesty labels: MODE MOCK, "Client simulé", "Visiteur (financé par le compte de démo)", "Séquestre dégradé". The server sends a strict Content-Security-Policy, so the page loads no external resource and no inline script. More: [`frontend/README.md`](frontend/README.md).
+
+## Known limitations
+
+- The **testnet mode has never been run end to end** on the real network (only against a fake NEAR backend).
+- The **Rust contract is compiled and unit-tested natively but not deployed**; its WASM was not built with `cargo-near`. Escrow is therefore **degraded by default** (operator-controlled account, local ledger).
+- **NEAR AI Cloud has never been called for real in tests** (chat completions); only `/models` was observed.
+- **NEAR Intents (real flow) has never been replayed**; the default is dry-run quotes only.
+- **Node >= 22.22.2 is required** for `near-api-js` (testnet mode); mock mode needs Node >= 22.12.
+- Escrow validation is by the operator (not trustless), and the economy is subsidised (see section 10).
 
 ## 13. Repository structure
 
@@ -212,7 +221,7 @@ intents/     NEAR Intents 1Click client (off by default)
 shared/      types, bigint money, event bus, config, MockChain and MockBrain
 scripts/     secret scanner (and submission-form check)
 docs/        SPECS, CONFORMITE, ARCHITECTURE, DECISIONS, SECURITE, STATUS, submission drafts
-frontend/    web page (not merged yet)
+frontend/    web page (static HTML, CSS, ES modules)
 ```
 
 ## 14. License
@@ -230,4 +239,4 @@ MIT, see [`LICENSE`](LICENSE).
 - **Ce qui est simulé** : chaîne et IA en mode mock ; client « simulé » étiqueté ; tâches de visiteurs financées par un compte de démo de l'opérateur. Le coût IA est converti en NEAR de testnet à un taux fixe configurable et débité vers le compte maître ; la vraie facture est payée en USD par l'opérateur.
 - **Modèle de confiance** : le compte maître est l'oracle de validation du séquestre ; ce n'est pas « trustless ». Si le contrat n'est pas déployé, le séquestre est « dégradé » (compte piloté par l'opérateur, registre local). L'économie est subventionnée et en boucle fermée.
 - **Divulgation** : la majeure partie du code a été écrite par des agents IA (Claude Code) sous la direction d'un humain ; bibliothèques tierces : celles de `package.json` ; licence MIT.
-- **Frontend** : en cours dans un autre lot ; il sera décrit définitivement à la fusion.
+- **Frontend** : page web statique servie sur `/` (arbre généalogique, soldes, flux de transactions, marché, lettres, formulaire de tâche, bandeaux d'honnêteté « mode mock », « client simulé », « séquestre dégradé »).
