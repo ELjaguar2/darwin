@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  MockBrain, MockChain, createJournal, createRng, hashObject, loadConfig, parseNear, type Agent, type Deps, type Journal,
+  BrainError, MockBrain, MockChain, createJournal, createRng, hashObject, loadConfig, parseNear, type Agent, type Deps, type Journal,
 } from "../shared/index.ts";
 import {
-  MarketError, VISITOR_FUNDING_LABEL, brainJudge, clientValidator, createMarket, createSimulatedClient, judgeMessages,
+  JudgeUnavailableError, MarketError, VISITOR_FUNDING_LABEL, brainJudge, clientValidator, createMarket, createSimulatedClient, judgeMessages,
   parseJudgeVerdict, ruleValidator, taskMessages, type MarketOptions, type Validator,
 } from "./index.ts";
 
@@ -152,14 +152,14 @@ describe("cas d'échec", () => {
     await expect(s.market.submitResult({ taskId: t.id, agentId: "a-0001", text: GOOD })).rejects.toMatchObject({ code: "NOT_AWARDED" });
   });
 
-  it("validateur qui échoue : rien n'est payé ni remboursé, la tâche reste attribuée", async () => {
+  it("validateur qui échoue : rien n'est payé ni remboursé, la tâche reste en attente de validation", async () => {
     const boom: Validator = { id: "rule:boom", validate: async () => { throw new Error("panne"); } };
     const s = await setup({ validators: { visitor: boom } });
     const t = await post(s.market);
     await s.market.placeBid({ taskId: t.id, agentId: "a-0001", price: N("0.5"), etaTicks: 1 });
     await s.market.step(1);
-    await expect(s.market.submitResult({ taskId: t.id, agentId: "a-0001", text: GOOD })).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
-    expect(s.market.getTask(t.id)!.status).toBe("awarded");
+    await expect(s.market.submitResult({ taskId: t.id, agentId: "a-0001", text: GOOD })).rejects.toMatchObject({ code: "VALIDATION_PENDING", httpStatus: 503 });
+    expect(s.market.getTask(t.id)!.status).toBe("submitted");
     expect((await s.chain.getEscrow(t.id))!.status).toBe("locked");
   });
 
@@ -314,7 +314,85 @@ describe("validation et sécurité du texte", () => {
     expect(floor.verdict).toBe("rejected");
   });
 
-  it("juge indisponible : repli sur la règle, avertissement journalisé", async () => {
+  describe("juge indisponible avec un cerveau réel : échec fermé", () => {
+    /** Cerveau « réel » (kind nearai) dont le comportement est piloté par le test. */
+    function realBrain(behave: { mode: "ok" | "down" | "rate" | "garbage" }) {
+      const inner = new MockBrain();
+      return {
+        kind: "nearai" as const,
+        behave,
+        listModels: () => inner.listModels(),
+        defaultModel: () => inner.defaultModel(),
+        async complete(req: Parameters<MockBrain["complete"]>[0]) {
+          if (behave.mode === "down") throw new Error("réseau");
+          if (behave.mode === "rate") throw new BrainError("RATE_LIMITED", "30 appels/minute atteints", 429);
+          const r = await inner.complete(req);
+          return behave.mode === "garbage" ? { ...r, text: "peut-être" } : r;
+        },
+      };
+    }
+    async function ready(mode: "ok" | "down" | "rate" | "garbage") {
+      const s = await setup();
+      const brain = realBrain({ mode });
+      const market = createMarket({ ...s.deps, brain });
+      const t = await post(market);
+      await market.placeBid({ taskId: t.id, agentId: "a-0001", price: N("0.5"), etaTicks: 1 });
+      await market.step(1);
+      return { s, brain, market, t };
+    }
+
+    for (const mode of ["down", "rate", "garbage"] as const) {
+      it(`${mode} : aucune libération, validation différée puis reprise au step suivant`, async () => {
+        const { s, brain, market, t } = await ready(mode);
+        await expect(market.submitResult({ taskId: t.id, agentId: "a-0001", text: GOOD })).rejects.toMatchObject({ code: "VALIDATION_PENDING" });
+        expect(market.getTask(t.id)!.status).toBe("submitted");
+        expect(market.getTask(t.id)!.validation).toBeUndefined();
+        expect((await s.chain.getEscrow(t.id))!.status).toBe("locked");
+        expect(s.types()).not.toContain("escrow.released");
+        expect(s.journal.since(0).filter((e) => e.type === "system.warning").map((e) => (e.data as { code: string }).code)).toEqual(expect.arrayContaining(["JUDGE_UNAVAILABLE", "VALIDATION_PENDING"]));
+        await market.step(2); // toujours en panne : toujours rien
+        expect(market.getTask(t.id)!.status).toBe("submitted");
+        expect((await s.chain.getEscrow(t.id))!.status).toBe("locked");
+        brain.behave.mode = "ok";
+        await market.step(3);
+        const done = market.getTask(t.id)!;
+        expect(done.status).toBe("settled");
+        expect(done.validation!.validator).toMatch(/^brain:/);
+        expect(await s.chain.getReputation("a-0001")).toBe(1);
+        expect(s.chain.totalSupply()).toBe(s.supply);
+      });
+    }
+
+    it("jamais rétabli : remboursement après le délai de grâce, sans pénalité de réputation pour l'agent", async () => {
+      const { s, market, t } = await ready("down");
+      await expect(market.submitResult({ taskId: t.id, agentId: "a-0001", text: GOOD })).rejects.toMatchObject({ code: "VALIDATION_PENDING" });
+      await market.step(4);
+      await market.step(7); // deadline 4 + grâce 3 : encore en attente
+      expect(market.getTask(t.id)!.status).toBe("submitted");
+      await market.step(8);
+      expect(market.getTask(t.id)!.status).toBe("expired");
+      expect((await s.chain.getEscrow(t.id))!.status).toBe("refunded");
+      expect(await s.chain.getReputation("a-0001")).toBe(0);
+      expect(s.types()).not.toContain("escrow.released");
+      expect(s.chain.totalSupply()).toBe(s.supply);
+    });
+
+    it("jamais de libération par la seule règle de longueur avec un cerveau réel", async () => {
+      const { s, market, t } = await ready("down");
+      await market.submitResult({ taskId: t.id, agentId: "a-0001", text: GOOD }).catch(() => undefined);
+      const v = await brainJudge({ brain: realBrain({ mode: "down" }) as never, journal: s.journal, config: s.config }).validate({ task: market.getTask(t.id)!, agentId: "a-0001", text: GOOD, resultHash: "h", tick: 0 }).catch((e) => e);
+      expect(v).toBeInstanceOf(JudgeUnavailableError);
+    });
+
+    it("règle de base rejette sans appeler le juge (même panne)", async () => {
+      const { s, market, t } = await ready("down");
+      const r = await market.submitResult({ taskId: t.id, agentId: "a-0001", text: "trop court" });
+      expect(r.validation.verdict).toBe("rejected");
+      expect((await s.chain.getEscrow(t.id))!.status).toBe("refunded");
+    });
+  });
+
+  it("juge indisponible en mode mock : repli sur la règle, avertissement journalisé", async () => {
     const s = await setup();
     s.deps.brain.complete = async () => { throw new Error("réseau"); };
     const market = createMarket(s.deps);

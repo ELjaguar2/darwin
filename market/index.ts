@@ -30,6 +30,8 @@ export interface MarketOptions {
   validators?: Partial<Record<Requester["kind"], Validator>>;
   /** Plafond de dépense par heure du compte visiteurs. Défaut : `config.sim.visitorHourlyCap` si présent, sinon 10 x budget max. */
   visitorHourlyCap?: bigint;
+  /** Ticks de grâce après le délai pour retenter une validation différée avant remboursement. Défaut : taskDeadlineTicks. */
+  validationGraceTicks?: number;
   /** Variation de réputation : accepté / rejeté / expiré. */
   reputationDeltas?: { accepted: number; rejected: number; expired: number };
 }
@@ -52,6 +54,7 @@ const cleanLabel = (s: string) => s.replace(/[\u0000-\u001f\u007f]/g, " ").trim(
 export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
   const { chain, journal, config } = deps;
   const sim = config.sim;
+  const graceTicks = opts.validationGraceTicks ?? sim.taskDeadlineTicks;
   const deltas = opts.reputationDeltas ?? { accepted: 1, rejected: -2, expired: -2 };
   const masterId = chain.info().masterId;
   const accounts = { visitors: `${VISITORS_ACCOUNT_LABEL}.${masterId}`, simClient: `${SIM_CLIENT_ACCOUNT_LABEL}.${masterId}` };
@@ -263,12 +266,12 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
     emit({ type: "escrow.refunded", tick, data: { taskId: task.id, payer: esc.payer, amount: esc.amount, tx: tx.hash } });
   }
 
-  async function expire(task: Task, reason: "no_bids" | "deadline", tick: number): Promise<void> {
+  async function expire(task: Task, reason: "no_bids" | "deadline", tick: number, penalize = true): Promise<void> {
     const winner = task.winnerId;
     task.status = "expired";
     emit({ type: "task.expired", tick, data: { taskId: task.id, reason } });
     await refund(task, "expired", tick);
-    if (winner && reason === "deadline") await reputation(task, winner, deltas.expired, hashObject({ taskId: task.id, event: "expired" }), tick);
+    if (winner && reason === "deadline" && penalize) await reputation(task, winner, deltas.expired, hashObject({ taskId: task.id, event: "expired" }), tick);
   }
 
   // ---------- paiement ----------
@@ -321,6 +324,18 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
       busy.add(t.id);
       try {
         if (t.status === "submitted" && t.validation) await trySettle(t, tick); // reprise d'un paiement interrompu
+        else if (t.status === "submitted") {
+          // validation différée (juge indisponible ou plafond d'appels) : nouvel essai à chaque step ;
+          // au-delà du délai de grâce, remboursement sans pénalité pour l'agent (la panne n'est pas de son fait)
+          if (tick > t.deadlineTick + graceTicks) await expire(t, "deadline", tick, false);
+          else {
+            try {
+              await validateAndSettle(t, tick);
+            } catch (e) {
+              emit({ type: "system.warning", tick, data: { code: "VALIDATION_PENDING", message: `${t.id} : ${(e as Error).message}`.slice(0, 300) } });
+            }
+          }
+        }
         else if (t.status === "posted" && t.biddingEndsTick <= tick) await award(t, tick);
         else if (t.status === "awarded") {
           const rec = t.winnerId ? await chain.getAgentRecord(t.winnerId) : null;
@@ -353,33 +368,37 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
     task.result = { text, resultHash, submittedTick: tick };
     emit({ type: "task.submitted", tick, data: { taskId: task.id, agentId: input.agentId, resultHash } });
     try {
-      const validator = validatorFor(task.requester.kind);
-      const verdict = await validator.validate({ task: clone(task), agentId: input.agentId, text, resultHash, tick });
-      const who = verdict.validator;
-      const requesterAgent = task.requester.kind === "agent" ? task.requester.agentId : undefined;
-      if (!who || who.startsWith("agent:") || who === input.agentId || who === requesterAgent)
-        throw new MarketError("INVALID_VALIDATOR", `validateur interdit : ${who}`);
-      if (verdict.verdict !== "accepted" && verdict.verdict !== "rejected") throw new MarketError("INVALID_VALIDATOR", "verdict invalide");
-      const validation: Validation = {
-        verdict: verdict.verdict, score: Math.min(1, Math.max(0, Number.isFinite(verdict.score) ? verdict.score : 0)),
-        validator: who, reason: verdict.reason.slice(0, 300), resultHash, tick,
-      };
-      task.validation = validation;
-      emit({ type: "task.validated", tick, data: { taskId: task.id, validation: clone(validation) } });
-      await trySettle(task, tick);
+      const validation = await validateAndSettle(task, tick);
       return { task: clone(task), validation: clone(validation) };
     } catch (e) {
-      if (!task.validation) {
-        // validation impossible : rien n'est payé ni remboursé, la tâche reste ouverte jusqu'au délai
-        task.status = "awarded";
-        delete task.result;
-        if (e instanceof MarketError) throw e;
-        throw new MarketError("VALIDATION_FAILED", (e as Error).message);
-      }
-      throw e;
+      // Échec fermé : validation impossible (juge indisponible, plafond d'appels, panne, validateur interdit).
+      // Rien n'est payé ni remboursé ; la tâche reste `submitted`, `step` retente puis rembourse après le délai de grâce.
+      const msg = (e as Error).message;
+      emit({ type: "system.warning", tick, data: { code: "VALIDATION_PENDING", message: `${task.id} : ${msg}`.slice(0, 300) } });
+      throw new MarketError(e instanceof MarketError && e.code === "INVALID_VALIDATOR" ? "INVALID_VALIDATOR" : "VALIDATION_PENDING", msg);
     } finally {
       busy.delete(task.id);
     }
+  }
+
+  /** Valide le résultat remis puis règle (paiement ou remboursement). Lève si aucune validation n'a pu être enregistrée. */
+  async function validateAndSettle(task: Task, tick: number): Promise<Validation> {
+    const result = task.result!;
+    const validator = validatorFor(task.requester.kind);
+    const verdict = await validator.validate({ task: clone(task), agentId: task.winnerId!, text: result.text, resultHash: result.resultHash, tick });
+    const who = verdict.validator;
+    const requesterAgent = task.requester.kind === "agent" ? task.requester.agentId : undefined;
+    if (!who || who.startsWith("agent:") || who === task.winnerId || who === requesterAgent)
+      throw new MarketError("INVALID_VALIDATOR", `validateur interdit : ${who}`);
+    if (verdict.verdict !== "accepted" && verdict.verdict !== "rejected") throw new MarketError("INVALID_VALIDATOR", "verdict invalide");
+    const validation: Validation = {
+      verdict: verdict.verdict, score: Math.min(1, Math.max(0, Number.isFinite(verdict.score) ? verdict.score : 0)),
+      validator: who, reason: verdict.reason.slice(0, 300), resultHash: result.resultHash, tick,
+    };
+    task.validation = validation;
+    emit({ type: "task.validated", tick, data: { taskId: task.id, validation: clone(validation) } });
+    await trySettle(task, tick);
+    return validation;
   }
 
   return {

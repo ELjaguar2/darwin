@@ -99,6 +99,14 @@ export function parseJudgeVerdict(raw: string): { accepted: boolean; score: numb
   return { accepted, score: clamp(m[2] === undefined ? (accepted ? 1 : 0) : Number(m[2])), reason: (m[3] ?? "").slice(0, 300) };
 }
 
+/** Le juge IA n'a pas pu trancher (panne, plafond d'appels, réponse illisible) : la validation est différée. */
+export class JudgeUnavailableError extends Error {
+  constructor(message: string) {
+    super(`juge indisponible : ${message}`);
+    this.name = "JudgeUnavailableError";
+  }
+}
+
 export interface JudgeDeps {
   brain: Brain;
   journal: Journal;
@@ -109,7 +117,8 @@ export interface JudgeDeps {
 
 /**
  * Juge composite : la règle de base fait plancher (rejet = rejet), puis le juge IA tranche.
- * Juge indisponible ou illisible : repli sur la règle seule, signalé dans `reason` et par `system.warning`.
+ * Juge indisponible, plafond d'appels atteint ou réponse illisible : cerveau mock = repli sur la règle (signalé) ;
+ * cerveau réel = échec fermé (JudgeUnavailableError), le marché diffère la validation.
  */
 export function brainJudge(deps: JudgeDeps): Validator {
   const rule = deps.rule ?? ruleValidator();
@@ -134,8 +143,14 @@ export function brainJudge(deps: JudgeDeps): Validator {
           reason: v.reason || (v.accepted ? "accepté par le juge" : "refusé par le juge"),
         };
       } catch (e) {
-        deps.journal.emit({ type: "system.warning", tick: input.tick, data: { code: "JUDGE_UNAVAILABLE", message: `juge IA indisponible, repli sur la règle de base : ${(e as Error).message}`.slice(0, 300) } });
-        return { ...floor, reason: `${floor.reason} (juge IA indisponible)` };
+        const mock = deps.brain.kind === "mock";
+        deps.journal.emit({
+          type: "system.warning", tick: input.tick,
+          data: { code: "JUDGE_UNAVAILABLE", message: `juge IA indisponible (${(e as Error).message})${mock ? ", repli sur la règle de base (mode mock)" : ", validation différée, aucune libération"}`.slice(0, 300) },
+        });
+        // Échec fermé : avec un cerveau réel, jamais de repli sur la seule règle de longueur.
+        if (!mock) throw new JudgeUnavailableError((e as Error).message);
+        return { ...floor, reason: `${floor.reason} (juge IA indisponible, mode mock)` };
       }
     },
   };
