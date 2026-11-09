@@ -29,9 +29,9 @@ export interface EventCatalog {
   "subcontract.created": { parentTaskId: string; childTaskId: string; byAgentId: string };
   "reputation.updated": { agentId: string; delta: number; total: number; taskId: string; tx?: string };
   // économie / IA
-  "brain.charged": { agentId: string; purpose: string; model: string; promptTokens: number; completionTokens: number; reasoningTokens: number; cost: Yocto; mock: boolean; tx?: string };
+  "brain.charged": { agentId: string; purpose: string; model: string; promptTokens: number; completionTokens: number; reasoningTokens: number; cost: Yocto; costUsd: number; nearUsdRate: number; priceSource: "models" | "mock"; mock: boolean; tx?: string };
   "balance.changed": { agentId: string; balance: Yocto; delta: Yocto; reason: string };
-  "funding.received": { to: string; amount: Yocto; source: "master" | "faucet" | "visitor"; tx: string };
+  "funding.received": { to: string; amount: Yocto; source: "master" | "faucet" | "demo"; tx: string };
   // chaîne / intents / technique
   "chain.tx": { kind: string; from?: string; to?: string; amount?: Yocto; hash: string; explorerUrl?: string };
   "intents.quote": { dry: true; originAsset: string; destinationAsset: string; amountIn: string; amountOut?: string; note?: string };

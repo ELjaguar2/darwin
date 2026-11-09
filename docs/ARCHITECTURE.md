@@ -168,9 +168,9 @@ Journal append-only, `seq` croissant sans trou. Ajouter un type exige de modifie
 | `escrow.refunded` | market | taskId, payer, amount, tx |
 | `subcontract.created` | market | parentTaskId, childTaskId, byAgentId |
 | `reputation.updated` | market | agentId, delta, total, taskId, tx |
-| `brain.charged` | engine | agentId, purpose, model, promptTokens, completionTokens, reasoningTokens, cost, mock, tx |
+| `brain.charged` | engine | agentId, purpose, model, promptTokens, completionTokens, reasoningTokens, cost, costUsd, nearUsdRate, priceSource (`models`/`mock`), mock, tx |
 | `balance.changed` | engine | agentId, balance, delta, reason (metabolism/brain/task/birth/...) |
-| `funding.received` | engine/backend | to, amount, source (master/faucet/visitor), tx |
+| `funding.received` | engine/backend | to, amount, source (master/faucet/demo), tx |
 | `chain.tx` | accounts (via journal injecté) | kind, from, to, amount, hash, explorerUrl : alimente le « flux de transactions » de l'UI |
 | `intents.quote` | intents | devis `dry:true` seulement |
 | `system.warning` / `system.error` | tous | code, message (jamais de secret) |
@@ -183,7 +183,7 @@ Règle : tout événement qui touche à l'argent porte un `tx`/`hash` (mock ou r
 
 | Route | Rôle |
 |---|---|
-| `GET /api/health` | `{ok, mode, chain, brain, tick}` |
+| `GET /api/health` | `{ok, mode, chain, brain, tick, escrow: "contract" \| "operator-account"}` (D-022) |
 | `GET /api/config` | configuration publique (`redactConfig`) |
 | `GET /api/state` | `SimState` complet |
 | `GET /api/agents`, `/api/agents/:id` | agents (vivants et morts), détail + lignée |
@@ -192,7 +192,7 @@ Règle : tout événement qui touche à l'argent porte un `tx`/`hash` (mock ou r
 | `GET /api/tasks`, `/api/tasks/:id` | tâches, offres, séquestre, validation |
 | `POST /api/tasks` | formulaire visiteur ; corps = `TaskInput` ; 201 + `Task`, 400 si invalide (erreurs zod), 429 au-delà de 10 tâches ouvertes par IP |
 | `GET /api/events?since=&limit=` | journal paginé |
-| `POST /api/sim/start|pause|resume|stop` | contrôle ; exige `Authorization: Bearer ${DARWIN_ADMIN_TOKEN}` si défini |
+| `POST /api/sim/start|pause|resume|stop` | contrôle ; exige `Authorization: Bearer ${DARWIN_ADMIN_TOKEN}` ; le token est OBLIGATOIRE dès que `HOST` n'est pas `127.0.0.1` (démarrage refusé sinon, D-023) |
 | `GET /*` | statique `frontend/` |
 
 Le serveur écoute `127.0.0.1:3000` par défaut. Aucune route ne renvoie un secret ni la configuration brute.
@@ -215,7 +215,7 @@ Détail commenté dans `.env.example` ; valeurs par défaut dans `shared/config.
 | Groupe | Variables |
 |---|---|
 | Mode | `DARWIN_MODE` (mock/testnet), `DARWIN_PRESET` (normal/demo), `DARWIN_CHAIN` (mock/near), `DARWIN_BRAIN` (mock/nearai), `DARWIN_SEED` |
-| Serveur | `HOST`, `PORT`, `DARWIN_DATA_DIR`, `DARWIN_ADMIN_TOKEN` (SECRET) |
+| Serveur | `HOST`, `PORT`, `DARWIN_DATA_DIR`, `DARWIN_ADMIN_TOKEN` (SECRET, obligatoire si `HOST` != `127.0.0.1`), `DARWIN_VISITOR_HOURLY_CAP_NEAR` (plafond horaire du compte de démo, à ajouter à `shared/config.ts` au lot L6/L7, D-025) |
 | NEAR | `NEAR_NETWORK`, `NEAR_RPC_URL`, `NEAR_MASTER_ACCOUNT_ID`, `NEAR_MASTER_PRIVATE_KEY` (SECRET), `NEAR_CONTRACT_ID` |
 | NEAR AI Cloud | `NEARAI_API_KEY` (SECRET), `NEARAI_BASE_URL`, `NEARAI_MODEL`, `NEARAI_TIMEOUT_MS` |
 | Simulation | voir §12 |
@@ -291,11 +291,13 @@ Les scripts `start*` pointent vers `backend/main.ts`, créé au lot L7 : avant L
 
 ## 17. Points à faire valider (gardien des specs) et risques
 
-1. **Coût IA sur la chaîne (D-013)** : le coût réel est payé en USD par la clé de plateforme ; l'agent débite l'équivalent NEAR vers le compte maître. Acceptable vis-à-vis de « l'agent paie son propre cerveau » ? À confirmer, avec libellé honnête dans le README.
-2. **Tokens de raisonnement (C-05)** : règle `max(completion, total - prompt)` à confirmer avec la réponse réelle de `/v1/models` et `/chat/completions` (dev-cerveau).
-3. **Modèle de confiance du séquestre (D-015)** : opérateur = oracle de validation. Divulgué dans le README ; suffisant pour « validation, réputation » ?
-4. **Tâches de visiteurs financées par la démo (D-014)** : conforme à « tâches de visiteurs (séquestre, validation, réputation) » ?
-5. **Chaîne d'outils Rust absente (D-016)** : le repli dégradé est-il acceptable si le contrat n'est pas prêt (T-04 : contrat personnalisé « suffit » mais n'est pas obligatoire) ?
+Questions 1 à 5 tranchées par le gardien le 2026-11-09 (Avis L1, `docs/CONFORMITE.md`) ; décisions D-020 à D-025.
+
+1. **Coût IA sur la chaîne (D-013) : ACCEPTÉ SOUS CONDITIONS (D-020).** Débit NEAR = représentation, pas un paiement à NEAR AI Cloud. `brain.charged` porte `costUsd`, `nearUsdRate`, `priceSource` ; prix inconnu = erreur (`assertValidPrice`), jamais un coût 0 silencieux ; les appels mock sont étiquetés `mock:true`.
+2. **Tokens de raisonnement (C-05) : RÈGLE DURCIE (D-021).** `billable = max(completion, total - prompt, reasoning, 0)` (`shared/money.ts`, testé). Reste à vérifier sur réponse réelle (dev-cerveau, L5) ; peut légèrement surestimer.
+3. **Modèle de confiance du séquestre (D-015) : ACCEPTÉ, divulgation obligatoire (D-024).** `validator` et `resultHash` journalisés, UI « validé par ».
+4. **Tâches de visiteurs financées par la démo (D-014) : ACCEPTÉ SOUS CONDITIONS (D-025).** `funding.received.source = "demo"` ; plafond horaire du compte `visitors.<maître>`.
+5. **Chaîne d'outils Rust absente (D-016) : REPLI SEULEMENT, échéance 2026-11-11 23:59 UTC (D-022).** Mode dégradé : badge permanent, `/api/health.escrow`.
 6. **Node >= 22.22.2 pour le testnet (D-005)** : à annoncer dans le README (J-01 : le juge IA doit pouvoir lancer au moins le mock sur Node 22.12+).
 7. **Faucet et URL d'explorateur testnet** : non vérifiés ici (`ChainInfo.explorerBase` laissé vide) ; dev-comptes les vérifie et les documente.
 8. **LICENSE (L-02)** absente du dépôt ; hors périmètre architecte, à confier au rédacteur.

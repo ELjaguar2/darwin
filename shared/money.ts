@@ -39,14 +39,24 @@ export interface ModelPrice {
 }
 
 /**
- * Tokens de sortie facturables : le plus grand de completion_tokens et (total - prompt).
- * Les tokens de raisonnement sont ainsi comptés qu'ils soient inclus ou non dans completion_tokens.
+ * Tokens de sortie facturables (R1) : max(completion, total - prompt, reasoning, 0).
+ * Les tokens de raisonnement sont comptés qu'ils soient inclus ou non dans completion_tokens
+ * (peut légèrement surestimer le coût). Un champ absent ou non fini vaut 0.
  */
 export function billableCompletionTokens(u: Usage): number {
-  return Math.max(u.completionTokens, u.totalTokens - u.promptTokens, 0);
+  const n = (x: number | undefined): number => (Number.isFinite(x) ? (x as number) : 0);
+  return Math.max(n(u.completionTokens), n(u.totalTokens) - n(u.promptTokens), n(u.reasoningTokens), 0);
+}
+
+/** Un prix inconnu ou invalide n'est jamais traité comme 0 : erreur explicite. */
+export function assertValidPrice(p: ModelPrice | undefined | null): asserts p is ModelPrice {
+  if (!p || !Number.isFinite(p.usdPerMTokIn) || !Number.isFinite(p.usdPerMTokOut) || p.usdPerMTokIn < 0 || p.usdPerMTokOut < 0) {
+    throw new Error("prix du modèle inconnu ou invalide : pas de coût nul silencieux");
+  }
 }
 
 export function costUsd(u: Usage, p: ModelPrice): number {
+  assertValidPrice(p);
   return (u.promptTokens * p.usdPerMTokIn + billableCompletionTokens(u) * p.usdPerMTokOut) / 1e6;
 }
 

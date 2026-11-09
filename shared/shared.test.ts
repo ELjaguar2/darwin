@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  ChainError, MockBrain, MockChain, MOCK_MODELS, PRESETS, costYocto, createJournal, createRng,
+  ChainError, MockBrain, MockChain, MOCK_MODELS, PRESETS, costYocto, billableCompletionTokens, createJournal, createRng,
   formatNear, hashObject, loadConfig, parseNear, redactConfig, GenomeSchema,
 } from "./index.ts";
 
@@ -21,6 +21,20 @@ describe("money", () => {
     const b = costYocto({ promptTokens: 1000, completionTokens: 500, reasoningTokens: 300, totalTokens: 1800 }, price, 2);
     expect(b).toBeGreaterThan(a);
     expect(a).toBeGreaterThan(0n);
+  });
+  it("billableCompletionTokens : max(completion, total - prompt, reasoning, 0)", () => {
+    const base = { promptTokens: 100, completionTokens: 50, reasoningTokens: 0, totalTokens: 150 };
+    expect(billableCompletionTokens(base)).toBe(50);
+    expect(billableCompletionTokens({ ...base, totalTokens: 400 })).toBe(300);
+    // total_tokens absent (0) : le raisonnement seul fait foi
+    expect(billableCompletionTokens({ ...base, totalTokens: 0, reasoningTokens: 120 })).toBe(120);
+    expect(billableCompletionTokens({ ...base, totalTokens: Number.NaN })).toBe(50);
+    expect(billableCompletionTokens({ promptTokens: 10, completionTokens: 0, reasoningTokens: 0, totalTokens: 0 })).toBe(0);
+  });
+  it("prix inconnu ou invalide : erreur, jamais un coût nul silencieux", () => {
+    const u = { promptTokens: 10, completionTokens: 10, reasoningTokens: 0, totalTokens: 20 };
+    expect(() => costYocto(u, undefined as never, 2)).toThrow();
+    expect(() => costYocto(u, { usdPerMTokIn: Number.NaN, usdPerMTokOut: 1 }, 2)).toThrow();
   });
 });
 
