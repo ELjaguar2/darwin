@@ -39,6 +39,8 @@ fn proof(hash: &str) -> ReleaseProof {
 }
 
 fn lock(c: &mut Darwin, task: &str) {
+    ctx(op(), 0);
+    c.reserve_task(task.into(), payer());
     ctx(op(), 2 * ONE);
     c.lock_escrow(task.into(), payer());
 }
@@ -133,15 +135,52 @@ fn escrow_lock_release_flow() {
 #[test]
 fn payer_can_lock_for_itself() {
     let mut c = setup();
+    c.reserve_task("t-0001".into(), payer());
     ctx(payer(), ONE);
     c.lock_escrow("t-0001".into(), payer());
     assert!(c.get_escrow("t-0001".into()).is_some());
+    assert!(c.get_reservation("t-0001".into()).is_none());
+}
+
+#[test]
+#[should_panic(expected = "TASK_NOT_RESERVED")]
+fn lock_without_reservation_refused() {
+    let mut c = setup();
+    ctx(payer(), ONE);
+    c.lock_escrow("t-0001".into(), payer());
+}
+
+#[test]
+#[should_panic(expected = "TASK_NOT_RESERVED")]
+fn squatter_cannot_take_reserved_id() {
+    let mut c = setup();
+    c.reserve_task("t-0001".into(), payer());
+    // Un tiers se declare payeur sur un id reserve pour un autre : refuse.
+    ctx(accounts(4), ONE);
+    c.lock_escrow("t-0001".into(), accounts(4));
+}
+
+#[test]
+#[should_panic(expected = "Reserve a l'operateur")]
+fn reserve_operator_only() {
+    let mut c = setup();
+    ctx(accounts(4), 0);
+    c.reserve_task("t-0001".into(), accounts(4));
+}
+
+#[test]
+#[should_panic(expected = "TASK_ALREADY_RESERVED")]
+fn reserve_twice_refused() {
+    let mut c = setup();
+    c.reserve_task("t-0001".into(), payer());
+    c.reserve_task("t-0001".into(), accounts(4));
 }
 
 #[test]
 #[should_panic(expected = "Reserve a l'operateur ou au payeur")]
 fn stranger_cannot_lock() {
     let mut c = setup();
+    c.reserve_task("t-0001".into(), payer());
     ctx(accounts(4), ONE);
     c.lock_escrow("t-0001".into(), payer());
 }
@@ -150,6 +189,7 @@ fn stranger_cannot_lock() {
 #[should_panic(expected = "Depot attache requis")]
 fn lock_requires_deposit() {
     let mut c = setup();
+    c.reserve_task("t-0001".into(), payer());
     ctx(op(), 0);
     c.lock_escrow("t-0001".into(), payer());
 }
@@ -343,14 +383,23 @@ fn reputation_penalty_only_after_rejected_refund() {
 }
 
 #[test]
-#[should_panic(expected = "malus seulement")]
-fn reputation_penalty_refused_after_expiry() {
+fn reputation_penalty_allowed_after_expiry() {
     let mut c = setup();
     c.register_agent(new_agent("a-0001", worker_acc(), None, 1));
     lock(&mut c, "t-0001");
     ctx(op(), 0);
     let _ = c.refund_escrow("t-0001".into(), RefundReason::Expired);
     settle_ok(&mut c, "t-0001");
+    ctx(op(), 0);
+    assert_eq!(c.add_reputation("a-0001".into(), "t-0001".into(), -1, "x".into()), -1);
+}
+
+#[test]
+#[should_panic(expected = "malus seulement")]
+fn reputation_penalty_refused_on_locked_escrow() {
+    let mut c = setup();
+    c.register_agent(new_agent("a-0001", worker_acc(), None, 1));
+    lock(&mut c, "t-0001");
     ctx(op(), 0);
     let _ = c.add_reputation("a-0001".into(), "t-0001".into(), -1, "x".into());
 }

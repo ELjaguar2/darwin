@@ -26,6 +26,7 @@ pub const MAX_REPUTATION_DELTA: i32 = 100;
 enum StorageKey {
     Agents,
     Escrows,
+    Reservations,
     Reputation,
     RepApplied,
 }
@@ -36,6 +37,8 @@ pub struct Darwin {
     operator: AccountId,
     agents: IterableMap<String, AgentRecord>,
     escrows: LookupMap<String, Escrow>,
+    /// task_id -> payer, reserves par l'operateur avant `lock_escrow` (anti-squat d'identifiants).
+    reservations: LookupMap<String, AccountId>,
     reputation: LookupMap<String, i64>,
     /// Cles "task_id|agent_id" deja creditees (une seule ecriture de reputation par tache et agent).
     rep_applied: LookupSet<String>,
@@ -59,6 +62,7 @@ impl Darwin {
             operator,
             agents: IterableMap::new(StorageKey::Agents),
             escrows: LookupMap::new(StorageKey::Escrows),
+            reservations: LookupMap::new(StorageKey::Reservations),
             reputation: LookupMap::new(StorageKey::Reputation),
             rep_applied: LookupSet::new(StorageKey::RepApplied),
         }
@@ -137,12 +141,33 @@ impl Darwin {
 
     // ------------------------------------------------------------------ sequestre
 
-    /// Verrouille le depot attache. Appelable par l'operateur ou par le payeur lui-meme.
+    /// Reserve un identifiant de tache pour un payeur donne (operateur seulement). Sans cette
+    /// reservation, `lock_escrow` est refuse : un tiers ne peut pas squatter un id previsible.
+    pub fn reserve_task(&mut self, task_id: String, payer: AccountId) {
+        self.assert_operator();
+        require!(valid_id(&task_id), "task_id invalide");
+        require!(!self.escrows.contains_key(&task_id), "ESCROW_EXISTS");
+        require!(!self.reservations.contains_key(&task_id), "TASK_ALREADY_RESERVED");
+        self.reservations.insert(task_id.clone(), payer.clone());
+        events::emit("task_reserved", json!({"task_id": task_id, "payer": payer}));
+    }
+
+    pub fn get_reservation(&self, task_id: String) -> Option<AccountId> {
+        self.reservations.get(&task_id).cloned()
+    }
+
+    /// Verrouille le depot attache. L'id doit etre reserve par l'operateur pour CE payeur ;
+    /// l'appelant est le payeur (signataire) ou l'operateur.
     #[payable]
     pub fn lock_escrow(&mut self, task_id: String, payer: AccountId) {
         let caller = env::predecessor_account_id();
         require!(caller == self.operator || caller == payer, "Reserve a l'operateur ou au payeur");
         require!(valid_id(&task_id), "task_id invalide");
+        require!(
+            self.reservations.get(&task_id) == Some(&payer),
+            "TASK_NOT_RESERVED : id non reserve pour ce payeur"
+        );
+        self.reservations.remove(&task_id);
         let deposit = env::attached_deposit();
         require!(deposit > NearToken::from_yoctonear(0), "Depot attache requis");
         require!(!self.escrows.contains_key(&task_id), "ESCROW_EXISTS");
@@ -256,8 +281,9 @@ impl Darwin {
             );
         } else {
             require!(
-                esc.status == EscrowStatus::Refunded && esc.refund_reason == Some(RefundReason::Rejected),
-                "malus seulement apres un sequestre rembourse pour rejet"
+                esc.status == EscrowStatus::Refunded
+                    && matches!(esc.refund_reason, Some(RefundReason::Rejected) | Some(RefundReason::Expired)),
+                "malus seulement apres un sequestre rembourse (rejected ou expired)"
             );
         }
         let key = format!("{}|{}", task_id, agent_id);
