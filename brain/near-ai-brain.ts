@@ -21,6 +21,10 @@ export interface Guardrails {
   maxIdenticalCalls: number;
   /** Nombre de relances sur 429/5xx/réseau (une seule par défaut, avec attente courte). */
   retries: number;
+  /** Plafond GLOBAL de dépense sur la clé de plateforme (crédit réel), en USD : cumulé par run (vie de l'instance). */
+  maxUsdPerRun: number;
+  /** Idem sur une fenêtre glissante d'une heure. */
+  maxUsdPerHour: number;
 }
 
 export const DEFAULT_GUARDRAILS: Guardrails = {
@@ -31,6 +35,8 @@ export const DEFAULT_GUARDRAILS: Guardrails = {
   windowMs: 60_000,
   maxIdenticalCalls: 3,
   retries: 1,
+  maxUsdPerRun: 2,
+  maxUsdPerHour: 1,
 };
 
 export interface NearAiBrainOptions {
@@ -47,6 +53,24 @@ export interface NearAiBrainOptions {
   /** Durée de vie du cache des modèles. */
   modelsTtlMs?: number;
   sleep?: (ms: number) => Promise<void>;
+  /** Autorise http:// uniquement vers localhost/127.0.0.1/[::1] (tests). Sinon https exigé : la clé ne part jamais en clair. */
+  allowInsecureLocalhost?: boolean;
+}
+
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+/** Valide NEARAI_BASE_URL : https obligatoire (http seulement vers localhost avec opt-in explicite). Message sans clé. */
+export function assertSafeBaseUrl(baseUrl: string, allowInsecureLocalhost = false): void {
+  let u: URL;
+  try {
+    u = new URL(baseUrl);
+  } catch {
+    throw new Error("NEARAI_BASE_URL invalide : URL attendue");
+  }
+  if (u.username || u.password) throw new Error("NEARAI_BASE_URL ne doit pas contenir d'identifiants");
+  if (u.protocol === "https:") return;
+  if (u.protocol === "http:" && allowInsecureLocalhost && LOCAL_HOSTS.has(u.hostname)) return;
+  throw new Error("NEARAI_BASE_URL doit utiliser https:// (la clé API ne doit jamais circuler en clair)");
 }
 
 const intOr0 = (x: unknown): number => (typeof x === "number" && Number.isFinite(x) && x > 0 ? Math.floor(x) : 0);
@@ -76,7 +100,42 @@ export class NearAiBrain implements Brain {
   private readonly identical = new Map<string, number[]>(); // hash de requête -> horodatages
   private readonly warned = new Set<string>();
 
+  // Dépense globale : réel cumulé + réservations des appels en vol (pire cas), pour tenir même en concurrence.
+  private spentRun = 0;
+  private pending = 0;
+  private readonly hourLog: { t: number; usd: number }[] = [];
+
+  /** USD dépensés (estimés d'après usage) depuis le démarrage, et sur l'heure glissante. */
+  spend(): { run: number; hour: number } {
+    return { run: this.spentRun, hour: this.hourSpent() };
+  }
+
+  private hourSpent(): number {
+    const t = this.now();
+    while (this.hourLog.length && t - this.hourLog[0]!.t >= 3_600_000) this.hourLog.shift();
+    return this.hourLog.reduce((n, e) => n + e.usd, 0);
+  }
+
+  private reserve(worstUsd: number) {
+    const g = this.guardrails;
+    const hour = this.hourSpent();
+    const over = this.spentRun + this.pending + worstUsd > g.maxUsdPerRun ? "run" : hour + this.pending + worstUsd > g.maxUsdPerHour ? "heure" : undefined;
+    if (over) {
+      const msg = `plafond global de dépense IA atteint (${over === "run" ? `${g.maxUsdPerRun} USD par run` : `${g.maxUsdPerHour} USD par heure`}) : appel refusé`;
+      this.warn("BRAIN_BUDGET_CAP", msg);
+      throw new BrainError("RATE_LIMITED", `Garde-fou budget : ${msg}`);
+    }
+    this.pending += worstUsd;
+  }
+
+  private settle(worstUsd: number, actualUsd: number) {
+    this.pending = Math.max(0, this.pending - worstUsd);
+    this.spentRun += actualUsd;
+    this.hourLog.push({ t: this.now(), usd: actualUsd });
+  }
+
   constructor(private readonly opts: NearAiBrainOptions) {
+    assertSafeBaseUrl(opts.baseUrl, opts.allowInsecureLocalhost);
     this.guardrails = { ...DEFAULT_GUARDRAILS, ...opts.guardrails };
     this.f = opts.fetch ?? fetch;
     this.now = opts.now ?? (() => Date.now());
@@ -230,6 +289,10 @@ export class NearAiBrain implements Brain {
       body: JSON.stringify(body),
     };
 
+    const worstUsd = worst(maxTokens);
+    this.reserve(worstUsd);
+    let actualUsd = 0;
+    try {
     let last: BrainError | undefined;
     for (let attempt = 0; attempt <= g.retries; attempt++) {
       if (attempt > 0) await this.sleep(500 * attempt);
@@ -254,6 +317,7 @@ export class NearAiBrain implements Brain {
         throw new BrainError("BAD_RESPONSE", "Réponse sans champ usage : débit impossible");
       }
       const usage = parseUsage(r.body.usage);
+      actualUsd = costUsd(usage, info);
       const text = typeof content === "string" ? content : "";
       if (text === "" ) this.warn("BRAIN_EMPTY_TEXT", `réponse vide de ${model} (finish_reason=${String(choice.finish_reason)}) : tokens de raisonnement épuisés ?`);
       return {
@@ -265,5 +329,8 @@ export class NearAiBrain implements Brain {
       };
     }
     throw last ?? new BrainError("HTTP_ERROR", "NEAR AI Cloud : échec");
+    } finally {
+      this.settle(worstUsd, actualUsd);
+    }
   }
 }

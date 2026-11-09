@@ -24,6 +24,11 @@ Le Brain ne débite rien : il renvoie `usage`. L'engine calcule `costYocto(usage
 ## Garde-fous (`Guardrails`, tous testés)
 `max_tokens` plafonné (`sim.maxTokensPerCall`) ; budget maximum par appel en USD (`maxCostUsdPerCall`, défaut 0.05 : réduit `max_tokens`, sinon refuse) ; taille de prompt maximale ; quota d'appels par agent sur fenêtre glissante ; refus d'une même requête répétée ; une seule relance sur 429/5xx/réseau ; délai maximal (`NEARAI_TIMEOUT_MS`). Les refus lèvent `BrainError` (`RATE_LIMITED` ou `BAD_RESPONSE`) et émettent `BRAIN_LOOP_GUARD` via `onWarning`.
 
+## Plafond global de dépense et URL
+- `maxUsdPerRun` (défaut 2 USD) et `maxUsdPerHour` (défaut 1 USD, fenêtre glissante) plafonnent la dépense cumulée sur la clé de plateforme. Chaque appel réserve son pire cas avant l'envoi (les appels concurrents comptent), puis le coût réel d'après `usage` est enregistré. À l'atteinte : `BrainError RATE_LIMITED` et warning `BRAIN_BUDGET_CAP`, sans appel réseau. `brain.spend()` expose les totaux. Valeurs configurables via `guardrails` (variables d'environnement proposées : `NEARAI_MAX_USD_PER_RUN`, `NEARAI_MAX_USD_PER_HOUR`, à câbler dans `shared/config.ts`).
+- `NEARAI_BASE_URL` doit être en https ; http n'est accepté que vers localhost/127.0.0.1/[::1] avec `allowInsecureLocalhost: true` (tests). Sinon le constructeur et `createBrain` lèvent une erreur.
+- `sanitizeExternal` retire les délimiteurs `<<<` et `>>>` en boucle jusqu'à stabilité.
+
 ## Prompts (`prompts.ts`)
 Personnalité, enchère, décision JSON, exécution, validation, lettre à l'enfant, mutation. Tout texte externe (visiteur, autre agent) va dans un message `user`, entre `<<<...>>>`, délimiteurs neutralisés, taille bornée. Le `system` ne contient que les règles fixes et le génome. Les parseurs `parseDecision` et `parseVerdict` retombent sur `skip` ou `rejected`.
 

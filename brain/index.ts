@@ -11,6 +11,8 @@ export interface CreateBrainOptions {
   /** Reçoit les system.warning (ex. repli de prix, garde-fou). Le backend les émet dans le journal. */
   onWarning?: (w: { code: string; message: string }) => void;
   guardrails?: Partial<Guardrails>;
+  /** http:// accepté seulement vers localhost (tests explicites). */
+  allowInsecureLocalhost?: boolean;
 }
 
 /** Mock par défaut ; NearAiBrain seulement si config.brain === "nearai" ET clé présente (sinon mock + avertissement). */
@@ -27,6 +29,7 @@ export function createBrain(config: Config, opts: CreateBrainOptions = {}): Brai
     timeoutMs: config.nearai.timeoutMs,
     fetch: opts.fetch,
     onWarning: opts.onWarning,
+    allowInsecureLocalhost: opts.allowInsecureLocalhost,
     guardrails: { maxTokensPerCall: config.sim.maxTokensPerCall, ...opts.guardrails },
   });
 }

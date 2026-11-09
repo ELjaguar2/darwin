@@ -7,7 +7,13 @@ const MAX_EXTERNAL_CHARS = 4000;
 
 /** Neutralise les délimiteurs et borne la taille d'un texte externe. */
 export function sanitizeExternal(text: string, max = MAX_EXTERNAL_CHARS): string {
-  return String(text).replace(/<<<|>>>/g, "").replace(/\u0000/g, "").slice(0, max);
+  // Boucle jusqu'à stabilité : retirer un délimiteur ne doit pas en recomposer un (ex. `<<>>><`).
+  let s = String(text).replace(/\u0000/g, "").slice(0, max);
+  for (let prev = ""; prev !== s; ) {
+    prev = s;
+    s = s.replace(/<<<|>>>/g, "");
+  }
+  return s;
 }
 
 const wrap = (label: string, text: string) => `<<<${label}\n${sanitizeExternal(text)}\n>>>`;
