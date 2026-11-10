@@ -11,13 +11,21 @@ export interface NearSigner {
   secretKey: Secret;
 }
 
+/** Clé function call à droits limités, ajoutée dans la MÊME transaction que la création du compte. */
+export interface FunctionCallKeySpec {
+  publicKey: string;
+  contractId: string;
+  methodNames: string[];
+  allowance: bigint;
+}
+
 export interface NearBackend {
   /** Vérifie que le RPC répond et renvoie le réseau (attendu : "testnet"). */
   status(): Promise<{ chainId: string }>;
   /** null si le compte n'existe pas. `available` = total moins le stockage immobilisé. */
   getState(accountId: string): Promise<{ total: bigint; available: bigint } | null>;
   /** Crée `<label>.<signer.accountId>` financé de `fund` ; renvoie le hash de transaction. */
-  createSubAccount(signer: NearSigner, label: string, publicKey: string, fund: bigint): Promise<string>;
+  createSubAccount(signer: NearSigner, label: string, publicKey: string, fund: bigint, fc?: FunctionCallKeySpec): Promise<string>;
   transfer(signer: NearSigner, to: string, amount: bigint): Promise<string>;
   deleteAccount(signer: NearSigner, beneficiary: string): Promise<string>;
   addFunctionCallKey(
@@ -90,7 +98,16 @@ export async function loadNearApiBackend(rpcUrl: string): Promise<NearBackend> {
       "near-api-js est introuvable (paquet optionnel). Installez-le avec Node >= 22.22.2 : `npm install near-api-js@7.4.0`.",
     );
   }
-  const provider = new lib.JsonRpcProvider({ url: rpcUrl });
+  // `rpcUrl` peut lister plusieurs fournisseurs séparés par des virgules (NEAR_RPC_URL) : bascule automatique
+  // (FailoverRpcProvider) quand l'un d'eux échoue ou limite le débit. nearcore n'accepte pas le JSON-RPC groupé
+  // (« batch ») : on réduit donc le nombre d'appels par un cache court des états de compte (voir getState).
+  const urls = rpcUrl.split(",").map((u) => u.trim()).filter(Boolean);
+  const provider: AnyRec =
+    urls.length > 1
+      ? new lib.FailoverRpcProvider(urls.map((url) => new lib.JsonRpcProvider({ url })))
+      : new lib.JsonRpcProvider({ url: urls[0] ?? rpcUrl });
+  const STATE_TTL_MS = Number(process.env.DARWIN_RPC_STATE_TTL_MS ?? 3000);
+  const stateCache = new Map<string, { at: number; v: { total: bigint; available: bigint } | null }>();
   const accounts = new Map<string, AnyRec>(); // une instance par compte (gestion des nonces)
   const acct = (s: NearSigner): AnyRec => {
     const k = `${s.accountId}|${s.secretKey.reveal().slice(-8)}`;
@@ -112,7 +129,7 @@ export async function loadNearApiBackend(rpcUrl: string): Promise<NearBackend> {
         if (e instanceof ChainError) throw e;
         const msg = safeMessage(e);
         if (attempt < RATE_LIMIT_RETRIES && RATE_LIMIT_RE.test(msg)) {
-          await new Promise((r) => setTimeout(r, Math.min(30_000, 2000 * 2 ** attempt)));
+          await new Promise((r) => setTimeout(r, Math.min(30_000, 2000 * 2 ** attempt) * (0.75 + Math.random() * 0.5)));
           continue;
         }
         throw mapChainError(msg);
@@ -120,18 +137,22 @@ export async function loadNearApiBackend(rpcUrl: string): Promise<NearBackend> {
     }
   };
 
+  const written = <T>(p: Promise<T>): Promise<T> => p.finally(() => stateCache.clear());
+
   return {
     call: (signer, contractId, methodName, args, o) =>
-      wrap(async () => {
+      written(wrap(async () => {
         const res = await acct(signer).callFunctionRaw({ contractId, methodName, args, deposit: o?.deposit ?? 0n, gas: o?.gas ?? 30_000_000_000_000n });
         const f = failureOf(res);
         if (f) throw mapChainError(f.replace(/ed25519:[1-9A-HJ-NP-Za-km-z]{40,}/g, "ed25519:[REDACTED]").slice(0, 400));
         return hashOf(res);
-      }),
+      })),
     view: (contractId, methodName, args) => wrap(async () => provider.callFunction({ contractId, method: methodName, args })),
     status: () => wrap(async () => ({ chainId: String((await provider.viewNodeStatus()).chain_id) })),
-    getState: (accountId) =>
-      wrap(async () => {
+    getState: async (accountId) => {
+      const hit = stateCache.get(accountId);
+      if (hit && Date.now() - hit.at < STATE_TTL_MS) return hit.v;
+      const v = await wrap(async () => {
         try {
           const st = await new lib.Account(accountId, provider).getState();
           return { total: BigInt(st.balance.total), available: BigInt(st.balance.available) };
@@ -139,14 +160,34 @@ export async function loadNearApiBackend(rpcUrl: string): Promise<NearBackend> {
           if (/does not exist|UNKNOWN_ACCOUNT|AccountDoesNotExist/i.test(safeMessage(e))) return null;
           throw e;
         }
-      }),
-    createSubAccount: (signer, label, publicKey, fund) =>
-      wrap(async () => hashOf(await acct(signer).createSubAccount({ accountOrPrefix: label, publicKey, nearToTransfer: fund }))),
-    transfer: (signer, to, amount) => wrap(async () => hashOf(await acct(signer).transfer({ receiverId: to, amount }))),
-    deleteAccount: (signer, beneficiary) => wrap(async () => hashOf(await acct(signer).deleteAccount(beneficiary))),
+      });
+      stateCache.set(accountId, { at: Date.now(), v });
+      return v;
+    },
+    createSubAccount: (signer, label, publicKey, fund, fc) =>
+      written(wrap(async () => {
+        if (!fc) return hashOf(await acct(signer).createSubAccount({ accountOrPrefix: label, publicKey, nearToTransfer: fund }));
+        // Une seule transaction : créer, financer, clé complète, clé function call. Ajouter la clé limitée après coup
+        // (signée par le nouveau compte) échouait : le RPC ne voyait pas encore la clé du compte (« access key does not exist »).
+        const { actions, PublicKey } = lib;
+        const a = acct(signer);
+        return hashOf(
+          await a.signAndSendTransaction({
+            receiverId: `${label}.${signer.accountId}`,
+            actions: [
+              actions.createAccount(),
+              actions.transfer(fund),
+              actions.addFullAccessKey(PublicKey.from(publicKey)),
+              actions.addFunctionCallAccessKey(PublicKey.from(fc.publicKey), fc.contractId, fc.methodNames, fc.allowance),
+            ],
+          }),
+        );
+      })),
+    transfer: (signer, to, amount) => written(wrap(async () => hashOf(await acct(signer).transfer({ receiverId: to, amount })))),
+    deleteAccount: (signer, beneficiary) => written(wrap(async () => hashOf(await acct(signer).deleteAccount(beneficiary)))),
     addFunctionCallKey: (signer, publicKey, o) =>
-      wrap(async () =>
+      written(wrap(async () =>
         hashOf(await acct(signer).addFunctionCallAccessKey({ publicKey, contractId: o.contractId, methodNames: o.methodNames, allowance: o.allowance })),
-      ),
+      )),
   };
 }

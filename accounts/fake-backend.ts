@@ -44,11 +44,12 @@ export class FakeNearBackend implements NearBackend {
     const a = this.accounts.get(id);
     return a ? { total: a.total, available: a.total > STORAGE ? a.total - STORAGE : 0n } : null;
   }
-  async createSubAccount(signer: NearSigner, label: string, publicKey: string, fund: bigint) {
+  async createSubAccount(signer: NearSigner, label: string, publicKey: string, fund: bigint, fc?: { publicKey: string; contractId: string; methodNames: string[]; allowance: bigint }) {
     const id = `${label}.${signer.accountId}`;
     if (this.accounts.has(id)) throw new ChainError("RPC_ERROR", "AccountAlreadyExists");
     this.pay(signer.accountId, fund);
-    this.accounts.set(id, { total: fund, keys: [publicKey] });
+    this.accounts.set(id, { total: fund, keys: fc ? [publicKey, fc.publicKey] : [publicKey] });
+    if (fc) this.fcKeys.push({ accountId: id, ...fc });
     return this.hash();
   }
   private pay(from: string, amount: bigint) {
