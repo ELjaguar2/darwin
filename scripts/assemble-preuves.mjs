@@ -16,6 +16,7 @@ if (existsSync("data/ai-usage.jsonl")) {
     .replace(/^## /gm, "#### ")
     .replace(/^### /gm, "##### ");
 }
-const final = existsSync("docs/preuves/RUN_FINAL.md") ? readFileSync("docs/preuves/RUN_FINAL.md", "utf8") : "_À compléter._";
+const run8 = run(["scripts/gen-preuves.mjs", "docs/preuves/run8-journal.jsonl", "--cycles", "5"]).replace(/^### /gm, "#### ");
+const final = (existsSync("docs/preuves/RUN_FINAL.md") ? readFileSync("docs/preuves/RUN_FINAL.md", "utf8") : "_À compléter._").replace("{{RUN8}}", () => run8);
 writeFileSync("docs/PREUVES_TESTNET.md", tpl.replace("{{RUN6}}", () => run6).replace("{{RUN5}}", () => run5).replace("{{USAGE}}", () => usage).replace("{{FINAL}}", () => final));
 console.log("docs/PREUVES_TESTNET.md écrit");

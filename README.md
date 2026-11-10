@@ -144,12 +144,12 @@ Change the port with `PORT=3100` (default `3000`). Data is written under `data/`
 | `NEAR_MASTER_ACCOUNT_ID` | testnet master account (parent of the agents' sub-accounts) |
 | `NEAR_MASTER_PRIVATE_KEY` | **SECRET**, `ed25519:...`. Never commit it. |
 | `NEAR_CONTRACT_ID` | optional; empty = degraded escrow. Set after deploying the contract |
-| `NEAR_RPC_URL` | default `https://test.rpc.fastnear.com` |
+| `NEAR_RPC_URL` | default `https://test.rpc.fastnear.com`; comma-separated list = automatic failover between providers listed in the NEAR docs |
 | `NEARAI_API_KEY` | **SECRET**, from cloud.near.ai > API Keys; empty = mock brain |
 | `NEARAI_MODEL` | optional default model (checked against `/v1/models`) |
 | `NEARAI_MAX_USD_PER_RUN`, `NEARAI_MAX_USD_PER_HOUR` | spending caps in USD |
 | `DARWIN_NEAR_USD_RATE` | fixed USD per NEAR used to convert AI cost |
-| `DARWIN_PRESET` | `normal` or `demo` |
+| `DARWIN_PRESET` | `normal`, `demo` or `selection` (testnet: deaths and generation 3 within one run) |
 | `DARWIN_ADMIN_TOKEN` | required when `HOST` is not `127.0.0.1`; protects `POST /api/sim/*` |
 
 4. Optional, deploy the contract (executed once on 2026-11-10 with this syntax, using `sign-with-legacy-keychain` instead of `sign-with-keychain`): `NEAR_CONTRACT_ID=... NEAR_MASTER_ACCOUNT_ID=... bash contracts/deploy-testnet.sh`; see `contracts/README.md`.

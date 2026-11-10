@@ -39,6 +39,13 @@ out.push("| Parent | Enfant | Transféré (NEAR) |");
 out.push("|---|---|---|");
 for (const e of of("agent.reproduced")) out.push(`| ${e.data.parentId} | ${e.data.childId} | ${near(e.data.transferred)} |`);
 
+out.push("\n### Morts\n");
+out.push("| Agent | Cause | Solde final (NEAR) | Récupéré par le maître (NEAR) | Tx de clôture |");
+out.push("|---|---|---|---|---|");
+for (const e of of("agent.died")) out.push(`| ${e.data.agentId} | ${e.data.cause} | ${near(e.data.finalBalance)} | ${near(e.data.swept)} | ${link(e.data.tx)} |`);
+const markDead = of("chain.tx").filter((e) => e.data.kind === "mark_dead").map((e) => link(e.data.hash));
+if (markDead.length) out.push(`\nInscription de la mort dans le registre du contrat (\`mark_dead\`) : ${markDead.join(", ")}.`);
+
 const locked = new Map(of("escrow.locked").map((e) => [e.data.taskId, e.data]));
 const released = new Map(of("escrow.released").map((e) => [e.data.taskId, e.data]));
 const rep = new Map(of("reputation.updated").map((e) => [e.data.taskId, e.data]));

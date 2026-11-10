@@ -1,6 +1,6 @@
 # PREUVES TESTNET — ce qui a réellement tourné
 
-> Mis à jour le 2026-11-10. Règle : seul ce qui figure ici avec un identifiant de transaction, un journal ou une commande reproductible est **prouvé**. Le reste est dit non prouvé. Explorateur : `https://testnet.nearblocks.io/txns/<hash>` (nearblocks, testnet). Aucune dépense mainnet, rien n'est publié. Ce fichier est généré à partir de `docs/preuves/PREUVES_TEMPLATE.md` et des journaux par `node scripts/assemble-preuves.mjs`.
+> Mis à jour le 2026-11-10 (run 8 : génération 3 et morts). Règle : seul ce qui figure ici avec un identifiant de transaction, un journal ou une commande reproductible est **prouvé**. Le reste est dit non prouvé. Explorateur : `https://testnet.nearblocks.io/txns/<hash>` (nearblocks, testnet). Aucune dépense mainnet, rien n'est publié. Ce fichier est généré à partir de `docs/preuves/PREUVES_TEMPLATE.md` et des journaux par `node scripts/assemble-preuves.mjs`.
 
 ## 1. Résumé honnête
 
@@ -12,10 +12,10 @@
 | Cerveau réel NEAR AI Cloud, consommation tracée | **Prouvé** (§6) |
 | Attestation TEE d'une réponse, vérifiée de bout en bout | **Prouvé pour un modèle, à la demande** (§7) |
 | Génération 2 sur la vraie chaîne (5 reproductions et 5 lettres dans un seul run) | **Prouvé** (§4) |
-| Génération 3 dans un même run réel | **Non prouvé** : run final de 20 minutes, génération 2 seulement (§8) |
-| Mort d'un agent sur testnet | **Non prouvé** (0 mort dans les journaux) |
+| Génération 3 dans un même run réel | **Prouvé** (run 8, preset `selection`, 59 ticks : génération 3, 12 naissances, 8 reproductions ; §8) |
+| Mort d'un agent sur testnet | **Prouvé** : 7 morts par famine au run 8, `mark_dead` et clôture de compte avec transactions (§8) |
 | `refund_escrow` sur testnet | **Prouvé une fois** : tâche `t-5003` rejetée par le juge, remboursement `rejected` par le contrat, malus de réputation −2 (§8) |
-| Clés function call des agents | **Échec** : avertissement `FC_KEY_NOT_ADDED` à chaque naissance |
+| Clés function call des agents | **Prouvé au run 8** : clé ajoutée dans la transaction de création, 0 avertissement, 2 clés vérifiées sur la chaîne (échec aux runs 5 à 7, corrigé) |
 | NEAR Intents, mainnet | **Jamais exécuté** (aucune dépense) |
 
 ## 2. Compte maître
@@ -35,7 +35,7 @@
 
 ## 4. Génération 2 sur la vraie chaîne
 
-Plusieurs runs réels ont eu lieu le 2026-11-10 ; les ids d'agents changent à chaque run (`a-0101…`, `a-0201…`, …, `a-0701…`). Journaux conservés : `docs/preuves/run5-journal.jsonl` et `docs/preuves/run6-journal.jsonl` (événements Darwin, hashes de transactions publics, aucun secret). Tableaux générés par `node scripts/gen-preuves.mjs <journal>`.
+Plusieurs runs réels ont eu lieu le 2026-11-10 ; les ids d'agents changent à chaque run (`a-0101…`, …, `a-0701…`, puis `a-214953…` au run 8, décalage automatique). **Le run 8 (§8) est le plus complet : génération 3 et morts.** Journaux conservés : `docs/preuves/run5-journal.jsonl` et `docs/preuves/run6-journal.jsonl` (événements Darwin, hashes de transactions publics, aucun secret). Tableaux générés par `node scripts/gen-preuves.mjs <journal>`.
 
 ### Run 6 (le plus complet : 8 naissances, 5 reproductions, 26 cycles de séquestre)
 
@@ -57,7 +57,7 @@ Source : `data/ai-usage.jsonl` (une ligne par appel réel : tokens `usage` x pri
 
 - Plafond global : arrêt propre à 8 EUR (`DARWIN_AI_BUDGET_EUR_STOP`), budget total 10 EUR. **Le plafond n'a jamais été approché.**
 - Ces chiffres sont notre **comptabilité locale** : la facture réelle de la plateforme n'a pas été relue sur cloud.near.ai, à vérifier par l'humain.
-- Les appels du juge (`validate`, modèle `google/gemini-2.5-flash-lite`, agent `treasury`) sont comptés dans le budget global mais **non débités aux agents** (avertissement `JUDGE_COST_UNKNOWN`) : bug connu.
+- Les appels du juge (`validate`, modèle `google/gemini-2.5-flash-lite`, agent `treasury`) sont comptés dans le budget global et journalisés (`brain.charged`, agent `treasury`) ; ils ne sont **pas débités aux agents**, par conception. L'avertissement `JUDGE_COST_UNKNOWN` des runs 5 à 7 est corrigé (0 au run 8).
 
 ## 7. Attestation TEE
 
@@ -78,6 +78,8 @@ Exécutée le 2026-11-10 sur `z-ai/glm-5.3-flash` : 20 contrôles PASS, 0 FAIL, 
 | 4 | arrêt au tick 18 | 429 | réessais à délai croissant (`accounts/near-backend.ts`) |
 | 5 | pas d'arrêt, génération 2 lente | gains 0,02 à 0,08 NEAR contre 0,004 de métabolisme par tick | économie réglée par variables d'environnement |
 | 6 | pas d'arrêt, plus de naissance | population plafonnée à 8 par le preset demo | `DARWIN_MAX_POPULATION=14` |
-| tous | collision d'ids au redémarrage | comptes et registre du contrat persistent | `DARWIN_AGENT_SEQ_START` |
+| tous | collision d'ids au redémarrage | comptes et registre du contrat persistent | `DARWIN_AGENT_SEQ_START` ; **depuis le run 8, décalage automatique** (horloge) |
+| 5 à 7 | `FC_KEY_NOT_ADDED` | clé limitée ajoutée après coup, le RPC ne voyait pas encore la clé du nouveau compte | clé ajoutée dans la transaction de création (run 8 : 0 échec) |
+| 5 à 7 | `JUDGE_COST_UNKNOWN` | préfixe du modèle servi différent de l'identifiant du catalogue | prix cherché sur l'identifiant demandé (run 8 : 0) |
 
-Réglages des runs 6 et 7 : `DARWIN_PRESET=demo`, `DARWIN_TICK_MS=10000`, `DARWIN_BIRTH_CAPITAL=0.1`, `DARWIN_METABOLISM=0.002`, `DARWIN_MIN_VITAL=0.02`, `DARWIN_REPRO_COOLDOWN_TICKS=5`, `DARWIN_SIM_CLIENT_RATE=1.5`, `DARWIN_MAX_POPULATION=14` (run 7 seulement), Node 22.23.4, RPC `https://test.rpc.fastnear.com`.
+Réglages du run 8 : `DARWIN_PRESET=selection` seul. Réglages des runs 6 et 7 : `DARWIN_PRESET=demo`, `DARWIN_TICK_MS=10000`, `DARWIN_BIRTH_CAPITAL=0.1`, `DARWIN_METABOLISM=0.002`, `DARWIN_MIN_VITAL=0.02`, `DARWIN_REPRO_COOLDOWN_TICKS=5`, `DARWIN_SIM_CLIENT_RATE=1.5`, `DARWIN_MAX_POPULATION=14` (run 7 seulement), Node 22.23.4, RPC `https://test.rpc.fastnear.com`.

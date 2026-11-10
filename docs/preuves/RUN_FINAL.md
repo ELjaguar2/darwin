@@ -1,3 +1,24 @@
+**Objectif** : une seule exécution réelle (testnet, séquestre dans le contrat, cerveau NEAR AI réel) montrant la sélection : naissances, morts, génération 3.
+
+**Résultat (run 8, 2026-11-10, 22:50 à 23:29 UTC, 59 ticks, preset `selection`)** : **objectif atteint**. Génération maximale **3** (`a-214964`, fille de `a-214962`, née au tick 59), 12 naissances (4 fondateurs, 7 de génération 2, 1 de génération 3), 8 reproductions, 8 lettres parent vers enfant, **7 morts par famine** (premier décès au tick 14), 65 séquestres verrouillés dont 63 libérés et 2 remboursés, 65 réputations écrites. Simulation mise en pause (`POST /api/sim/pause`, tick 59), processus arrêté, journal sauvegardé dans `docs/preuves/run8-journal.jsonl`.
+
+**Réglages** : `DARWIN_PRESET=selection` sans aucune autre variable de réglage ; ids décalés **automatiquement** (aucune variable `*_SEQ_START`) ; Node 22.23.4 ; RPC `https://test.rpc.fastnear.com`. Le preset est défini dans `shared/config.ts` (testnet : 4 fondateurs, population max 16, capital de naissance 0,1 NEAR, métabolisme 0,005/tick, minimum vital 0,03, cooldown de reproduction 4 ticks, client simulé 1,5 tâche/tick, budgets 0,02 à 0,06 NEAR, tick de 10 s).
+
+**Correctifs vérifiés par ce run** :
+- `FC_KEY_NOT_ADDED` : **0 avertissement** (le run 7 en avait 2). La clé function call est ajoutée dans la transaction de création du compte (créer, financer, clé complète, clé limitée : une seule transaction). Vérification indépendante en lecture seule : `near account list-keys a-214964.darwin-master-7k2.testnet` montre 2 clés : « full access » et « only do ["lock_escrow"] function calls on darwin-contract-7k2.testnet with an allowance of 0.05 NEAR ».
+- `JUDGE_COST_UNKNOWN` : **0 avertissement** (26 sur 26 appels du juge au run 7). La cause : le modèle servi (`gemini-2.5-flash-lite`) n'a pas le préfixe de l'identifiant demandé (`google/gemini-2.5-flash-lite`) ; le prix est maintenant cherché sur l'identifiant demandé. Le coût du juge est imputé à la trésorerie (agent `treasury`), pas aux agents : c'est voulu.
+- Aucun avertissement système du tout dans ce journal (`system.warning` : 0) : pas de 429 bloquant.
+
+**Vérification sur la chaîne (lecture seule, après le run)** : `get_agent a-214956` = mort, cause `starvation`, tick de mort 14 ; `get_agent a-214964` = génération 3, parent `a-214962`, vivant, né au tick 59 ; solde du compte maître 3,12 NEAR après le run (3,82 avant ; les fonds des agents morts reviennent au maître).
+
+**Consommation IA** : 138 appels facturés aux agents ce run (0 mock), 0,0149 USD ; cumul local depuis le début 0,034 USD (`data/ai-budget.json`), contre un plafond d'arrêt de 8 EUR. Comptabilité locale : la facture de la plateforme n'a pas été relue.
+
+**Limites honnêtes** : le payeur des tâches reste le client **simulé** `sim-client` ; une seule graine de population (pas de répétition) donc la vitesse d'apparition de la génération 3 (tick 59) n'est pas une garantie ; les agents morts le sont par famine (soldes de 0,025 à 0,030 NEAR, sous le minimum vital de 0,03) ; une seule génération 3 est née dans la fenêtre. Run mis en pause juste après sa naissance.
+
+{{RUN8}}
+
+### Run 7 (historique : génération 3 non atteinte)
+
 **Objectif** : atteindre la génération 3 dans un même run réel (testnet, séquestre dans le contrat, cerveau NEAR AI réel).
 **Résultat (2026-11-10, run 7, 20:43 à 21:03 UTC, arrêté au bout de 15 minutes de fenêtre)** : **génération 3 NON atteinte**. Génération maximale : 2 ; 3 fondateurs + 5 enfants vivants (8 agents), 5 reproductions, 5 lettres parent vers enfant, **0 mort**. Simulation mise en pause (`POST /api/sim/pause`, tick 26) puis processus arrêté ; journal sauvegardé dans `docs/preuves/run7-journal.jsonl`.
 
