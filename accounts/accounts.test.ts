@@ -143,6 +143,16 @@ describe("NearChain, mode contrat (faux backend)", () => {
     expect((await keystore.get(accountId, "fc"))?.publicKey).toBe(backend.fcKeys[0]!.publicKey);
   });
 
+  it("échec de la création : les deux clés (complète et function call) sont retirées du keystore", async () => {
+    const { chain, backend, keystore } = newChain({ contract: true });
+    backend.createSubAccount = async () => {
+      throw new Error("boom");
+    };
+    await expect(chain.createAccount({ label: "a-0003", initialFunding: Y("0.3") })).rejects.toThrow();
+    expect(await keystore.get("a-0003.darwin.testnet", "full")).toBeNull();
+    expect(await keystore.get("a-0003.darwin.testnet", "fc")).toBeNull();
+  });
+
   it("naissance financée par le parent : le capital vient du parent, plafond appliqué", async () => {
     const { chain } = newChain({ contract: true, birth: N("0.3") });
     const p = await chain.createAccount({ label: "p", initialFunding: Y("5") });

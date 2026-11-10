@@ -3,6 +3,7 @@
 // getState(), createSubAccount({accountOrPrefix, publicKey, nearToTransfer}), transfer({receiverId, amount}),
 // deleteAccount(beneficiaryId), addFunctionCallAccessKey({publicKey, contractId, methodNames, allowance}).
 // NearChain ne dépend que de l'interface `NearBackend`, donc se teste sans réseau avec un faux backend.
+import { createHash } from "node:crypto";
 import { ChainError } from "../shared/chain.ts";
 import type { Secret } from "./keys.ts";
 
@@ -110,7 +111,7 @@ export async function loadNearApiBackend(rpcUrl: string): Promise<NearBackend> {
   const stateCache = new Map<string, { at: number; v: { total: bigint; available: bigint } | null }>();
   const accounts = new Map<string, AnyRec>(); // une instance par compte (gestion des nonces)
   const acct = (s: NearSigner): AnyRec => {
-    const k = `${s.accountId}|${s.secretKey.reveal().slice(-8)}`;
+    const k = `${s.accountId}|${createHash("sha256").update(s.secretKey.reveal()).digest("hex").slice(0, 16)}`; // empreinte, jamais un fragment de clé
     const known = accounts.get(k);
     if (known) return known;
     const created: AnyRec = new lib.Account(s.accountId, provider, s.secretKey.reveal());

@@ -19,9 +19,13 @@ Statuts : à faire / en cours / en revue / validé / fusionné (dans main)
 | L12 | Recette V1 | qa + gardien-des-specs | tous | QA : PASSE en mock (docs/QA_RAPPORT.md) ; avis final du gardien en cours |
 | L13 | Cerveau réel : budget global 8 EUR, liste blanche de modèles bon marché, journal de consommation, attestation TEE, secours OpenAI-compatible | dev-cerveau-ia | L5 | fusionné dans `main` (branche `lot/L11-cerveau-reel`) |
 | L14 | Testnet réel : compte maître, déploiement du contrat, runs réels, décalage des ids (`DARWIN_AGENT_SEQ_START`, `DARWIN_TASK_SEQ_START`), marge de financement du marché, réessais 429 | chef-de-projet | L2, L3, L13 | branche `testnet-reel` ; génération 2 et `refund_escrow` prouvés ; génération 3 et mort **non prouvées** |
-| **L15 (PROCHAIN)** | **Fiabiliser le RPC testnet puis créer un preset testnet** (détail ci-dessous) | dev-comptes-wallets, dev-backend, dev-moteur-evolution | L14 | à faire |
+| L15 | Fiabiliser le RPC testnet, preset `selection`, clé function call à la naissance, ids automatiques, coût du juge | chef-de-projet (agents dev) | L14 | **fusionné** : run 8 réel = génération 3 + 7 morts (docs/PREUVES_TESTNET.md §8) |
 
-## Prochain lot : L15
+## Lot L15 (fait, 2026-11-10/11). Restes : réserves mineures
+
+Fait : clé function call dans la transaction de création ; `NEAR_RPC_URL` multi-fournisseurs (FailoverRpcProvider) ; cache `getState` 3 s ; jitter des réessais ; décalage automatique des ids ; preset `selection` ; `JUDGE_COST_UNKNOWN` corrigé ; run 8 réel. Pas de JSON-RPC groupé : nearcore ne l'accepte pas (doc NEAR). Restes : tester la bascule multi-RPC en réel ; plafonner `fundingMargin` (0,2 NEAR) selon le preset ; documenter dans `docs/SECURITE.md` le flux de la clé function call et les 3 faux positifs de l'historique ; répéter le run 8 pour confirmer la reproductibilité ; tâches de visiteurs en réel.
+
+## Détail initial du lot L15 (archive)
 
 1. **Limite de débit RPC** (le RPC public fastnear renvoie HTTP/JSON-RPC 429 et a arrêté 5 runs sur 7 ; `rpc.testnet.near.org` répond 429 « deprecated ») :
    - nouvelles tentatives avec délai croissant : **premier jet fait** dans `accounts/near-backend.ts` (6 essais, 2 s puis x2 jusqu'à 30 s sur `429`/`rate limit`) ; à compléter (jitter, mêmes règles pour les vues, test unitaire avec un faux backend qui renvoie 429) ;
