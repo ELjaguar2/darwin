@@ -5,7 +5,9 @@
   "type": "module",
   "description": "Darwin : agents IA qui gagnent leur vie, paient leur cerveau, se reproduisent et meurent (NEAR testnet).",
   "license": "MIT",
-  "engines": { "node": ">=22.12.0" },
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "start": "tsx backend/main.ts",
     "start:mock": "cross-env DARWIN_MODE=mock DARWIN_CHAIN= DARWIN_BRAIN= tsx backend/main.ts",
@@ -29,8 +31,10 @@
     "near-api-js": "7.4.0"
   },
   "devDependencies": {
+    "@phala/dcap-qvl": "0.7.1",
     "@types/node": "^22.12.0",
     "cross-env": "^7.0.3",
+    "ethers": "6.17.0",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
     "vitest": "5.1.0"

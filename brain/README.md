@@ -35,5 +35,12 @@ Personnalité, enchère, décision JSON, exécution, validation, lettre à l'enf
 ## Branchement backend
 `onWarning` doit émettre `system.warning` dans le journal. Aucun secret ni clé dans les messages d'erreur ou les warnings.
 
+## L11 : cerveau réel, budget, liste blanche, secours, attestation
+- **Catalogue et liste blanche** (`model-list.ts`) : `GET /v1/model/list` (public) ; prix = `inputCostPerToken.amount / 10^scale` USD par token (x 1e6 = USD/M). Seuls les 7 modèles de `MODEL_WHITELIST` sont proposés comme gène, jamais un modèle > 1 USD/M en entrée. Si le catalogue échoue : prix de repli du 2026-11-10 (`verified:false`, warning `BRAIN_PRICES_FALLBACK`). `extraBody` limite le raisonnement par modèle (sinon tokens de raisonnement facturés et texte vide). Un modèle hors liste est remplacé par le défaut (`BRAIN_MODEL_FALLBACK`). Revérifier : `npm run ai:probe` (un vrai appel minuscule par modèle, ~0,0005 USD au total).
+- **Budget global** (`budget.ts`) : `DARWIN_AI_BUDGET_EUR_STOP` (8), `DARWIN_AI_BUDGET_EUR_TOTAL` (10), `DARWIN_EUR_USD_RATE` (1.10, prudent). Cumul USD persistant `data/ai-budget.json`. Au plafond : `BrainError BUDGET_EXHAUSTED`, aucun appel réseau, `onBudgetExhausted` -> le backend émet `BRAIN_BUDGET_STOP` et arrête le moteur (`sim.stopped`). Pour repartir à zéro : supprimer `data/ai-budget.json` (et archiver `data/ai-usage.jsonl`).
+- **Journal d'usage** `data/ai-usage.jsonl` (une ligne par appel : horodatage, fournisseur, modèle, tokens, coût USD/EUR, id de réponse, agent, usage). Rapport : `npm run ai:usage-report [-- --dir data --last 15]` (Markdown prêt pour `docs/PREUVES_TESTNET.md`).
+- **Secours** (`fallback-brain.ts`) : `AI_BASE_URL` / `AI_API_KEY` / `AI_MODEL`. Bascule après 3 échecs consécutifs (panne, timeout, 401/402/403, 429), jamais sur budget ou garde-fou local ; sans clé NEAR AI : secours seul. Pas de liste blanche NEAR pour lui, plafond de budget commun.
+- **Attestation TEE** : `npm run ai:verify-attestation` ; voir `docs/ATTESTATION_TEE.md` (ce qui est vérifié et ce qui ne l'est pas).
+
 ## Tests
-`npx vitest run brain` : fetch simulé uniquement, sans clé ni réseau.
+`npx vitest run brain` : fetch simulé uniquement, sans clé ni réseau (`brain.test.ts`, `l11.test.ts`). Les scripts `ai:probe` et `ai:verify-attestation` font de vrais appels et exigent `NEARAI_API_KEY` ; ils ne font pas partie de `npm test`.
