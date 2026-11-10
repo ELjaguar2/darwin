@@ -183,31 +183,35 @@ export class NearChain implements Chain {
     // La clé est enregistrée AVANT la transaction : un crash ne doit jamais laisser un compte sans clé.
     const key = generateKey();
     await this.keystore.put(accountId, "full", key);
+    // Clé function call à droits limités (contrat Darwin seulement, méthodes listées, gaz borné, aucun dépôt possible),
+    // ajoutée dans la même transaction que la création du compte : l'agent naît avec ses deux clés.
+    let fc: ReturnType<typeof generateKey> | undefined;
+    if (this.o.contractId) {
+      fc = generateKey();
+      await this.keystore.put(accountId, "fc", fc);
+    }
     let hash: string;
     try {
-      hash = await this.o.backend.createSubAccount(this.master, args.label, key.publicKey, fund);
+      hash = await this.o.backend.createSubAccount(
+        this.master,
+        args.label,
+        key.publicKey,
+        fund,
+        fc && this.o.contractId
+          ? {
+              publicKey: fc.publicKey,
+              contractId: this.o.contractId,
+              methodNames: this.o.fcMethods?.length ? this.o.fcMethods : ["lock_escrow"],
+              allowance: this.o.fcAllowance ?? NEAR / 20n, // 0.05 NEAR de gaz au plus
+            }
+          : undefined,
+      );
     } catch (e) {
       await this.keystore.remove(accountId);
       if (reimbursed) await this.transfer({ from: this.o.masterId, to: from, amount: fund.toString(), memo: "rollback" }).catch(() => undefined);
       throw e;
     }
     const tx = this.receipt("create_account", hash, { from: this.o.masterId, to: accountId, amount: fund.toString() });
-
-    // Clé function call à droits limités (contrat Darwin seulement, méthodes listées, gaz borné, aucun dépôt possible).
-    if (this.o.contractId) {
-      try {
-        const fc = generateKey();
-        await this.keystore.put(accountId, "fc", fc);
-        await this.o.backend.addFunctionCallKey({ accountId, secretKey: key.secretKey }, fc.publicKey, {
-          contractId: this.o.contractId,
-          methodNames: this.o.fcMethods?.length ? this.o.fcMethods : ["lock_escrow"],
-          allowance: this.o.fcAllowance ?? NEAR / 20n, // 0.05 NEAR de gaz au plus
-        });
-      } catch (e) {
-        await this.keystore.remove(accountId, "fc");
-        this.o.onWarning?.("FC_KEY_NOT_ADDED", `Clé function call non ajoutée pour ${accountId} : ${e instanceof Error ? e.message.slice(0, 200) : "erreur"}`);
-      }
-    }
     return { accountId, tx };
   }
 

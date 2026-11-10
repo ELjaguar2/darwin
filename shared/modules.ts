@@ -53,6 +53,7 @@ export interface SimState {
 /** Options du moteur (D-027). En mock, `emitChainTx: true` : le moteur émet lui-même `chain.tx` pour ses transferts (MockChain n'a pas de journal) ; avec NearChain (accounts/ émet déjà), laisser false. */
 export interface EngineOptions {
   emitChainTx?: boolean;
+  agentSeqStart?: number;
 }
 
 /** Moteur d'évolution (dev-moteur-evolution, dossier engine/) : boucle de ticks, cycle de vie, économie des agents. */

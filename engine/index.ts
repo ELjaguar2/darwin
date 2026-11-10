@@ -24,7 +24,7 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
   const ctx: Ctx = {
     deps, market, agents: new Map(), letters: new Map(), models: [], defaultModel: "",
     emitChainTx: options.emitChainTx ?? deps.chain.info().kind === "mock",
-    tick: 0, nextAgent: 0, nextLetter: 0, lastRepro: new Map(), pending: new Map(), attempted: new Set(), warned: new Set(),
+    tick: 0, nextAgent: Math.max(0, Math.floor(options.agentSeqStart ?? 0)), nextLetter: 0, lastRepro: new Map(), pending: new Map(), attempted: new Set(), warned: new Set(),
   };
   const { config, journal, rng } = deps;
   const { sim } = config;

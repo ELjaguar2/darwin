@@ -317,6 +317,21 @@ describe("validation et sécurité du texte", () => {
     expect(floor.verdict).toBe("rejected");
   });
 
+  it("juge IA : modèle servi sans préfixe (« gemini-… » pour « google/gemini-… ») : coût quand même comptabilisé, pas de JUDGE_COST_UNKNOWN", async () => {
+    const s = await setup();
+    const real = s.deps.brain;
+    const id = await real.defaultModel();
+    s.deps.brain.complete = async () => ({ text: '{"verdict":"accepted","score":0.9,"reason":"ok"}', model: id.split("/").pop()! + "-served", mock: false, usage: { promptTokens: 10, completionTokens: 10, reasoningTokens: 0, totalTokens: 20 } });
+    const market = createMarket(s.deps);
+    const t = await post(market);
+    await market.placeBid({ taskId: t.id, agentId: "a-0001", price: N("0.5"), etaTicks: 1 });
+    await market.step(1);
+    await market.submitResult({ taskId: t.id, agentId: "a-0001", text: GOOD });
+    const ev = s.journal.since(0);
+    expect(ev.find((e) => e.type === "system.warning" && (e.data as { code?: string }).code === "JUDGE_COST_UNKNOWN")).toBeUndefined();
+    expect(ev.find((e) => e.type === "brain.charged")!.data).toMatchObject({ agentId: "treasury", purpose: "validate" });
+  });
+
   describe("juge indisponible avec un cerveau réel : échec fermé", () => {
     /** Cerveau « réel » (kind nearai) dont le comportement est piloté par le test. */
     function realBrain(behave: { mode: "ok" | "down" | "rate" | "garbage" }) {

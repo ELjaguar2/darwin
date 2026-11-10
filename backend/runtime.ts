@@ -57,6 +57,20 @@ export function readVersion(): string {
   }
 }
 
+/**
+ * Décalage de départ des numéros d'agents et de tâches. Sur une vraie chaîne, les sous-comptes et le registre du contrat
+ * persistent d'un run à l'autre : repartir de 1 provoquerait « Compte déjà existant » ou ESCROW_EXISTS. Sans variable
+ * explicite, on part donc d'un nombre croissant avec l'horloge (secondes depuis le 2026-11-01 x `perSecond`) : deux runs
+ * espacés de quelques minutes ne se chevauchent pas, sans lecture du registre. Mock : 0 (ids lisibles, tests stables).
+ */
+export function idOffset(envName: string, chainKind: string, perSecond: number, now: () => Date, env: NodeJS.ProcessEnv = process.env): number {
+  const explicit = env[envName];
+  if (explicit !== undefined && explicit !== "") return Math.max(0, Math.floor(Number(explicit)) || 0);
+  if (chainKind === "mock") return 0;
+  const seconds = Math.max(0, (now().getTime() - Date.UTC(2026, 10, 1)) / 1000);
+  return Math.floor(seconds * perSecond);
+}
+
 export function createRuntime(config: Config, opts: RuntimeOptions = {}): Runtime {
   const now = opts.now ?? (() => new Date());
   const log = opts.log ?? (() => {});
@@ -102,8 +116,8 @@ export function createRuntime(config: Config, opts: RuntimeOptions = {}): Runtim
   });
 
   const deps: Deps = { config, chain, brain, journal, rng: createRng(config.seed), now };
-  const market = createMarket(deps);
-  const engine = createEngine(deps, market, { emitChainTx, autoRun: opts.autoRun ?? true });
+  const market = createMarket(deps, { taskSeqStart: idOffset("DARWIN_TASK_SEQ_START", chain.info().kind, 10, now), fundingMargin: chain.info().kind === "mock" ? 0n : 200_000_000_000_000_000_000_000n });
+  const engine = createEngine(deps, market, { emitChainTx, autoRun: opts.autoRun ?? true, agentSeqStart: idOffset("DARWIN_AGENT_SEQ_START", chain.info().kind, 0.25, now) });
   stopEngine = () => { void engine.stop().catch(() => {}); };
 
   // Index des offres (le journal fait foi pour l'historique).

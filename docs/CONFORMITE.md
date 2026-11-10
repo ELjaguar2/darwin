@@ -4,7 +4,7 @@
 
 ## A. Définition de la V1 (CLAUDE.md)
 - [ ] Clone neuf + commandes du README = tout tourne (mock sans clé, testnet avec clés) : mock vérifié par la QA sur clone neuf (c99eab0) et par moi sur l'arbre de travail (démarrage, health, POST /api/tasks, tâche `settled`) ; pas de re-clone par moi ; testnet jamais exécuté (pas de clés, Node 22.17.1 < 22.22.2)
-- [x] >= 3 générations naissent, travaillent, paient leur IA, se reproduisent, meurent, sans intervention (mock) : `start:demo` lancé par moi, `generations: 3` en ~1 min, 94 `brain.charged`, 45 `escrow.released`, 2 `agent.reproduced`, 2 `letter.written` ; morts : test `engine/simulation.test.ts` (3 générations) et QA (15 morts, `starvation`). Réserve : en testnet non exécuté
+- [x] >= 3 générations naissent, travaillent, paient leur IA, se reproduisent, meurent, sans intervention (mock) : `start:demo` lancé par moi, `generations: 3` en ~1 min, 94 `brain.charged`, 45 `escrow.released`, 2 `agent.reproduced`, 2 `letter.written` ; morts : test `engine/simulation.test.ts` (3 générations) et QA (15 morts, `starvation`). Testnet (mise à jour 2026-11-11) : run 8 réel, preset `selection`, génération 3, 12 naissances, 8 reproductions, 7 morts par famine avec `mark_dead` et clôture de compte, sans intervention jusqu'à la pause au tick 59 (`docs/PREUVES_TESTNET.md` §8, journal `docs/preuves/run8-journal.jsonl`). Réserve : un seul run, non rejoué par la QA
 - [x] Marché : publication, enchères, séquestre, validation, paiement, réputation (mock) : tâche visiteur `t-0047` publiée, enchère, validée `brain:mock/small`, `settled` ; 45 `reputation.updated`, 6 `subcontract.created` ; code `market/index.ts` `settle()` lu
 - [x] Lettres parent -> enfant générées et consultables (événements `letter.written` vérifiés ; endpoint `/api/agents/<id>/letter` vérifié par la QA)
 - [ ] Page web en direct : arbre généalogique, soldes, naissances, morts, flux de transactions, formulaire de tâche : code `frontend/` lu (étiquettes d'honnêteté présentes, aucun `innerHTML`), vérifiée dans Chromium par la QA (réserve : panneau « morts » non contrôlé visuellement, puis capture `morts-desktop` ajoutée) ; je n'ai pas rendu la page moi-même
@@ -60,7 +60,7 @@
 
 ## H. Concept Darwin (CLAUDE.md) et règles communes
 - [x] Génome (vérifié `shared/types.ts`, `GenomeSchema`, test vert) : métier, modèle d'IA, prix, appétit du risque, seuil de reproduction, générosité, coopération, personnalité
-- [x] Cycle (mock) : naissance, travail, reproduction (mutations + lettre), mort (solde sous le minimum vital, lignée conservée) : événements observés en preset demo ; mort et lignée par test et QA ; en testnet non exécuté
+- [x] Cycle (mock) : naissance, travail, reproduction (mutations + lettre), mort (solde sous le minimum vital, lignée conservée) : événements observés en preset demo ; mort et lignée par test et QA ; en testnet : run 8 réel (génération 3, 7 morts, `docs/PREUVES_TESTNET.md` §8), payeur = client simulé
 - [x] Économie (mock) : tâches de visiteurs (séquestre, validation, réputation), sous-traitance, client simulé étiqueté (`badge: "simulé"`, « Visiteur (financé par le compte de démo) »)
 - [x] Jamais de crédit sans preuve vérifiée : `Chain.releaseEscrow` exige `PROOF_REQUIRED` (testé `shared.test.ts:90-116`) ; `market/index.ts:278-308` : libération seulement après verdict `accepted` enregistré, `resultHash` identique, séquestre contrôlé ; `rejected` -> remboursement ; juge IA indisponible -> `VALIDATION_PENDING` 503 (échec fermé). La « preuve » est produite par l'opérateur (non cryptographique), divulgué dans README §10
 - [x] Aucune dérive de périmètre : rien d'ajouté hors concept dans `frontend/`, `backend/`, `market/`, `engine/`, `brain/`, `accounts/`, `intents/`
@@ -166,7 +166,7 @@ Aucun changement par rapport à SPECS : début 2026-11-01 00:00 UTC, clôture 20
 | Case | Verdict | Raison |
 |---|---|---|
 | Clone neuf + README | PARTIEL | Mock OK (QA sur clone neuf à c99eab0, moi sur l'arbre de travail : démarrage, health, tâche `settled`). Testnet avec clés jamais exécuté. |
-| >= 3 générations autonomes | OK (mock) | `start:demo` : 3 générations en ~1 min, paiements IA, reproductions, lettres ; morts par test et QA. Jamais sur testnet. |
+| >= 3 générations autonomes | OK (mock) | `start:demo` : 3 générations en ~1 min, paiements IA, reproductions, lettres ; morts par test et QA. Testnet : run 8 réel (génération 3, 7 morts ; un seul run, payeur = client simulé). |
 | Marché complet | OK (mock) | Publication, enchères, séquestre, validation nommée, paiement, réputation observés ; garde « pas de crédit sans verdict `accepted` » lue dans `market/index.ts:278-308`. Séquestre dégradé par défaut (contrat non déployé). |
 | Lettres consultables | OK | `letter.written` observé ; endpoint vérifié par la QA. |
 | Page web en direct | PARTIEL | Code et étiquettes lus ; vérifiée dans un navigateur par la QA uniquement ; je ne l'ai pas rendue. |

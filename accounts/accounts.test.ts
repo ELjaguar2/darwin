@@ -125,6 +125,34 @@ describe("NearChain, mode contrat (faux backend)", () => {
     await expect(chain.createAccount({ label: "Bad.Label", initialFunding: "1" })).rejects.toThrow(/invalide/);
   });
 
+  it("naissance : la clé function call est dans la transaction de création (jamais ajoutée après coup)", async () => {
+    const { chain, backend, keystore } = newChain({ contract: true });
+    let afterwards = 0;
+    const orig = backend.addFunctionCallKey.bind(backend);
+    backend.addFunctionCallKey = async (...a: Parameters<typeof orig>) => {
+      afterwards++;
+      return orig(...a);
+    };
+    const warnings: string[] = [];
+    (chain as unknown as { o: { onWarning?: (c: string) => void } }).o.onWarning = (c) => warnings.push(c);
+    const { accountId } = await chain.createAccount({ label: "a-0002", initialFunding: Y("0.3") });
+    expect(afterwards).toBe(0);
+    expect(warnings).not.toContain("FC_KEY_NOT_ADDED");
+    expect(backend.accounts.get(accountId)!.keys).toHaveLength(2);
+    expect(backend.fcKeys.filter((k) => k.accountId === accountId)).toHaveLength(1);
+    expect((await keystore.get(accountId, "fc"))?.publicKey).toBe(backend.fcKeys[0]!.publicKey);
+  });
+
+  it("échec de la création : les deux clés (complète et function call) sont retirées du keystore", async () => {
+    const { chain, backend, keystore } = newChain({ contract: true });
+    backend.createSubAccount = async () => {
+      throw new Error("boom");
+    };
+    await expect(chain.createAccount({ label: "a-0003", initialFunding: Y("0.3") })).rejects.toThrow();
+    expect(await keystore.get("a-0003.darwin.testnet", "full")).toBeNull();
+    expect(await keystore.get("a-0003.darwin.testnet", "fc")).toBeNull();
+  });
+
   it("naissance financée par le parent : le capital vient du parent, plafond appliqué", async () => {
     const { chain } = newChain({ contract: true, birth: N("0.3") });
     const p = await chain.createAccount({ label: "p", initialFunding: Y("5") });

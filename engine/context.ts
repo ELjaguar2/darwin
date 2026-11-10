@@ -6,6 +6,8 @@ export interface EngineOptions {
   autoRun?: boolean;
   /** Émet `chain.tx` pour les transferts du moteur. Défaut : true seulement avec une chaîne mock (NearChain journalise elle-même). */
   emitChainTx?: boolean;
+  /** Numéro de départ des identifiants d'agents (a-XXXX). Défaut 0. Utile en testnet : les comptes et le registre du contrat persistent entre deux lancements. */
+  agentSeqStart?: number;
 }
 
 export interface Ctx {

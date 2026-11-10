@@ -133,7 +133,7 @@ export function brainJudge(deps: JudgeDeps): Validator {
           agentId: "treasury", purpose: "validate", model, messages: judgeMessages(input.task, input.text),
           maxTokens: deps.maxTokens ?? 200, temperature: 0,
         });
-        await chargeTreasury(deps, res, input.tick);
+        await chargeTreasury(deps, res, input.tick, model);
         const v = parseJudgeVerdict(res.text);
         if (!v) throw new Error("réponse du juge illisible");
         return {
@@ -156,10 +156,12 @@ export function brainJudge(deps: JudgeDeps): Validator {
   };
 }
 
-async function chargeTreasury(deps: JudgeDeps, res: BrainResponse, tick: number): Promise<void> {
+async function chargeTreasury(deps: JudgeDeps, res: BrainResponse, tick: number, requestedModel?: string): Promise<void> {
   // Coût imputé à la trésorerie : comptabilisé dans le journal, débité à aucun agent. Jamais de coût nul silencieux.
   try {
-    const info = (await deps.brain.listModels()).find((m) => m.id === res.model);
+    // Le modèle servi peut perdre son préfixe (« gemini-2.5-flash-lite » pour « google/gemini-2.5-flash-lite ») : on prix sur l'id demandé.
+    const models = await deps.brain.listModels();
+    const info = models.find((m) => m.id === requestedModel) ?? models.find((m) => m.id === res.model);
     assertValidPrice(info);
     const rate = deps.config.sim.nearUsdRate;
     deps.journal.emit({

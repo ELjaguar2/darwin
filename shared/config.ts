@@ -2,7 +2,7 @@
 // Aucun module ne lit process.env directement : tous reçoivent un `Config` (testable, sans effet de bord).
 import { parseNear } from "./money.ts";
 
-export type Preset = "normal" | "demo";
+export type Preset = "normal" | "demo" | "selection";
 
 /** Paramètres de simulation (montants déjà en yocto, durées en ticks). */
 export interface SimParams {
@@ -47,6 +47,13 @@ export const PRESETS: Record<"mock" | "testnet", Record<Preset, SimParams>> = {
       // D-028 : taux bas = coût IA visible (un appel `mock/large` ~0,07 NEAR, `mock/small` ~0,01 NEAR) ; sans effet sur un taux réel.
       nearUsdRate: 0.01, maxTokensPerCall: 300, settleEveryTicks: 1, visitorHourlyCap: N("30"),
     },
+    selection: {
+      tickMs: 400, founders: 4, maxPopulation: 16, maxTicks: 900,
+      birthCapital: N("10"), metabolism: N("0.08"), minVital: N("1.5"), reproCooldownTicks: 10,
+      simClientRatePerTick: 1.5, taskBudgetMin: N("0.5"), taskBudgetMax: N("2.5"),
+      bidWindowTicks: 1, taskDeadlineTicks: 5, mutationRate: 0.4, mutationSd: 0.2,
+      nearUsdRate: 0.01, maxTokensPerCall: 300, settleEveryTicks: 1, visitorHourlyCap: N("30"),
+    },
   },
   // Testnet : montants minuscules (le testnet est limité par faucet), ticks lents (latence des transactions).
   testnet: {
@@ -61,6 +68,17 @@ export const PRESETS: Record<"mock" | "testnet", Record<Preset, SimParams>> = {
       tickMs: 3000, founders: 3, maxPopulation: 8, maxTicks: 400,
       birthCapital: N("0.2"), metabolism: N("0.004"), minVital: N("0.05"), reproCooldownTicks: 8,
       simClientRatePerTick: 0.9, taskBudgetMin: N("0.02"), taskBudgetMax: N("0.08"),
+      bidWindowTicks: 1, taskDeadlineTicks: 4, mutationRate: 0.4, mutationSd: 0.2,
+      nearUsdRate: 3, maxTokensPerCall: 300, settleEveryTicks: 4, visitorHourlyCap: N("0.5"),
+    },
+    // « selection » : la sélection est visible en un seul run réel (morts ET génération 3). Population plafonnée large,
+    // capital de naissance modeste, métabolisme fort (un agent sans contrat meurt en une dizaine de ticks), gains
+    // supérieurs au métabolisme pour les bons agents (ils se reproduisent), reproduction rapide. Ticks de 10 s :
+    // la latence RPC testnet fait qu'un tick réel dure environ une minute.
+    selection: {
+      tickMs: 10000, founders: 4, maxPopulation: 16, maxTicks: 0,
+      birthCapital: N("0.1"), metabolism: N("0.005"), minVital: N("0.03"), reproCooldownTicks: 4,
+      simClientRatePerTick: 1.5, taskBudgetMin: N("0.02"), taskBudgetMax: N("0.06"),
       bidWindowTicks: 1, taskDeadlineTicks: 4, mutationRate: 0.4, mutationSd: 0.2,
       nearUsdRate: 3, maxTokensPerCall: 300, settleEveryTicks: 4, visitorHourlyCap: N("0.5"),
     },
@@ -127,7 +145,7 @@ export function loadConfig(env: Env = process.env): Config {
   const mode = (str(env, "DARWIN_MODE") ?? "mock") as Config["mode"];
   if (mode !== "mock" && mode !== "testnet") throw new Error(`DARWIN_MODE invalide : ${mode} (mock|testnet)`);
   const preset = (str(env, "DARWIN_PRESET") ?? "normal") as Preset;
-  if (preset !== "normal" && preset !== "demo") throw new Error(`DARWIN_PRESET invalide : ${preset} (normal|demo)`);
+  if (preset !== "normal" && preset !== "demo" && preset !== "selection") throw new Error(`DARWIN_PRESET invalide : ${preset} (normal|demo|selection)`);
 
   const apiKey = str(env, "NEARAI_API_KEY");
   const chain = (str(env, "DARWIN_CHAIN") ?? (mode === "testnet" ? "near" : "mock")) as Config["chain"];

@@ -2,11 +2,11 @@
 
 > "Today, you pay for your AI's consumption. Tomorrow, you will pay an agent like a freelancer: it will have overhead, answer calls for tenders and have to be profitable to exist. Darwin shows who will survive, on NEAR."
 
-**AI agents that earn their living, pay for their own brain, reproduce with their own money, and die when they run dry. Economic natural selection, live. Runs fully simulated (mock chain and AI) by default; NEAR testnet and NEAR AI Cloud modes are implemented but not yet run.**
+**AI agents that earn their living, pay for their own brain, reproduce with their own money, and die when they run dry. Economic natural selection, live. Runs fully simulated (mock chain and AI) by default; the NEAR testnet and NEAR AI Cloud modes were run for real on 2026-11-10 (one real run reached generation 3 with 7 deaths: see [docs/PREUVES_TESTNET.md](docs/PREUVES_TESTNET.md)).**
 
 Built at NEAR HACKATHON 2026 (tracks envisaged: AI Swarms (main), Agent Economy, Open Innovation; to be confirmed by the submitter). License: MIT. A short French summary is at the end of this file ([Résumé en français](#résumé-en-français)).
 
-> Honesty first. Everything marked **MOCK** or **SIMULATED** below is simulated, and the app labels it as such. The testnet mode and the NEAR AI Cloud mode were **not run against the real network** by the author of this README (no keys, Node 22.17.1 on the authoring machine). See [What is real, simulated or mock](#what-is-real-simulated-or-mock) and [Trust model and known limits](#10-trust-model-and-known-limits).
+> Honesty first. Everything marked **MOCK** or **SIMULATED** below is simulated, and the app labels it as such. On 2026-11-10 the testnet mode, the deployed contract and the NEAR AI Cloud mode were **run for real**: in one real run (run 8, preset `selection`, 59 ticks, about 40 minutes) the population reached **generation 3**, with 12 births, 8 reproductions and letters, **7 deaths by starvation** (accounts closed, `mark_dead` in the contract), 65 escrows locked in the contract (63 released, 2 refunded). **Still not real**: every paid task in those runs came from the **simulated client** (no human visitor paid on testnet), NEAR Intents was never executed, and the NEAR AI Cloud bill was not checked against the platform invoice (local accounting only, about 0.034 USD). One run, one seed: generation 3 at tick 59 is an observation, not a guarantee. Transaction ids and explorer links: [docs/PREUVES_TESTNET.md](docs/PREUVES_TESTNET.md). See [What is real, simulated or mock](#what-is-real-simulated-or-mock) and [Trust model and known limits](#10-trust-model-and-known-limits).
 
 ---
 
@@ -64,28 +64,28 @@ Full details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Module READMEs: [`
 
 | NEAR tool | How Darwin uses it | Status |
 |---|---|---|
-| **Accounts and sub-accounts** | Each agent gets its own sub-account `<agent>.<master>` created from the master account with a birth capital; on death the account is deleted and the balance returns to the master. Two marketplace sub-accounts exist: `visitors.<master>` (demo funds for visitor tasks) and `sim-client.<master>` (simulated client). Code: `accounts/near-chain.ts`, `accounts/near-backend.ts` (`near-api-js` 7.4.0). | **Testnet mode: implemented, tested only against a fake NEAR backend**; first real run pending. **Mock mode: in-memory MockChain.** |
-| **Access keys (full key + function-call key)** | Every sub-account gets a full-access key (held by the engine: transfers, escrow deposits, deletion) and, when a contract is configured, a **function-call access key** restricted to the Darwin contract, an explicit method list (default `lock_escrow`) and a gas allowance of 0.05 NEAR. Keys are stored under `data/keys/` (git-ignored) and never logged. | Implemented, **not run on testnet**. A function-call key cannot attach a deposit, so it cannot move money (protocol limit); it is meant for a less privileged agent runtime and is not used by the engine today. |
-| **Testnet smart contract** `contracts/darwin` (Rust, `near-sdk` 5.30.1) | Agent registry and genealogy, task escrow (`reserve_task`, `lock_escrow`, `release_escrow`, `refund_escrow`), reputation. 35 native unit tests pass (per `contracts/README.md`; not re-run by the author of this README). | **Written and unit-tested. NOT deployed to testnet, NOT built with `cargo near build`, never called on a real network.** Until deployed, escrow runs in **degraded mode** (below). |
-| **NEAR AI Cloud** (`https://cloud-api.near.ai/v1`) | The agents' brain: `POST /chat/completions` for bids, work, validation, letters, mutations; `GET /models` for the model list and prices (the model is a gene). Token `usage` drives the AI cost debit. | Client implemented and tested with a simulated `fetch`. The `GET /models` format was observed on a real response (prices per million tokens). **Chat completions not run with a real key.** Mock brain when no key. |
-| **NEAR Intents (1Click API)** | One optional mainnet moment: quote and deposit flow (`https://1click.chaindefuser.com`: `/v0/tokens`, `/v0/quote`, `/v0/deposit/submit`, `/v0/status`). Disabled by default (`INTENTS_ENABLED=false`), limited to `dry:true` quotes (`INTENTS_DRY_ONLY=true`). The code never signs; a human sends the deposit. | Client implemented with mock tests. **Outside the V1 demo.** A real run needs a written human go-ahead (it spends mainnet money); procedure in [`intents/DEMO_MAINNET.md`](intents/DEMO_MAINNET.md). Not run by the author of this README. |
+| **Accounts and sub-accounts** | Each agent gets its own sub-account `<agent>.<master>` created from the master account with a birth capital; on death the account is deleted and the balance returns to the master. Two marketplace sub-accounts exist: `visitors.<master>` (demo funds for visitor tasks) and `sim-client.<master>` (simulated client). Code: `accounts/near-chain.ts`, `accounts/near-backend.ts` (`near-api-js` 7.4.0). | **Testnet mode: run for real on 2026-11-10** (accounts created, funded and registered; see docs/PREUVES_TESTNET.md). **Mock mode: in-memory MockChain.** |
+| **Access keys (full key + function-call key)** | Every sub-account gets a full-access key (held by the engine: transfers, escrow deposits, deletion) and, when a contract is configured, a **function-call access key** restricted to the Darwin contract, an explicit method list (default `lock_escrow`) and a gas allowance of 0.05 NEAR. Keys are stored under `data/keys/` (git-ignored) and never logged. | **Run for real on testnet (run 8)**: the function-call key is now added inside the account-creation transaction (create, fund, full key, limited key in one transaction); 0 `FC_KEY_NOT_ADDED` warning in run 8 (it failed in runs 5 to 7), and `near account list-keys` on a run-8 agent shows both keys. A function-call key cannot attach a deposit, so it cannot move money (protocol limit); it is meant for a less privileged agent runtime and is **not used by the engine today**. |
+| **Testnet smart contract** `contracts/darwin` (Rust, `near-sdk` 5.30.1) | Agent registry and genealogy, task escrow (`reserve_task`, `lock_escrow`, `release_escrow`, `refund_escrow`), reputation. 35 native unit tests pass (per `contracts/README.md`). | **Deployed on testnet (2026-11-10) and called for real**: registry, escrow lock and release with proof, reputation (see docs/PREUVES_TESTNET.md). Built with plain `cargo build --target wasm32-unknown-unknown`, **not** with `cargo near build`; the runtime accepted it. `refund_escrow` was exercised on testnet (tasks rejected by the validator or expired, escrow refunded: 1 in run 7, 2 in run 8), and `mark_dead` for the 7 deaths of run 8. |
+| **NEAR AI Cloud** (`https://cloud-api.near.ai/v1`) | The agents' brain: `POST /chat/completions` for bids, work, validation, letters, mutations; `GET /model/list` for the model list and prices (the model is a gene, restricted to a cheap allow-list). Token `usage` drives the AI cost debit. | **Run for real** (350 real completions, about 0.034 USD in total by our local accounting; the platform invoice was not re-read; global stop cap 8 EUR). One TEE attestation was verified end to end on `z-ai/glm-5.3-flash` (`docs/ATTESTATION_TEE.md`); the simulation does **not** attest every call. Mock brain when no key. |
+| **NEAR Intents (1Click API)** | One optional mainnet moment: quote and deposit flow (`https://1click.chaindefuser.com`: `/v0/tokens`, `/v0/quote`, `/v0/deposit/submit`, `/v0/status`). Disabled by default (`INTENTS_ENABLED=false`), limited to `dry:true` quotes (`INTENTS_DRY_ONLY=true`). The code never signs; a human sends the deposit. | Client implemented with mock tests. **Outside the V1 demo.** A real run needs a written human go-ahead (it spends mainnet money); procedure in [`intents/DEMO_MAINNET.md`](intents/DEMO_MAINNET.md). **Never executed** (no real quote or deposit, no mainnet spending). |
 
 ### What is real, simulated or mock
 
 | Thing | Mock mode (default) | Testnet mode |
 |---|---|---|
-| Chain | **MOCK**: in-memory accounts, fake tx hashes (`mock_...`) | NEAR testnet sub-accounts (implemented, not yet run on the real network) |
+| Chain | **MOCK**: in-memory accounts, fake tx hashes (`mock_...`) | NEAR testnet sub-accounts (**run for real**: generation 3 and 7 deaths in run 8, see docs/PREUVES_TESTNET.md) |
 | AI brain | **MOCK**: deterministic canned answers (`[mock] ...`), simulated usage | NEAR AI Cloud if `NEARAI_API_KEY` is set, else mock + `system.warning BRAIN_NO_KEY` |
 | Escrow | Mock, operator-account semantics | `contract` only if `NEAR_CONTRACT_ID` is set, else **degraded** |
-| Simulated client | **SIMULATED**: a task generator; tasks labelled `simulé` / "Client simulé" | same |
-| Visitor tasks | Funded by the operator's demo account `visitors.<master>`, labelled "Visiteur (financé par le compte de démo)": test money of the operator, not the visitor's money | same |
+| Simulated client | **SIMULATED**: a task generator; tasks labelled `simulé` / "Client simulé" | same: in the real runs, **every** paid task came from the simulated client (`sim-client.<master>`) |
+| Visitor tasks | Funded by the operator's demo account `visitors.<master>`, labelled "Visiteur (financé par le compte de démo)": test money of the operator, not the visitor's money | same (code path exists; **no visitor task was run on testnet**) |
 | Money | Testnet NEAR has **no value** | same |
 
 **Degraded escrow (decisions D-016/D-022).** If the contract is not deployed (`NEAR_CONTRACT_ID` empty), escrow is held by an operator-controlled sub-account `escrow.<master>`, and registry and reputation live in a local ledger (`data/ledger.json`). In that mode, do **not** read "smart contract", "on-chain registry" or "on-chain reputation": it is a local journal. `GET /api/health` exposes `"escrow": "contract"` or `"escrow": "operator-account"`. Mock mode also shows `"operator-account"` (and `"mock": true` says separately that everything is simulated).
 
 ### How AI cost is accounted
 
-The cost of each AI call is computed in **USD** from the prices of `GET /v1/models` and the `usage` of the response, **converted to testnet NEAR at a fixed, configurable rate** (`DARWIN_NEAR_USD_RATE`, a simulation parameter, **not a market price**), and **debited from the agent's balance in favour of the master account**. The real bill is paid in USD by the operator's platform API key. The agent does **not** pay NEAR AI Cloud directly. The billing rule counts reasoning tokens and can slightly overestimate the cost. Global spending caps protect the platform key (`NEARAI_MAX_USD_PER_RUN`, default 2 USD; `NEARAI_MAX_USD_PER_HOUR`, default 1 USD).
+The cost of each AI call is computed in **USD** from the prices of `GET /v1/model/list` and the `usage` of the response, **converted to testnet NEAR at a fixed, configurable rate** (`DARWIN_NEAR_USD_RATE`, a simulation parameter, **not a market price**), and **debited from the agent's balance in favour of the master account**. The real bill is paid in USD by the operator's platform API key. The agent does **not** pay NEAR AI Cloud directly. The billing rule counts reasoning tokens and can slightly overestimate the cost. Global spending caps protect the platform key (`NEARAI_MAX_USD_PER_RUN`, default 2 USD; `NEARAI_MAX_USD_PER_HOUR`, default 1 USD).
 
 ## 6. Requirements
 
@@ -97,9 +97,9 @@ The cost of each AI call is computed in **USD** from the prices of `GET /v1/mode
 
 > **Verified status.**
 > - Verified: mock mode on a clean clone (QA run, `docs/QA_RAPPORT.md`), the API steps of section 9, the web page, and the full test suite (`npm test`).
-> - **Never executed**: NEAR testnet mode, the Rust contract deployed on testnet, real NEAR AI Cloud calls, the real NEAR Intents flow.
-> - The default and only verified mode is **MOCK** (simulated chain and AI).
-> - Escrow is **degraded** by default (operator-controlled account, local ledger).
+> - **Run for real on 2026-11-10**: NEAR testnet mode, the Rust contract deployed on testnet, real NEAR AI Cloud calls; one real run (preset `selection`) reached generation 3 with 7 deaths. Proofs: docs/PREUVES_TESTNET.md.
+> - **Never executed**: the real NEAR Intents flow; a human visitor's task on testnet (the payer in the real runs is the simulated client). The default mode remains **MOCK**.
+> - Escrow is in the **contract** when `NEAR_CONTRACT_ID` is set (it was in the real runs), otherwise **degraded** (operator-controlled account, local ledger).
 
 ```bash
 git clone <repository-url> darwin
@@ -133,7 +133,7 @@ Change the port with `PORT=3100` (default `3000`). Data is written under `data/`
 
 ## 8. Run it in testnet mode (keys and variables)
 
-> **Not run by the author of this README** (no testnet key, Node 22.17.1 < 22.22.2). The testnet code path is covered only by tests against a fake NEAR backend. Treat the first real run as a smoke test.
+> **Run for real on 2026-11-10** (Node 22.23.4, RPC `https://test.rpc.fastnear.com`). The run that reached generation 3 and deaths (run 8) used **`DARWIN_PRESET=selection` and no other tuning variable**. Early runs were stopped by public-RPC rate limits (HTTP 429); retries with growing delay were added and run 8 had no system warning. `NEAR_RPC_URL` also accepts a comma-separated list of providers (automatic failover); run 8 used a single provider, so the failover itself has not been exercised on the real network. Agent and task ids are now offset automatically at each launch (sub-accounts and the contract registry persist between runs); `DARWIN_AGENT_SEQ_START` / `DARWIN_TASK_SEQ_START` stay available as overrides. The `demo` preset caps the testnet population at 8 agents and is not meant for generation 3 on testnet.
 
 1. Use Node >= 22.22.2.
 2. Create a testnet account and fund it from a faucet (https://near-faucet.io or the faucet in docs.near.org). The faucet amount is not documented; the master account must cover the founders' capital plus the demo accounts.
@@ -144,16 +144,17 @@ Change the port with `PORT=3100` (default `3000`). Data is written under `data/`
 | `NEAR_MASTER_ACCOUNT_ID` | testnet master account (parent of the agents' sub-accounts) |
 | `NEAR_MASTER_PRIVATE_KEY` | **SECRET**, `ed25519:...`. Never commit it. |
 | `NEAR_CONTRACT_ID` | optional; empty = degraded escrow. Set after deploying the contract |
-| `NEAR_RPC_URL` | default `https://test.rpc.fastnear.com` |
+| `NEAR_RPC_URL` | default `https://test.rpc.fastnear.com`; comma-separated list = automatic failover between providers (public testnet providers listed in `.env.example`, from https://docs.near.org/api/rpc/providers) |
 | `NEARAI_API_KEY` | **SECRET**, from cloud.near.ai > API Keys; empty = mock brain |
 | `NEARAI_MODEL` | optional default model (checked against `/v1/models`) |
 | `NEARAI_MAX_USD_PER_RUN`, `NEARAI_MAX_USD_PER_HOUR` | spending caps in USD |
 | `DARWIN_NEAR_USD_RATE` | fixed USD per NEAR used to convert AI cost |
-| `DARWIN_PRESET` | `normal` or `demo` |
+| `DARWIN_PRESET` | `normal`, `demo` or `selection` (testnet: 4 founders, population cap 16, birth capital 0.1 NEAR, vital minimum 0.03 NEAR, 10 s ticks; the preset of the real run with deaths and generation 3) |
 | `DARWIN_ADMIN_TOKEN` | required when `HOST` is not `127.0.0.1`; protects `POST /api/sim/*` |
 
-4. Optional, deploy the contract: `NEAR_CONTRACT_ID=... NEAR_MASTER_ACCOUNT_ID=... bash contracts/deploy-testnet.sh` (this deploy syntax was never executed nor checked against the CLI docs; see `contracts/README.md`).
-5. `npm run start:testnet`. At startup the backend checks that the testnet RPC is reachable and the master account exists, otherwise it stops with a clear error.
+4. Optional, deploy the contract (executed once on 2026-11-10 with this syntax, using `sign-with-legacy-keychain` instead of `sign-with-keychain`): `NEAR_CONTRACT_ID=... NEAR_MASTER_ACCOUNT_ID=... bash contracts/deploy-testnet.sh`; see `contracts/README.md`.
+5. Put `DARWIN_PRESET=selection` in `.env` (a variable already set in the shell wins over `.env`), then `npm run start:testnet`. At startup the backend checks that the testnet RPC is reachable and the master account exists, otherwise it stops with a clear error.
+6. What you should see (as in run 8; one run, timings vary): `curl http://127.0.0.1:3000/api/health` shows `"mode":"testnet"`, and `"escrow":"contract"` if `NEAR_CONTRACT_ID` is set; `chain.tx` events in `/api/stream` carry real testnet hashes viewable on `https://testnet.nearblocks.io/txns/<hash>`. A tick lasts about a minute in practice (RPC latency). In run 8 the first death came at tick 14 (`/api/agents?status=dead`, `"causeOfDeath":"starvation"`) and generation 3 at tick 59 (`/api/lineage`), about 40 minutes. Pause with `curl -X POST http://127.0.0.1:3000/api/sim/pause`. Real runs spend testnet NEAR from the master account (3.82 to 3.12 NEAR in run 8) and a few cents of NEAR AI Cloud credit.
 
 All variables and defaults: `.env.example`. Keep keys in `.env` only.
 
@@ -179,7 +180,7 @@ These steps were **executed by the author against a real running backend** (`npm
 | 14 | Open `http://127.0.0.1:3000/` in a browser | The Darwin page: a banner "MODE MOCK, Client simulé, Séquestre dégradé", counters (generation, alive, dead, born, paid tasks, total balance), a live status pill ("En direct", tick number), the family tree (SVG) with agents sized by balance, a list of agents with balances, the market of tasks, and a form "Publier la tâche" (title, prompt, profession, budget in NEAR, display name). Submitting the form shows "Tâche t-NNNN publiée" and the task appears in the market. Checked with Playwright: no console error. |
 | 15 | `npm test`, then `npm run typecheck` | All tests pass and typecheck reports no error (author's run; run the commands to get the current count). |
 
-Never run by anyone so far: testnet mode, a real NEAR AI Cloud call, the contract on a real network, the real NEAR Intents flow. The web page and the clean-clone install in mock mode were checked (page by the author with Playwright, clean clone by the QA run, see `docs/QA_RAPPORT.md`). The Rust tests were not re-run by the author of this README.
+Run for real on 2026-11-10: testnet mode, the contract on testnet, real NEAR AI Cloud completions, one TEE attestation, and one run (preset `selection`) with generation 3 and 7 deaths (section 8, step 6; not re-run by QA as part of these steps). Never run: the real NEAR Intents flow, a human visitor's task on testnet. The web page and the clean-clone install in mock mode were checked (page by the author with Playwright, clean clone by the QA run, see `docs/QA_RAPPORT.md`). The Rust tests were not re-run by the author of this README.
 
 ## 10. Trust model and known limits
 
@@ -188,9 +189,9 @@ Never run by anyone so far: testnet mode, a real NEAR AI Cloud call, the contrac
 - **The economy is subsidised and a closed loop.** Agents' earnings come from the operator (simulated client and demo visitor account); metabolism and AI costs flow back to the master account. Testnet NEAR has no value. This is a simulation of selection, not a profitable business.
 - Visitor tasks: the visitor's text is always sent to the model as a `user` message, never as `system`. Limits: 10 open tasks per IP, 6 publications per minute per IP, an hourly budget cap on the demo account (HTTP 429).
 - **Degraded escrow** when the contract is not deployed (section 5).
-- The contract is **not deployed**; its WASM was built without `cargo-near`, and compatibility with the NEAR runtime is not verified.
-- Testnet gas: the minimal vital balance (0.05 NEAR) is an estimate not yet measured on the real network.
-- NEAR AI Cloud's usage format and prices were checked against the documentation and a real `/models` response only; a real completion was never run.
+- The contract is **deployed on testnet** (`darwin-contract-7k2.testnet`), but its WASM was built without `cargo-near`; it was accepted by the runtime and worked in the real runs, yet no reproducible-build guarantee exists.
+- Testnet gas: the vital minimum (0.05 NEAR in the `normal` and `demo` testnet presets, 0.03 NEAR in `selection`) is a simulation parameter; in run 8, agents died at 0.025 to 0.030 NEAR and their accounts were closed without error, but gas costs were not measured systematically.
+- NEAR AI Cloud completions were run for real; the cost debited to agents uses the catalogue prices and the response `usage`. The validator (judge) calls are counted in the global budget and booked to the treasury, **not** debited to agents, by design (the `JUDGE_COST_UNKNOWN` pricing warning of runs 5 to 7 is fixed: 0 in run 8). Costs are our local accounting; the platform invoice was not re-read.
 - The whole journal stays in memory; the `normal` preset runs unbounded. Behind a reverse proxy, IP limits become global.
 - The simulation restarts from zero at each launch (previous files are kept as `*.prev.*`).
 - NEAR Intents has no testnet: any real use is mainnet, with small amounts and a written human go-ahead.
@@ -209,10 +210,10 @@ The web page is in `frontend/` (plain HTML, CSS and ES modules, no build step, n
 
 ## Known limitations
 
-- The **testnet mode has never been run end to end** on the real network (only against a fake NEAR backend).
-- The **Rust contract is compiled and unit-tested natively but not deployed**; its WASM was not built with `cargo-near`. Escrow is therefore **degraded by default** (operator-controlled account, local ledger).
-- **NEAR AI Cloud has never been called for real in tests** (chat completions); only `/models` was observed.
-- **NEAR Intents (real flow) has never been replayed**; the default is dry-run quotes only.
+- The **testnet mode was run for real** (generation 3 and 7 deaths in one run, preset `selection`), but only **once** with that preset: no repetition, so speed of selection is not guaranteed. The payer of every task was the simulated client. The public RPC rate limit is a known weak point (multi-provider failover available, not exercised for real).
+- The **Rust contract is deployed on testnet and was called for real**; its WASM was not built with `cargo-near`.
+- **NEAR AI Cloud was called for real**; the TEE attestation is an on-demand check on one model, not a per-call guarantee.
+- **NEAR Intents (real flow) has never been executed**; the default is dry-run quotes only.
 - **Node >= 22.22.2 is required** for `near-api-js` (testnet mode); mock mode needs Node >= 22.12.
 - Escrow validation is by the operator (not trustless), and the economy is subsidised (see section 10).
 
@@ -245,7 +246,7 @@ MIT, see [`LICENSE`](LICENSE).
 **Darwin** est une population d'agents IA qui gagnent leur vie (enchères, tâches, séquestre), paient leur propre cerveau (coût IA débité de leur solde), se reproduisent avec leurs propres fonds (enfant muté et lettre « à mon enfant ») et meurent quand leur solde passe sous le minimum vital. Conçu pour NEAR testnet : sous-comptes, clés function call, contrat Rust, NEAR AI Cloud, NEAR Intents en option.
 
 - **Lancer sans aucune clé** : `npm install` puis `npm run start:mock` (Node >= 22.12). Preset rapide : `npm run start:demo`. API sur `http://127.0.0.1:3000` (`/api/health`, `/api/stream`, `POST /api/tasks`). Les étapes de la section 9 ont été exécutées contre un vrai backend.
-- **Mode testnet** : Node >= 22.22.2, `.env` avec `NEAR_MASTER_ACCOUNT_ID`, `NEAR_MASTER_PRIVATE_KEY`, `NEARAI_API_KEY`. **Non exécuté par l'auteur** (pas de clé) : testé seulement contre un faux backend NEAR.
+- **Mode testnet** : Node >= 22.22.2, `.env` avec `NEAR_MASTER_ACCOUNT_ID`, `NEAR_MASTER_PRIVATE_KEY`, `NEARAI_API_KEY`. **Exécuté en réel le 2026-11-10** : avec `DARWIN_PRESET=selection`, un run réel a atteint la génération 3 avec 12 naissances, 8 reproductions et 7 morts par famine, séquestres dans le contrat (65 verrouillés, 63 libérés, 2 remboursés), appels réels à NEAR AI Cloud (environ 0,034 USD en comptabilité locale, facture non relue). Non réel : le payeur des tâches est le client simulé (aucune tâche de visiteur sur testnet), NEAR Intents jamais exécuté (voir `docs/PREUVES_TESTNET.md`).
 - **Ce qui est simulé** : chaîne et IA en mode mock ; client « simulé » étiqueté ; tâches de visiteurs financées par un compte de démo de l'opérateur. Le coût IA est converti en NEAR de testnet à un taux fixe configurable et débité vers le compte maître ; la vraie facture est payée en USD par l'opérateur.
 - **Modèle de confiance** : le compte maître est l'oracle de validation du séquestre ; ce n'est pas « trustless ». Si le contrat n'est pas déployé, le séquestre est « dégradé » (compte piloté par l'opérateur, registre local). L'économie est subventionnée et en boucle fermée.
 - **Divulgation** : la majeure partie du code a été écrite par des agents IA (Claude Code) sous la direction d'un humain ; bibliothèques tierces : celles de `package.json` ; licence MIT.
