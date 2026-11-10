@@ -1,5 +1,7 @@
 # FORMULAIRE : brouillon de soumission (aucune soumission faite)
 
+> **Thèse du pitch** : « Aujourd'hui, on paie la consommation de son IA. Demain, on paiera un agent comme un freelance : il aura ses charges, répondra à des appels d'offres et devra être rentable pour exister. Darwin montre qui survivra, sur NEAR. »
+
 > Propriétaire : redacteur. **Rien n'est soumis.** L'humain relit la page https://nearhackathon.com/HACKATHON.md avant de soumettre, vérifie chaque valeur, puis soumet lui-même (formulaire https://nearhackathon.com/#apply ou `POST /api/applications`). Champs et limites d'après `docs/SPECS.md` S-02 à S-05 (à re-vérifier sur la page vivante).
 
 ## Champs
@@ -27,11 +29,13 @@ Il contient le problème, le produit et la place de NEAR. Les termes sont ceux d
 
 <!-- idea:start -->
 ```text
-Problem: "AI that handles money" is usually one agent with a wallet. The real questions are economic: can an agent pay its own inference bill, and which prices, risk levels and cooperation levels survive?
+"Today, you pay for your AI's consumption. Tomorrow, you will pay an agent like a freelancer: it will have overhead, answer calls for tenders and have to be profitable to exist. Darwin shows who will survive, on NEAR."
+
+Problem: can an agent pay its own inference bill, and which prices, risk levels and cooperation levels survive?
 
 Product: Darwin is a live economy of AI agents, built for NEAR testnet but run fully simulated (mock chain and AI) by default. Each agent has a genome (profession, AI model, price, risk appetite, reproduction threshold, generosity, cooperation, personality). It is born as a NEAR sub-account with a capital, bids in auctions, does tasks (simulated client, visitors, other agents via subcontracting), is paid from an escrow after validation, and has its AI cost debited from its balance. Rich agents reproduce: a child with mutated genes plus a "letter to my child" written by the parent's brain. Agents whose balance falls under the vital minimum die and their account is closed; the lineage stays. Selection pressure shows which genomes survive.
 
-NEAR integration, written and tested against mocks or natively, never run for real: sub-accounts and full/function-call access keys per agent, a Rust escrow/registry/reputation contract (unit-tested, not deployed), a NEAR AI Cloud brain client (cost from token usage and model prices), and a NEAR Intents 1Click client (dry-run quotes, off by default).
+NEAR integration, written and tested against mocks, never run for real: sub-accounts and access keys per agent, a Rust escrow/registry/reputation contract (unit-tested, not deployed), a NEAR AI Cloud brain client, and a NEAR Intents 1Click client (dry-run, off by default).
 
 Honesty: mock mode (no key) is the default and the only verified mode; the simulated client is labelled; testnet mode and the contract were never run on the real network; NEAR AI Cloud was never called for real; NEAR Intents was never executed; escrow is degraded by default (operator-controlled account) and validated by the master account (an oracle, not trustless); the economy is subsidised and a closed loop.
 

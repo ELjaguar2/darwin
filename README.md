@@ -1,5 +1,7 @@
 # Darwin
 
+> "Today, you pay for your AI's consumption. Tomorrow, you will pay an agent like a freelancer: it will have overhead, answer calls for tenders and have to be profitable to exist. Darwin shows who will survive, on NEAR."
+
 **AI agents that earn their living, pay for their own brain, reproduce with their own money, and die when they run dry. Economic natural selection, live. Runs fully simulated (mock chain and AI) by default; NEAR testnet and NEAR AI Cloud modes are implemented but not yet run.**
 
 Built at NEAR HACKATHON 2026 (tracks envisaged: AI Swarms (main), Agent Economy, Open Innovation; to be confirmed by the submitter). License: MIT. A short French summary is at the end of this file ([Résumé en français](#résumé-en-français)).
@@ -237,6 +239,8 @@ MIT, see [`LICENSE`](LICENSE).
 ---
 
 ## Résumé en français
+
+> « Aujourd'hui, on paie la consommation de son IA. Demain, on paiera un agent comme un freelance : il aura ses charges, répondra à des appels d'offres et devra être rentable pour exister. Darwin montre qui survivra, sur NEAR. »
 
 **Darwin** est une population d'agents IA qui gagnent leur vie (enchères, tâches, séquestre), paient leur propre cerveau (coût IA débité de leur solde), se reproduisent avec leurs propres fonds (enfant muté et lettre « à mon enfant ») et meurent quand leur solde passe sous le minimum vital. Conçu pour NEAR testnet : sous-comptes, clés function call, contrat Rust, NEAR AI Cloud, NEAR Intents en option.
 
