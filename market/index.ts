@@ -26,6 +26,10 @@ const MAX_BIDS_PER_TASK = 50;
 const HOUR_MS = 3_600_000;
 
 export interface MarketOptions {
+  /** Numéro de départ des identifiants de tâches (t-XXXX). Testnet : les séquestres du contrat persistent entre deux lancements. Défaut 0. */
+  taskSeqStart?: number;
+  /** Marge ajoutée à chaque financement des comptes du marché (gaz + réserve de stockage sur chaîne réelle). Défaut 0. */
+  fundingMargin?: bigint;
   /** Validateur par type de demandeur. Défaut : juge IA composite (règle de base + brain) pour tous. */
   validators?: Partial<Record<Requester["kind"], Validator>>;
   /** Plafond de dépense par heure du compte visiteurs. Défaut : `config.sim.visitorHourlyCap` si présent, sinon 10 x budget max. */
@@ -68,7 +72,8 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
   const reputationDone = new Set<string>();
   const busy = new Set<string>();
   const ledger: { at: number; amount: bigint }[] = [];
-  let taskSeq = 0;
+  const fundingMargin = opts.fundingMargin ?? 0n;
+  let taskSeq = Math.max(0, Math.floor(opts.taskSeqStart ?? 0));
   let bidSeq = 0;
   let stepTick = 0;
   let stepQueue: Promise<void> = Promise.resolve();
@@ -105,7 +110,9 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
   }
 
   /** Le marché possède et finance ses comptes : création au premier besoin, complément depuis le maître ensuite. */
-  async function ensureFunded(label: string, accountId: string, amount: bigint, source: "master" | "demo"): Promise<void> {
+  async function ensureFunded(label: string, accountId: string, price: bigint, source: "master" | "demo"): Promise<void> {
+    // Marge : le séquestre exige le prix + gaz + réserve de stockage, et plusieurs tâches peuvent se verrouiller dans le même tick.
+    const amount = price + fundingMargin;
     let balance: bigint;
     try {
       balance = BigInt(await chain.getBalance(accountId));

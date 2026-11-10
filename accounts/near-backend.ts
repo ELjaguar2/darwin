@@ -100,12 +100,23 @@ export async function loadNearApiBackend(rpcUrl: string): Promise<NearBackend> {
     accounts.set(k, created);
     return created;
   };
+  // Les RPC publics gratuits limitent le débit (HTTP/JSON-RPC 429) : on réessaie avec attente progressive
+  // (la requête est refusée avant traitement, donc le rejeu est sûr) avant d'échouer.
+  const RATE_LIMIT_RE = /\b429\b|rate limit/i;
+  const RATE_LIMIT_RETRIES = 6;
   const wrap = async <T>(fn: () => Promise<T>): Promise<T> => {
-    try {
-      return await fn();
-    } catch (e) {
-      if (e instanceof ChainError) throw e;
-      throw mapChainError(safeMessage(e));
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await fn();
+      } catch (e) {
+        if (e instanceof ChainError) throw e;
+        const msg = safeMessage(e);
+        if (attempt < RATE_LIMIT_RETRIES && RATE_LIMIT_RE.test(msg)) {
+          await new Promise((r) => setTimeout(r, Math.min(30_000, 2000 * 2 ** attempt)));
+          continue;
+        }
+        throw mapChainError(msg);
+      }
     }
   };
 
