@@ -25,7 +25,7 @@ Aucun autre champ ne doit être envoyé (corps limité à 12000 octets). Codes d
 
 ## Texte du champ `idea`
 
-Il contient le problème, le produit et la place de NEAR. Les termes sont ceux du README (ce qui est mock ou non exécuté y est dit).
+Il contient le problème, le produit et la place de NEAR. Les termes sont ceux du README (ce qui est mock ou non exécuté y est dit). Faits mis à jour le 2026-11-11 d'après `docs/PREUVES_TESTNET.md` (run 8).
 
 <!-- idea:start -->
 ```text
@@ -33,17 +33,17 @@ Il contient le problème, le produit et la place de NEAR. Les termes sont ceux d
 
 Problem: can an agent pay its own inference bill, and which prices, risk levels and cooperation levels survive?
 
-Product: Darwin is a live economy of AI agents, built for NEAR testnet but run fully simulated (mock chain and AI) by default. Each agent has a genome (profession, AI model, price, risk appetite, reproduction threshold, generosity, cooperation, personality). It is born as a NEAR sub-account with a capital, bids in auctions, does tasks (simulated client, visitors, other agents via subcontracting), is paid from an escrow after validation, and has its AI cost debited from its balance. Rich agents reproduce: a child with mutated genes plus a "letter to my child" written by the parent's brain. Agents whose balance falls under the vital minimum die and their account is closed; the lineage stays. Selection pressure shows which genomes survive.
+Product: Darwin is a live economy of AI agents, fully simulated by default, or on NEAR testnet. Each agent has a genome (profession, AI model, price, risk appetite, reproduction threshold, generosity, cooperation, personality). It is born as a NEAR sub-account with a capital, bids in auctions, does tasks (simulated client, visitors, other agents via subcontracting), is paid from an escrow after validation, and has its AI cost debited from its balance. Rich agents reproduce: a child with mutated genes plus a "letter to my child" written by the parent's brain. Agents whose balance falls under the vital minimum die and their account is closed; the lineage stays. Selection pressure shows which genomes survive.
 
-NEAR integration, written and tested against mocks, never run for real: sub-accounts and access keys per agent, a Rust escrow/registry/reputation contract (unit-tested, not deployed), a NEAR AI Cloud brain client, and a NEAR Intents 1Click client (dry-run, off by default).
+NEAR, run for real on testnet (tx ids in docs/PREUVES_TESTNET.md): a sub-account and function-call key per agent, a Rust registry/escrow/reputation contract, NEAR AI Cloud as the brain. One run reached generation 3: 12 births, 7 deaths by starvation, 65 escrows in the contract (63 released, 2 refunded).
 
-Honesty: mock mode (no key) is the default and the only verified mode; the simulated client is labelled; testnet mode and the contract were never run on the real network; NEAR AI Cloud was never called for real; NEAR Intents was never executed; escrow is degraded by default (operator-controlled account) and validated by the master account (an oracle, not trustless); the economy is subsidised and a closed loop.
+Honesty: mock is the default; on testnet the client was the labelled simulated client (no human visitor paid); AI cost (about 0.03 USD) is our local accounting, invoice not re-read; NEAR Intents (1Click, off by default) was never executed; escrow is validated by the master account (an oracle, not trustless); the economy is subsidised and a closed loop.
 
 Run: npm install && npm run start:mock. The README has "do X, you will see Y" steps run against the real backend. Most code was written by AI agents (Claude Code), disclosed in the README. MIT license.
 ```
 <!-- idea:end -->
 
-Vérification du compteur (script) : `node scripts/check-formulaire.mjs` (affiche le nombre de caractères et échoue hors de 20 à 2000). **Ré-exécuter après toute modification du texte**, et mettre à jour le README si les faits changent (par exemple si le contrat est déployé ou le mode testnet exécuté).
+Vérification du compteur (script) : `node scripts/check-formulaire.mjs` (affiche le nombre de caractères et échoue hors de 20 à 2000). **Ré-exécuter après toute modification du texte**, et garder ce texte aligné sur le README et sur `docs/PREUVES_TESTNET.md` si les faits changent.
 
 ## Ce que l'humain doit faire avant de soumettre
 
