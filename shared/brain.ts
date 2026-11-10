@@ -44,7 +44,7 @@ export interface ModelInfo extends ModelPrice {
 
 export class BrainError extends Error {
   constructor(
-    public code: "NO_API_KEY" | "UNKNOWN_MODEL" | "HTTP_ERROR" | "RATE_LIMITED" | "BAD_RESPONSE" | "TIMEOUT",
+    public code: "NO_API_KEY" | "UNKNOWN_MODEL" | "HTTP_ERROR" | "RATE_LIMITED" | "BAD_RESPONSE" | "TIMEOUT" | "BUDGET_EXHAUSTED",
     message: string,
     public status?: number,
   ) {

@@ -83,6 +83,17 @@ export interface Config {
     contractId: string | undefined;
   };
   nearai: { baseUrl: string; apiKey: string | undefined; model: string | undefined; timeoutMs: number; maxUsdPerRun: number | undefined; maxUsdPerHour: number | undefined }; // apiKey SECRET ; plafonds USD globaux (undefined = défauts du cerveau)
+  /**
+   * Budget IA réel (L11). Plafond dur `budgetEurStop` (EUR) : une fois atteint, tout appel est refusé (BrainError BUDGET_EXHAUSTED) et la
+   * simulation s'arrête proprement. `eurUsdRate` = USD pour 1 EUR (défaut prudent : sous le cours réel => coût en EUR surestimé).
+   * `fallback` : fournisseur OpenAI-compatible de secours (AI_BASE_URL / AI_API_KEY / AI_MODEL), apiKey SECRET.
+   */
+  ai: {
+    budgetEurTotal: number;
+    budgetEurStop: number;
+    eurUsdRate: number;
+    fallback: { baseUrl: string; apiKey: string; model: string; usdPerMTokIn: number; usdPerMTokOut: number } | undefined;
+  };
   intents: { enabled: boolean; baseUrl: string; jwt: string | undefined; dryOnly: boolean }; // jwt SECRET
 }
 
@@ -120,9 +131,24 @@ export function loadConfig(env: Env = process.env): Config {
 
   const apiKey = str(env, "NEARAI_API_KEY");
   const chain = (str(env, "DARWIN_CHAIN") ?? (mode === "testnet" ? "near" : "mock")) as Config["chain"];
-  const brain = (str(env, "DARWIN_BRAIN") ?? (mode === "testnet" && apiKey ? "nearai" : "mock")) as Config["brain"];
+  const brain = (str(env, "DARWIN_BRAIN") ?? (mode === "testnet" && (apiKey || (str(env, "AI_API_KEY") && str(env, "AI_BASE_URL") && str(env, "AI_MODEL"))) ? "nearai" : "mock")) as Config["brain"];
   if (chain !== "mock" && chain !== "near") throw new Error(`DARWIN_CHAIN invalide : ${chain}`);
   if (brain !== "mock" && brain !== "nearai") throw new Error(`DARWIN_BRAIN invalide : ${brain}`);
+
+  const fbKey = str(env, "AI_API_KEY");
+  const fbUrl = str(env, "AI_BASE_URL");
+  const fbModel = str(env, "AI_MODEL");
+  const fallback = fbKey && fbUrl && fbModel
+    ? {
+        baseUrl: fbUrl, apiKey: fbKey, model: fbModel,
+        // Prix inconnus d'un fournisseur tiers : valeurs volontairement pessimistes (USD/M tokens) tant que non renseignées.
+        usdPerMTokIn: optNum(env, "AI_PRICE_IN_USD_PER_M") ?? 1,
+        usdPerMTokOut: optNum(env, "AI_PRICE_OUT_USD_PER_M") ?? 5,
+      }
+    : undefined;
+  const budgetEurTotal = optNum(env, "DARWIN_AI_BUDGET_EUR_TOTAL") ?? 10;
+  const budgetEurStop = optNum(env, "DARWIN_AI_BUDGET_EUR_STOP") ?? 8;
+  if (budgetEurStop > budgetEurTotal) throw new Error("DARWIN_AI_BUDGET_EUR_STOP doit être <= DARWIN_AI_BUDGET_EUR_TOTAL");
 
   const base = PRESETS[mode][preset];
   const sim: SimParams = {
@@ -175,6 +201,7 @@ export function loadConfig(env: Env = process.env): Config {
       maxUsdPerRun: optNum(env, "NEARAI_MAX_USD_PER_RUN"),
       maxUsdPerHour: optNum(env, "NEARAI_MAX_USD_PER_HOUR"),
     },
+    ai: { budgetEurTotal, budgetEurStop, eurUsdRate: optNum(env, "DARWIN_EUR_USD_RATE") ?? 1.1, fallback },
     intents: {
       enabled: str(env, "INTENTS_ENABLED") === "true",
       baseUrl: str(env, "INTENTS_BASE_URL") ?? "https://1click.chaindefuser.com",
@@ -193,6 +220,7 @@ export function redactConfig(c: Config): unknown {
         ...c,
         near: { ...c.near, masterPrivateKey: mask(c.near.masterPrivateKey) },
         nearai: { ...c.nearai, apiKey: mask(c.nearai.apiKey) },
+        ai: { ...c.ai, fallback: c.ai.fallback ? { ...c.ai.fallback, apiKey: mask(c.ai.fallback.apiKey) } : undefined },
         intents: { ...c.intents, jwt: mask(c.intents.jwt) },
         server: { ...c.server, adminToken: mask(c.server.adminToken) },
       },

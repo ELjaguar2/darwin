@@ -421,7 +421,7 @@ describe("branchements (chain.tx, system.warning, plafonds du cerveau, testnet)"
     expect(a.brain).toBeInstanceOf(NearAiBrain);
     expect((a.brain as NearAiBrain).guardrails).toMatchObject({ maxUsdPerRun: 0.25, maxUsdPerHour: 0.1 });
     const b = createRuntime(loadConfig(env), { autoRun: false });
-    expect((b.brain as NearAiBrain).guardrails).toMatchObject({ maxUsdPerRun: 2, maxUsdPerHour: 1 });
+    expect((b.brain as NearAiBrain).guardrails).toMatchObject({ maxUsdPerRun: 8.8, maxUsdPerHour: 1 }); // L11 : défaut = plafond d'arrêt du budget IA (8 EUR x 1.10)
   });
 
   it("onWarning du cerveau -> system.warning (masqué)", () => {

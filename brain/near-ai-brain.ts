@@ -6,6 +6,8 @@ import {
   type Brain, type BrainRequest, type BrainResponse, type ModelInfo, type Usage,
 } from "../shared/index.ts";
 import { FALLBACK_MODELS, FALLBACK_SNAPSHOT_DATE, parseModelsResponse } from "./pricing.ts";
+import { MODEL_WHITELIST, extraBodyFor, WHITELIST_SNAPSHOT_DATE, parseModelList, whitelistFallbackModels } from "./model-list.ts";
+import type { AiBudget } from "./budget.ts";
 
 export interface Guardrails {
   /** Plafond de max_tokens par appel (config.sim.maxTokensPerCall). */
@@ -55,6 +57,19 @@ export interface NearAiBrainOptions {
   sleep?: (ms: number) => Promise<void>;
   /** Autorise http:// uniquement vers localhost/127.0.0.1/[::1] (tests). Sinon https exigé : la clé ne part jamais en clair. */
   allowInsecureLocalhost?: boolean;
+  /**
+   * Catalogue des modèles : "models" (GET /models, historique) ou "model-list" (GET /model/list : prix {amount,scale}, liste blanche
+   * `allowedModels`, repli sur MODEL_WHITELIST). createBrain utilise "model-list" pour NEAR AI Cloud.
+   */
+  catalog?: "models" | "model-list";
+  /** Liste blanche d'ids (catalogue "model-list"). Défaut : MODEL_WHITELIST. */
+  allowedModels?: readonly string[];
+  /** Modèles fixes (fournisseur OpenAI-compatible de secours sans catalogue de prix) : aucun appel de catalogue. */
+  staticModels?: ModelInfo[];
+  /** Budget IA global persistant (plafond d'arrêt, journal data/ai-usage.jsonl). */
+  budget?: AiBudget;
+  /** Étiquette du fournisseur dans le journal d'usage. */
+  provider?: "nearai" | "fallback";
 }
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
@@ -94,7 +109,7 @@ export class NearAiBrain implements Brain {
   private readonly f: typeof fetch;
   private readonly now: () => number;
   private readonly sleep: (ms: number) => Promise<void>;
-  private cache: { at: number; models: ModelInfo[]; fromFallback: boolean; reasoning: Set<string> } | undefined;
+  private cache: { at: number; models: ModelInfo[]; fromFallback: boolean; reasoning: Set<string>; attestation: Set<string> } | undefined;
   private loading: Promise<NonNullable<NearAiBrain["cache"]>> | undefined;
   private readonly calls = new Map<string, number[]>(); // agentId -> horodatages
   private readonly identical = new Map<string, number[]>(); // hash de requête -> horodatages
@@ -119,16 +134,19 @@ export class NearAiBrain implements Brain {
   private reserve(worstUsd: number) {
     const g = this.guardrails;
     const hour = this.hourSpent();
+    this.opts.budget?.reserve(worstUsd); // BUDGET_EXHAUSTED : plafond persistant, avant tout autre garde-fou
     const over = this.spentRun + this.pending + worstUsd > g.maxUsdPerRun ? "run" : hour + this.pending + worstUsd > g.maxUsdPerHour ? "heure" : undefined;
     if (over) {
       const msg = `plafond global de dépense IA atteint (${over === "run" ? `${g.maxUsdPerRun} USD par run` : `${g.maxUsdPerHour} USD par heure`}) : appel refusé`;
       this.warn("BRAIN_BUDGET_CAP", msg);
+      this.opts.budget?.settle(worstUsd);
       throw new BrainError("RATE_LIMITED", `Garde-fou budget : ${msg}`);
     }
     this.pending += worstUsd;
   }
 
-  private settle(worstUsd: number, actualUsd: number) {
+  private settle(worstUsd: number, actualUsd: number, rec?: Parameters<AiBudget["settle"]>[1]) {
+    this.opts.budget?.settle(worstUsd, rec);
     this.pending = Math.max(0, this.pending - worstUsd);
     this.spentRun += actualUsd;
     this.hourLog.push({ t: this.now(), usd: actualUsd });
@@ -179,24 +197,37 @@ export class NearAiBrain implements Brain {
     if (this.cache && this.now() - this.cache.at < ttl) return this.cache;
     if (this.loading) return this.loading;
     this.loading = (async () => {
+      if (this.opts.staticModels) {
+        this.cache = { at: this.now(), models: this.opts.staticModels.map((m) => ({ ...m })), fromFallback: false, reasoning: new Set(), attestation: new Set() };
+        return this.cache;
+      }
+      const modelList = this.opts.catalog === "model-list";
+      const allow = this.opts.allowedModels ?? MODEL_WHITELIST.map((m) => m.id);
       try {
         const headers: Record<string, string> = { Accept: "application/json" };
         if (this.opts.apiKey) headers.Authorization = `Bearer ${this.opts.apiKey}`;
-        const { status, body } = await this.fetchJson("/models", { method: "GET", headers });
+        const { status, body } = await this.fetchJson(modelList ? "/model/list" : "/models", { method: "GET", headers });
         if (status < 200 || status >= 300) throw new Error(`HTTP ${status}`);
-        const parsed = parseModelsResponse(body);
+        const parsed = modelList ? parseModelList(body, allow) : { ...parseModelsResponse(body), attestation: new Set<string>() };
         if (parsed.models.length === 0) throw new Error("aucun modèle exploitable (prix invalides ?)");
         for (const s of parsed.skipped) this.warn("BRAIN_MODEL_SKIPPED", `modèle ${s.id} ignoré : ${s.reason}`, true);
-        this.cache = { at: this.now(), models: parsed.models, fromFallback: false, reasoning: parsed.reasoning };
+        this.cache = { at: this.now(), models: parsed.models, fromFallback: false, reasoning: parsed.reasoning, attestation: parsed.attestation };
       } catch (e) {
         // Repli documenté : instantané de pricing.ts, marqué verified:false, avec avertissement. Jamais de prix nul.
         const stale = this.cache && !this.cache.fromFallback ? this.cache : undefined;
+        const fbDate = modelList ? WHITELIST_SNAPSHOT_DATE : FALLBACK_SNAPSHOT_DATE;
         this.warn("BRAIN_PRICES_FALLBACK", stale
           ? `GET /models a échoué (${(e as Error).message}) : derniers prix connus conservés`
-          : `GET /models a échoué (${(e as Error).message}) : prix du repli du ${FALLBACK_SNAPSHOT_DATE}, possiblement périmés`);
+          : `GET /models a échoué (${(e as Error).message}) : prix du repli du ${fbDate}, possiblement périmés`);
         this.cache = stale
           ? { ...stale, at: this.now() }
-          : { at: this.now(), models: FALLBACK_MODELS.map((m) => ({ ...m })), fromFallback: true, reasoning: new Set() };
+          : {
+              at: this.now(), fromFallback: true, reasoning: new Set(),
+              attestation: new Set(MODEL_WHITELIST.filter((m) => m.tee).map((m) => m.id)),
+              models: modelList
+                ? whitelistFallbackModels(MODEL_WHITELIST.filter((m) => allow.includes(m.id)))
+                : FALLBACK_MODELS.map((m) => ({ ...m })),
+            };
       }
       return this.cache!;
     })();
@@ -205,6 +236,11 @@ export class NearAiBrain implements Brain {
     } finally {
       this.loading = undefined;
     }
+  }
+
+  /** Ids de la liste blanche dont le catalogue annonce attestationSupported (TEE). */
+  async attestationModels(): Promise<string[]> {
+    return [...(await this.loadModels()).attestation];
   }
 
   async listModels(): Promise<ModelInfo[]> {
@@ -281,7 +317,9 @@ export class NearAiBrain implements Brain {
 
     this.checkLoop({ ...req, model }, promptChars + ":" + req.messages.map((m) => m.content).join("\u0001"));
 
-    const body: Record<string, unknown> = { model, messages: req.messages, max_tokens: maxTokens };
+    const body: Record<string, unknown> = {
+      ...(this.opts.catalog === "model-list" ? extraBodyFor(model) : {}), model, messages: req.messages, max_tokens: maxTokens,
+    };
     if (req.temperature !== undefined) body.temperature = req.temperature;
     const init: RequestInit = {
       method: "POST",
@@ -292,6 +330,7 @@ export class NearAiBrain implements Brain {
     const worstUsd = worst(maxTokens);
     this.reserve(worstUsd);
     let actualUsd = 0;
+    let rec: Parameters<AiBudget["settle"]>[1];
     try {
     let last: BrainError | undefined;
     for (let attempt = 0; attempt <= g.retries; attempt++) {
@@ -318,6 +357,11 @@ export class NearAiBrain implements Brain {
       }
       const usage = parseUsage(r.body.usage);
       actualUsd = costUsd(usage, info);
+      rec = {
+        provider: this.opts.provider ?? "nearai", model, servedModel: typeof r.body.model === "string" ? r.body.model : model,
+        promptTokens: usage.promptTokens, completionTokens: usage.completionTokens, reasoningTokens: usage.reasoningTokens,
+        costUsd: actualUsd, responseId: typeof r.body.id === "string" ? r.body.id : null, agentId: req.agentId, purpose: req.purpose,
+      };
       const text = typeof content === "string" ? content : "";
       if (text === "" ) this.warn("BRAIN_EMPTY_TEXT", `réponse vide de ${model} (finish_reason=${String(choice.finish_reason)}) : tokens de raisonnement épuisés ?`);
       return {
@@ -330,7 +374,7 @@ export class NearAiBrain implements Brain {
     }
     throw last ?? new BrainError("HTTP_ERROR", "NEAR AI Cloud : échec");
     } finally {
-      this.settle(worstUsd, actualUsd);
+      this.settle(worstUsd, actualUsd, rec);
     }
   }
 }

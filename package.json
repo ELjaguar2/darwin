@@ -15,7 +15,10 @@
     "typecheck": "tsc --noEmit",
     "contracts:build": "cd contracts/darwin && cargo near build non-reproducible-wasm",
     "scan-secrets": "node scripts/scan-secrets.mjs",
-    "scan:secrets": "node scripts/scan-secrets.mjs"
+    "scan:secrets": "node scripts/scan-secrets.mjs",
+    "ai:probe": "tsx brain/tools/probe-models.ts",
+    "ai:usage-report": "tsx brain/tools/usage-report.ts",
+    "ai:verify-attestation": "node scripts/verify-attestation.mjs"
   },
   "dependencies": {
     "@hono/node-server": "2.1.6",

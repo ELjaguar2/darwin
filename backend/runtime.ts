@@ -91,11 +91,20 @@ export function createRuntime(config: Config, opts: RuntimeOptions = {}): Runtim
   if (config.mode === "testnet" && config.brain === "mock" && !config.nearai.apiKey) {
     warn("BRAIN_NO_KEY", "NEARAI_API_KEY absente : cerveau mock (IA simulée, appels étiquetés mock)");
   }
-  const brain = opts.brain ?? createBrain(config, { onWarning: (w) => warn(w.code, w.message), guardrails });
+  // Budget IA global atteint : arrêt propre de la simulation (le moteur finit son tick, règle les dettes, émet sim.stopped).
+  let stopEngine: (() => void) | undefined;
+  const brain = opts.brain ?? createBrain(config, {
+    onWarning: (w) => warn(w.code, w.message), guardrails,
+    onBudgetExhausted: (i) => {
+      warn("BRAIN_BUDGET_STOP", `budget IA atteint (${i.spentEur.toFixed(2)} EUR, arrêt à ${i.stopEur} EUR) : arrêt propre de la simulation`);
+      setImmediate(() => stopEngine?.());
+    },
+  });
 
   const deps: Deps = { config, chain, brain, journal, rng: createRng(config.seed), now };
   const market = createMarket(deps);
   const engine = createEngine(deps, market, { emitChainTx, autoRun: opts.autoRun ?? true });
+  stopEngine = () => { void engine.stop().catch(() => {}); };
 
   // Index des offres (le journal fait foi pour l'historique).
   const bids = new Map<string, Bid[]>();

@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { BrainError, MockBrain, billableCompletionTokens, costYocto, loadConfig } from "../shared/index.ts";
 import {
   NearAiBrain, createBrain, parseModelsResponse, parseUsage, parseDecision, parseVerdict,
@@ -253,9 +256,10 @@ describe("createBrain", () => {
   });
   it("nearai avec clé : NearAiBrain (fetch simulé)", async () => {
     const { f } = fakeFetch({});
-    const b = createBrain(loadConfig({ DARWIN_BRAIN: "nearai", NEARAI_API_KEY: "k" }), { fetch: f });
+    // /model/list indisponible (404 simulé) : repli sur la liste blanche, modèle de la liste blanche.
+    const b = createBrain(loadConfig({ DARWIN_BRAIN: "nearai", NEARAI_API_KEY: "k", DARWIN_DATA_DIR: mkdtempSync(join(tmpdir(), "darwin-b-")) }), { fetch: f });
     expect(b.kind).toBe("nearai");
-    expect((await b.complete(req())).mock).toBe(false);
+    expect((await b.complete(req({ model: "z-ai/glm-5.3-flash" }))).mock).toBe(false);
   });
 });
 
