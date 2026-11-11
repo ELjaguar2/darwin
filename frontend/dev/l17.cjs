@@ -32,14 +32,38 @@ const ok = (c, m) => { c ? pass++ : fail++; console.log((c ? "OK   " : "FAIL ") 
     ok(/Rejeu d'un run/.test(await p.textContent("#replayText")), "bandeau : " + (await p.textContent("#replayText")));
     ok((await p.$$eval("#replayBanner .rp-ctl button", (n) => n.length)) >= 3, "boutons de vitesse x1/x5/x20");
     ok(await p.isDisabled("#mInput"), "barre de mission désactivée en rejeu");
-    ok((await p.getAttribute("#mInput", "placeholder")).includes("désactivées pendant le rejeu"), "mention « missions désactivées pendant le rejeu »");
+    ok((await p.getAttribute("#mInput", "placeholder")).includes("désactivées en rejeu"), "mention « missions désactivées en rejeu »");
+    // NB-6 : un seul message, pas de doublon
+    const dup = await p.$$eval("#composer *", (n) => n.filter((e) => !e.hidden && e.offsetParent && /Missions désactivées/.test(e.textContent) && e.children.length === 0).length);
+    ok(dup === 0, "NB-6 : le message « désactivées » n'est pas répété sous la barre (" + dup + ")");
+    // NB-2 : les notifications sont sous le bandeau, les boutons x1/x5/x20 restent cliquables
+    await p.evaluate(() => { const b = document.getElementById("toasts"); for (let i = 0; i < 3; i++) { const t = document.createElement("div"); t.className = "toast birth"; t.textContent = "Test notification " + i; b.append(t); } window.dispatchEvent(new Event("resize")); });
+    await p.waitForTimeout(200);
+    const geo = await p.evaluate(() => { const ban = document.getElementById("replayBanner").getBoundingClientRect(); const t = document.querySelector("#toasts .toast").getBoundingClientRect(); const bt = [...document.querySelectorAll("#replayBanner .rp-ctl button")].map((x) => { const r = x.getBoundingClientRect(); const e = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return e === x; }); return { banBottom: ban.bottom, toastTop: t.top, bt }; });
+    ok(geo.toastTop >= geo.banBottom - 1, `NB-2 : notifications sous le bandeau (${Math.round(geo.toastTop)} >= ${Math.round(geo.banBottom)})`);
+    ok(geo.bt.length >= 3 && geo.bt.every(Boolean), "NB-2 : boutons x1/x5/x20 non recouverts");
+    await p.evaluate(() => document.querySelectorAll("#toasts .toast").forEach((t) => t.remove()));
+    // NB-5 : fin de rejeu
+    const rp = await p.evaluate(() => fetch("/api/replay").then((r) => r.json()).catch(() => ({})));
+    if (rp.phase === "ended") {
+      ok(/Rejeu terminé/.test(await p.textContent("#connText")), "NB-5b : point d'état « Rejeu terminé » : " + (await p.textContent("#connText")));
+      const alive = await p.$$eval("#strip .agent-card", (n) => n.length);
+      const se = await p.textContent("#stripEmpty");
+      ok(alive > 0 || (!/En attente des premiers/.test(se) && /Plus aucun agent vivant|Rejeu terminé/.test(se)), "NB-5a : message de fin juste : " + (alive ? alive + " cartes" : se));
+    } else console.log("note : rejeu non terminé, NB-5 non évalué ici (" + rp.phase + ")");
   } else ok(!(await p.isVisible("#replayBanner")), "pas de bandeau de rejeu hors rejeu");
 
+  // V-6 / V-7 / V-9 : avertissements visibles
+  ok(!REPLAY ? (await p.isVisible("#publicNote")) && /publics/.test(await p.textContent("#publicNote")) && /compte de démo/.test(await p.textContent("#publicNote")) : true, "V-6 : « données publiques » et « financé par le compte de démo » visibles près du composeur");
+  { const st = await p.evaluate(() => ({ mode: window.__darwin.core.mode, esc: window.__darwin.core.health?.escrow })); const want = !(st.mode === "testnet" && st.esc && st.esc !== "contract"); ok((await p.isHidden("#escBadge")) === want, `V-7 : badge « séquestre dégradé » ${want ? "absent" : "présent"} (mode ${st.mode}, escrow ${st.esc})`); }
+  if (REPLAY) ok(/run (réel )?enregistré/.test(await p.textContent("#modePill")), "V-9 : pastille : " + (await p.textContent("#modePill")).trim());
+  ok(/Données publiques|publics/.test(await p.textContent("#composer")) || REPLAY, "V-6 : avertissement dans le composeur");
   // page Mission : cartes d'agents
   const cards = await p.$$eval("#strip .agent-card", (n) => n.length);
-  ok(cards >= 4, `${cards} cartes d'agents vivants`);
-  ok((await p.$$eval("#strip .agent-card .gauge-fill", (n) => n.length)) === cards, "chaque carte porte une jauge de solde");
-  ok((await p.$$eval("#strip .agent-card .avatar .av-badge svg", (n) => n.length)) === cards, "chaque carte porte l'icône du métier");
+  const extinct = REPLAY && cards === 0 && /Plus aucun agent vivant/.test(await p.textContent("#stripEmpty"));
+  ok(cards >= 4 || extinct, `${cards} cartes d'agents vivants${extinct ? " (population éteinte, message de fin)" : ""}`);
+  ok(extinct || (await p.$$eval("#strip .agent-card .gauge-fill", (n) => n.length)) === cards, "chaque carte porte une jauge de solde");
+  ok(extinct || (await p.$$eval("#strip .agent-card .avatar .av-badge svg", (n) => n.length)) === cards, "chaque carte porte l'icône du métier");
   ok((await p.$$eval("#feed .thread", (n) => n.length)) >= 1, "fil : au moins une mission en direct");
   ok((await p.$$eval("#feed .rtag.tag-sim", (n) => n.length)) >= 1 || REPLAY, "étiquette « simulé » visible sur le client artificiel");
 
@@ -115,6 +139,13 @@ const ok = (c, m) => { c ? pass++ : fail++; console.log((c ? "OK   " : "FAIL ") 
   ok((await p.$$eval("#population .pop-row", (n) => n.length)) >= 1, "preuves : population par génération");
   ok((await p.$$eval("#flows .flow", (n) => n.length)) === 3, "preuves : flux gagné / cerveau / transmis");
   ok((await p.$$eval("#txs li", (n) => n.length)) >= 5, "preuves : transactions listées");
+  // NB-3 : le coût du cerveau n'est jamais arrondi à « 0.00 » trompeur
+  const fmt = await p.evaluate(async () => { const f = await import("/format.js"); const Y = 10n ** 24n; return [f.formatNearSmall(0), f.formatNearSmall(Y / 333n), f.formatNearSmall(Y / 100000n), f.formatNearSmall(Y / 10000n), f.formatNearSmall(Y * 17n / 10n)]; });
+  ok(fmt.join("|") === "0|0.0030|< 0.0001|0.0001|1.70", "NB-3 : formatNearSmall " + fmt.join(" | "));
+  const brainTxt = (await p.textContent("#flows .flow.brain b")).trim();
+  const brainGen = await p.$$eval("#flowGen td.brain", (n) => n.map((x) => x.textContent.trim()));
+  console.log("   cerveau :", brainTxt, "|", brainGen.join(","));
+  ok(!/^0\.00 NEAR/.test(brainTxt) && !brainGen.includes("0.00"), "NB-3 : « Dépensé en cerveau IA » sans « 0.00 » trompeur : " + brainTxt);
   if (REPLAY || REAL) ok((await p.$$eval("#txs a.hash[href^='https://testnet.nearblocks.io/txns/']", (n) => n.length)) >= 1, "preuves : liens nearblocks");
   ok(/TEE/.test(await p.textContent("#tee")), "preuves : badge d'attestation TEE");
   ok((await p.$$eval("#tools li", (n) => n.length)) === 5, "preuves : 5 briques NEAR");
@@ -137,6 +168,11 @@ const ok = (c, m) => { c ? pass++ : fail++; console.log((c ? "OK   " : "FAIL ") 
   const tabY = await m.evaluate(() => document.querySelector(".tabs").getBoundingClientRect().bottom);
   ok(Math.abs(tabY - 812) < 4, "mobile : onglets en barre basse");
   await m.screenshot({ path: path.join(out, "l17-mission-mobile.png") });
+  if (REPLAY) {
+    const ph = await m.evaluate(() => { const t = document.getElementById("mInput"); const cs = getComputedStyle(t); const c = document.createElement("canvas").getContext("2d"); c.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`; const w = c.measureText(t.placeholder).width; return { w, avail: t.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight), text: t.placeholder }; });
+    ok(ph.w <= ph.avail, `NB-6 mobile : placeholder entier lisible (${Math.round(ph.w)} <= ${Math.round(ph.avail)} px)`);
+    await m.locator("#composer").screenshot({ path: path.join(out, "l17-replay-composer-mobile.png") });
+  }
   for (const t of ["lignees", "preuves"]) {
     await m.click(`[data-tab="${t}"]`); await m.waitForTimeout(900);
     ok(await m.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `mobile : pas de défilement horizontal (${t})`);

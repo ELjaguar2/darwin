@@ -1,7 +1,7 @@
 // Page « Lignées » (L17) : arbre généalogique plein écran (zoom, déplacement), panneau latéral par agent.
 // SVG construit par nœuds DOM (jamais innerHTML). Positions interpolées à chaque image : les nœuds glissent, naissent du parent, grisent à la mort.
 import { store, core, ledger, api, on, aliveAgents, labelOfJob } from "./core.js";
-import { h, formatNear, signedNear, nearNumber, big } from "./format.js";
+import { h, formatNear, formatNearSmall, signedNear, nearNumber, big } from "./format.js";
 import { jobOf, icon, avatar, firstName } from "./jobs.js";
 import { TEE_MODELS } from "./preuves.js";
 
@@ -278,7 +278,7 @@ async function renderPanel() {
     h("section", null, h("h3", null, "Historique financier"),
       h("dl", { class: "kv" },
         h("div", null, h("dt", null, "Gagné"), h("dd", null, formatNear(a.earned ?? 0, 3))),
-        h("div", null, h("dt", null, "Payé à l'IA"), h("dd", null, formatNear(a.spentBrain ?? 0, 3))),
+        h("div", null, h("dt", null, "Payé à l'IA"), h("dd", null, formatNearSmall(a.spentBrain ?? 0))),
         h("div", null, h("dt", null, "Transmis aux enfants"), h("dd", null, formatNear(passed, 3))),
         h("div", null, h("dt", null, "Missions"), h("dd", null, a.tasksDone ?? 0)),
         h("div", null, h("dt", null, "Réputation"), h("dd", null, a.reputation ?? 0)),
@@ -324,7 +324,7 @@ export function initLignees() {
       case "agent.born": case "agent.died": case "agent.reproduced": tree.schedule(); renderLegend(); renderCounters(); refreshPanel(); break;
       case "balance.changed":
         tree.schedule(); refreshPanel();
-        if (core.live && (d.reason === "task" || d.reason === "brain")) tree.float(d.agentId, signedNear(d.delta, 2), big(d.delta) >= 0n ? "up" : "down");
+        if (core.live && (d.reason === "task" || d.reason === "brain")) tree.float(d.agentId, d.reason === "brain" ? `${big(d.delta) >= 0n ? "+" : ""}${formatNearSmall(d.delta)}` : signedNear(d.delta, 2), big(d.delta) >= 0n ? "up" : "down");
         break;
       case "letter.written": refreshPanel(); break;
       default: break;

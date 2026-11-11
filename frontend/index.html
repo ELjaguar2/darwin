@@ -22,6 +22,7 @@
     </nav>
     <div class="top-r">
       <span class="mode-pill" id="modePill" data-mode="mock" title="Mode de fonctionnement"><span class="mp-dot" aria-hidden="true"></span><b>MODE MOCK</b></span>
+      <span class="esc-badge" id="escBadge" hidden title="Le séquestre n'est pas porté par le contrat Darwin : compte opérateur et registre local.">séquestre dégradé</span>
       <span class="conn" id="conn" role="status" data-state="connecting"><span class="dot" aria-hidden="true"></span><span id="connText">Connexion…</span></span>
       <button type="button" class="iconbtn" id="themeBtn" aria-label="Changer de thème (clair ou sombre)" title="Thème">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 3a9 9 0 1 0 9 9c0-.5 0-1-.1-1.4A5.5 5.5 0 0 1 13.4 3.1C13 3 12.5 3 12 3z"/></svg>
@@ -53,7 +54,8 @@
           <p class="c-help" id="jobHelp"></p>
           <p class="c-warn" id="jobWarn" hidden></p>
           <p class="m-status" id="mStatus" role="status" aria-live="polite" hidden></p>
-          <p class="replay-note" id="replayNote" hidden>Missions désactivées pendant le rejeu. Les missions du journal enregistré se rejouent ci-dessous.</p>
+          <p class="c-public" id="publicNote"><b>Données publiques</b> : le texte, les offres et le livrable de votre mission sont publics. Le budget est financé par le compte de démo.</p>
+          <p class="replay-note" id="replayNote" hidden>Les missions du journal enregistré se rejouent ci-dessous.</p>
         </form>
 
         <p class="feed-hint" id="feedHint">Les enchères des agents, leurs livrables et leurs paiements apparaîtront ici.</p>

@@ -11,7 +11,7 @@ const REAL = process.env.REAL_URL;
 const BASE = REAL ?? `http://127.0.0.1:${PORT}`;
 let pass = 0, fail = 0;
 const ok = (c, m) => { c ? pass++ : fail++; console.log((c ? "OK   " : "FAIL ") + m); };
-(async () => {
+(async () => { try {
   const srv = REAL ? { kill() {} } : spawn("node", [path.join(__dirname, "fake-server.mjs"), `--port=${PORT}`, "--tick=" + (process.env.TICK ?? 250), ...extra], { stdio: "inherit" });
   await new Promise((r) => setTimeout(r, 900));
   const b = await chromium.launch();
@@ -61,12 +61,19 @@ const ok = (c, m) => { c ? pass++ : fail++; console.log((c ? "OK   " : "FAIL ") 
     ok(/publiée/.test(await p.textContent("#fStatus")), "tâche publiée : " + (await p.textContent("#fStatus")).slice(0, 60));
   }
   // (2) vue tâche : ouvrir une tâche livrée de chaque type
+  // NB-1 : le faux serveur tire les métiers au hasard : on attend (jusqu'à 90 s) une tâche terminée et rendue de chaque métier testé
+  if (!noCat) {
+    await p.waitForFunction(() => {
+      const done = (pr) => [...window.__darwin.store.tasks.values()].some((t) => t.profession === pr && ["settled", "rejected"].includes(t.status) && document.getElementById("task-" + t.id));
+      return done("logo") && done("architecture");
+    }, null, { timeout: 90000, polling: 500 }).catch(() => console.log("note : pas de tâche logo/architecture terminée à temps, sections conditionnelles ignorées"));
+  }
   const taskInfo = await p.evaluate(() => [...window.__darwin.store.tasks.values()].filter((t) => ["settled", "rejected"].includes(t.status) && document.getElementById("task-" + t.id)).map((t) => [t.id, t.profession]));
   ok(taskInfo.length > 0, "tâches terminées : " + taskInfo.length);
   const byProf = {};
   for (const [id, pr] of taskInfo) byProf[pr] ??= id;
   console.log("métiers avec livrable :", Object.keys(byProf).join(","));
-  const open = async (id) => { await p.evaluate((i) => { const d = document.querySelector(`#task-${i} details`); if (d) { d.open = true; } }, id); await p.waitForSelector(`#task-${id} .deliverable`, { timeout: 8000 }).catch(() => {}); };
+  const open = async (id) => { await p.evaluate((i) => { const d = document.querySelector(`#task-${i} details`); if (d) { d.open = true; } }, id); await p.waitForSelector(`#task-${id} .deliverable`, { timeout: 15000 }).catch(() => {}); };
   if (!noCat) {
     if (byProf.logo) {
       await open(byProf.logo);
@@ -122,4 +129,4 @@ const ok = (c, m) => { c ? pass++ : fail++; console.log((c ? "OK   " : "FAIL ") 
   console.log(`\n${pass} OK, ${fail} FAIL`);
   await b.close(); srv.kill();
   process.exit(fail ? 1 : 0);
-})();
+} catch (e) { console.log("FAIL exception : " + String(e?.message ?? e).split("\n")[0]); process.exit(1); } })();

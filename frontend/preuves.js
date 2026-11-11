@@ -1,7 +1,7 @@
 // Page « Preuves » (L17) : population et spécialisation par génération, flux d'argent, transactions on-chain, attestation TEE, briques NEAR.
 // Tout est calculé à partir du journal reçu (agrégats d'affichage). Aucun innerHTML.
 import { store, core, ledger, on, aliveAgents, labelOfJob } from "./core.js";
-import { h, formatNear, shortHash, big, nearNumber } from "./format.js";
+import { h, formatNear, formatNearSmall, shortHash, big, nearNumber } from "./format.js";
 import { jobOf, icon } from "./jobs.js";
 
 /** Modèles marqués attestables (TEE) dans docs/ATTESTATION_TEE.md §1 (liste blanche du cerveau). Les autres sont externes : rien n'est prouvé pour eux. */
@@ -53,7 +53,7 @@ function renderPopulation() {
   const jobs = [...new Set(all.map((a) => a.genome?.profession).filter(Boolean))];
   $("popLegend").replaceChildren(...jobs.map((j) => h("li", { class: jobOf(j).cls }, h("span", { class: "dot" }), `${labelOf(j)} `, h("b", null, totalsAlive.get(j) ?? 0))), h("li", { class: "dead-key" }, h("span", { class: "dot hatch" }), "mort"));
   const dom = [...totalsAlive].sort((a, b) => b[1] - a[1])[0];
-  $("popNote").textContent = dom ? `Métier dominant parmi les vivants : ${labelOf(dom[0])} (${dom[1]} sur ${[...totalsAlive.values()].reduce((s, n) => s + n, 0)}). Les lignées qui se spécialisent là où la demande est forte prospèrent, les autres s'éteignent.` : "";
+  $("popNote").textContent = dom ? `Métier dominant parmi les vivants : ${labelOf(dom[0])} (${dom[1]} sur ${[...totalsAlive.values()].reduce((s, n) => s + n, 0)}). Hypothèse à vérifier sur ce journal : les lignées spécialisées là où la demande est forte devraient mieux survivre ; les chiffres ci-dessus ne le prouvent pas à eux seuls.` : "";
 }
 
 function renderFlows() {
@@ -61,13 +61,13 @@ function renderFlows() {
   const items = [["Gagné", t.earned, "earn", "missions payées aux agents"], ["Dépensé en cerveau IA", t.brain, "brain", "appels à l'IA, débités des soldes"], ["Transmis aux enfants", t.passed, "pass", "capital donné à chaque naissance"]];
   const max = Math.max(1, ...items.map(([, v]) => nearNumber(v)));
   $("flows").replaceChildren(...items.map(([l, v, cls, sub]) => h("li", { class: `flow ${cls}` },
-    h("div", { class: "flow-top" }, h("span", null, l), h("b", null, `${formatNear(v, 2)} NEAR`)),
-    h("div", { class: "flow-bar", role: "img", "aria-label": `${l} : ${formatNear(v, 3)} NEAR` }, h("span", { css: { width: `${Math.max(1.5, (nearNumber(v) / max) * 100)}%` } })),
+    h("div", { class: "flow-top" }, h("span", null, l), h("b", null, `${cls === "brain" ? formatNearSmall(v) : formatNear(v, 2)} NEAR`)),
+    h("div", { class: "flow-bar", role: "img", "aria-label": `${l} : ${cls === "brain" ? formatNearSmall(v) : formatNear(v, 3)} NEAR` }, h("span", { css: { width: `${Math.max(1.5, (nearNumber(v) / max) * 100)}%` } })),
     h("small", null, sub))));
   const gens = [...ledger.byGen.keys()].sort((a, b) => a - b);
   $("flowGen").replaceChildren(...(gens.length ? [
     h("thead", null, h("tr", null, ["Génération", "Gagné", "Cerveau", "Transmis"].map((x) => h("th", { scope: "col" }, x)))),
-    h("tbody", null, gens.map((g) => { const r = ledger.byGen.get(g); return h("tr", null, h("th", { scope: "row" }, `Gén. ${g}`), h("td", { class: "earn" }, formatNear(r.earned, 2)), h("td", { class: "brain" }, formatNear(r.brain, 2)), h("td", { class: "pass" }, formatNear(r.passed, 2))); })),
+    h("tbody", null, gens.map((g) => { const r = ledger.byGen.get(g); return h("tr", null, h("th", { scope: "row" }, `Gén. ${g}`), h("td", { class: "earn" }, formatNear(r.earned, 2)), h("td", { class: "brain" }, formatNearSmall(r.brain)), h("td", { class: "pass" }, formatNear(r.passed, 2))); })),
   ] : []));
   $("flowNote").textContent = t.fees > 0n ? `Frais réseau payés par les agents : ${formatNear(t.fees, 3)} NEAR (non inclus ci-dessus).` : "";
 }
@@ -119,7 +119,7 @@ function renderTools() {
     ["Explorateur nearblocks", "un lien par transaction vérifiable", near],
   ];
   $("tools").replaceChildren(...tools.map(([n, s, on]) => h("li", { class: on ? "on" : "off" }, h("b", null, n), h("span", null, s), h("em", null, on ? (core.mode === "replay" ? "réel (rejeu)" : "réel") : real && !on ? "inactif" : "simulé"))));
-  const notes = [["Client simulé", "les missions « simulé » viennent d'un client artificiel."], ["Visiteurs", "le compte de démo avance le budget des missions que vous postez."], ["Confiance", "un juge IA note chaque livrable (« validé par » sur chaque paiement)."]];
+  const notes = [["Client simulé", "les missions « simulé » viennent d'un client artificiel."], ["Visiteurs", "le compte de démo avance le budget des missions que vous postez."], ["Confiance", "un juge IA note chaque livrable (« validé par » sur chaque paiement) ; le juge est choisi par l'opérateur, pas trustless."]];
   $("honest").replaceChildren(...notes.map(([a, b]) => h("li", null, h("b", null, a), " ", b)));
 }
 
