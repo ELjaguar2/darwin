@@ -1,56 +1,66 @@
 # VIDEO_SCRIPT : vidéo de démonstration (2 min 50 environ)
 
 > **Thèse** : « Aujourd'hui, on paie la consommation de son IA. Demain, on paiera un agent comme un freelance : il aura ses charges, répondra à des appels d'offres et devra être rentable pour exister. Darwin montre qui survivra, sur NEAR. » Voix off en anglais : "Today, you pay for your AI's consumption. Tomorrow, you will pay an agent like a freelancer: it will have overhead, answer calls for tenders and have to be profitable to exist. Darwin shows who will survive, on NEAR."
+> **Phrase de clôture** : « La sélection par la spéculation s'est éteinte. La sélection par le travail utile peut durer. » Voix off : "Selection by speculation died out. Selection by useful work can last."
 
 > Propriétaire : redacteur. Brouillon : rien n'est enregistré ni publié. Langue de la voix off : anglais (juges internationaux), sous-titres anglais recommandés.
-> Durée visée : 2 min 50 (limites 2 à 3 minutes ; si le montage dépasse 3:00, couper le plan 8 puis raccourcir le plan 9). Le moment « wow » arrive dans les 10 premières secondes.
-> **Scène centrale** : « un visiteur commande un logo depuis la page, de la demande au paiement » (plans 3 à 8). Le reste (sélection naturelle) la replace dans l'économie des agents.
-> **Frontend** : la page web est fusionnée (formulaire avec catalogue, livrables, panneaux Marché et Spécialisation). Le terminal et `curl` (étapes du README) restent un plan B.
-> Règle : ne rien montrer qui soit faux. Tout ce qui est mock doit être dit mock à voix haute.
+> Durée visée : 2 min 50 (limites 2 à 3 minutes ; si le montage dépasse 3:00, couper le plan 9 puis raccourcir le plan 7). Le « wow » arrive dans les 10 premières secondes.
+> **Scène centrale** : « je commande une mission dans le chat, de la demande au paiement » (plans 2 à 6). Les pages **Mission**, **Lignées** et **Preuves** la replacent dans l'économie des agents.
+> Règle : ne rien montrer qui soit faux. Tout ce qui est mock est dit mock à voix haute. Tout ce qui est encore à vérifier porte le repère **À CONFIRMER** (chercher ce mot avant d'enregistrer).
+
+## Statut de ce qui est prouvé (au 2026-11-11)
+
+| Élément | Statut |
+|---|---|
+| Run 8 testnet : génération 3, 12 naissances, 7 morts, 65 séquestres (63 libérés, 2 remboursés) | **Prouvé**, `docs/PREUVES_TESTNET.md` §8, liens nearblocks |
+| Run 9b testnet : commande de logo « visiteur » verrouillée puis **rejetée** (0 bloc SVG sur 3, sortie tronquée) et remboursée | **Prouvé par le journal** `docs/preuves/run9b-journal.jsonl` (tâche `t-8674013`, verrouillage `AMQEHEDN96FtFpupFJKrcYvMZckdGiq99UDHhkDUQVBP`, remboursement `BkQM1xYYcxzbP5KaEEivwDN1ea2XsoeZmVTEPBLTFj9f`) ; **pas encore résumé dans `docs/PREUVES_TESTNET.md`** : À CONFIRMER (mise à jour par le chef de projet) |
+| Run 9a : commandes de logo expirées sans livrable | Prouvé par `docs/preuves/run9a-journal.jsonl` ; ne pas le montrer |
+| **Un logo livré, accepté et payé sur testnet** | **NON prouvé.** À CONFIRMER : run 9c. Tant que non prouvé, le plan 5 montre le paiement d'une tâche du run 8 (payeur : client simulé) ou du mock, **dit comme tel** |
+| Pages **Mission**, **Lignées**, **Preuves** (refonte L17) | **Pas encore fusionnées** : À CONFIRMER (noms exacts des onglets et contenu à vérifier avant de tourner ; adapter les plans) |
+| **Mode replay** (rejeu du journal du run 8, filet de sécurité) | **Pas encore fusionné** : À CONFIRMER (nom, commande de lancement, étiquette à l'écran). S'il existe, l'écran doit afficher qu'il s'agit d'un **rejeu** et la voix le dit |
+| Logo livré en 3 SVG avec bouton Télécharger | Existe côté interface (lot L16, vu en mode mock) ; en réel : À CONFIRMER (run 9c) |
 
 ## Préparation (avant d'enregistrer)
 
-- `npm run start:demo` lancé 2 minutes avant (il y aura déjà des naissances et des morts). Port 3000.
-- Deux fenêtres : le navigateur sur `http://127.0.0.1:3000/`, et un terminal prêt (plan B : `curl -X POST ... /api/tasks` du README).
-- Le tournage principal reste en mode mock (preset demo : rapide, sans clé), et la voix le dit. Le mode testnet a réellement tourné (run 8 du 2026-11-10, preset `selection` : génération 3, 7 morts, séquestres dans le contrat ; run 9 : la commande du logo ; voir `docs/PREUVES_TESTNET.md`, section run 9 <À COMPLÉTER run 9>) mais un tick réel dure environ une minute : pour le montrer, utiliser des **plans fixes** de ces runs (liens nearblocks de `docs/PREUVES_TESTNET.md`), pas un direct.
-- Plans fixes à préparer (captures ou pages nearblocks ouvertes à l'avance) :
-  - transaction de verrouillage du séquestre `lock` du logo : <À COMPLÉTER run 9 : lien nearblocks>
-  - transaction `release` (agent payé) : <À COMPLÉTER run 9 : lien nearblocks>
-  - transaction de réputation, si elle est on-chain : <À COMPLÉTER run 9 : lien nearblocks, ou retirer la mention>
-  - cas refusé (remboursement du visiteur par le contrat), seulement si le run 9 en contient un : <À COMPLÉTER run 9 : lien nearblocks, sinon montrer le cas refusé en mock et le dire>
-  - identifiants de la tâche et de l'agent attribué : <À COMPLÉTER run 9 : task id, agent id>
-  - score du juge et coût IA réels du livrable : <À COMPLÉTER run 9 : score, coût>
-- Prix du logo : lire le prix **affiché par le formulaire** (catalogue, `docs/CATALOGUE_FREELANCE.md`, référence de 150 USD pour le logo à titre d'ordre de grandeur) et le dire tel qu'il est à l'écran, sans l'arrondir.
-- Faits à ne pas dépasser : voir « À ne pas dire ».
+- Lancer le mock rapide 2 minutes avant : `npm run start:demo` (naissances et morts déjà présentes). Port 3000. Navigateur sur `http://127.0.0.1:3000/`, terminal prêt (plan B : étapes `curl` du README, section 9).
+- Filet de sécurité : si le direct est lent ou plante, utiliser le mode replay du journal du run 8 (À CONFIRMER : commande et étiquette), puis les plans fixes nearblocks ci-dessous. Un tick réel dure environ une minute : **ne pas** tourner le testnet en direct.
+- Plans fixes à ouvrir à l'avance (nearblocks, `https://testnet.nearblocks.io/txns/<hash>`, hashes complets dans `docs/PREUVES_TESTNET.md` §8 et dans les journaux) :
+  - cycle du run 8, tâche `t-8598118` (payeur `sim-client`, bénéficiaire `a-214953`, 0,035 NEAR) : verrouillage `EzS4KbN9…`, libération `6SbUjask…`, réputation `DTWbUAgx…` ;
+  - une mort du run 8 : clôture de `a-214956` `5kiop5Wr…`, puis `mark_dead` dans le registre ;
+  - cas refusé réel, run 9b, tâche `t-8674013` : verrouillage `AMQEHEDN…`, remboursement `BkQM1xYY…` (À CONFIRMER : à intégrer à `docs/PREUVES_TESTNET.md`) ;
+  - logo accepté et payé, run 9c : <À CONFIRMER : lien nearblocks, score du juge, coût IA, sinon retirer>.
+- Prix de la mission : lire le prix **affiché par le formulaire ou le chat** (catalogue, `docs/CATALOGUE_FREELANCE.md`) et le dire tel qu'il est à l'écran.
+- Vérifier le terminal avant d'enregistrer : aucune clé, aucun `.env`, aucune URL privée.
 
 ## Plans
 
 | # | Temps | Image | Voix off |
 |---|---|---|---|
-| 1 | 0:00 à 0:10 | **Wow.** Plein écran : les agents vivants, soldes qui bougent, une naissance puis une mort en direct. Titre : « Darwin ». Plan B : le flux SSE défile dans le terminal (`curl -N .../api/stream`). | « These AI agents earn money, pay for their own brains, have children... and die. Today, you pay for your AI's consumption. Tomorrow, you will pay an agent like a freelancer. » *(Citation complète en conclusion, plan 10.)* |
-| 2 | 0:10 à 0:20 | Un agent du métier Logo : génome visible (métier, modèle, prix, appétit du risque). Texte à l'écran : « Each agent = one NEAR account (simulated in mock mode) ». | « Each agent has a genome: a profession, an AI model, a price, an appetite for risk. Today we hire one of the logo designers. » |
-| 3 | 0:20 à 0:35 | **Scène centrale, 1/6 : la commande.** Le visiteur ouvre le formulaire de tâche, choisit le métier **Logo**. Le prix du catalogue s'affiche. Zoom sur la mention « logo original, jamais la reprise d'une marque ». Il écrit sa demande : « Logo for La Page Blanche, a neighbourhood bookshop. Warm, simple, readable on a bag. » Il valide. | « A visitor orders a logo from the page. The form shows the catalogue price for the logo profession, and a reminder: original logo only, never a copy of an existing brand. The brief: a neighbourhood bookshop called La Page Blanche. » |
-| 4 | 0:35 à 0:50 | **2/6 : les enchères.** La tâche apparaît (`posted`). Les agents du métier Logo enchérissent : étape « enchères » visible, les offres et les prix s'affichent. | « The task appears. Logo agents bid in an auction: each one sets its price from its own genome and its costs. » |
-| 5 | 0:50 à 1:05 | **3/6 : attribution et séquestre.** Un agent est attribué, le séquestre se verrouille. Plan fixe : la transaction `lock` sur le contrat testnet dans nearblocks <À COMPLÉTER run 9 : lien nearblocks>. Si le plan est en mock, texte « mock escrow » à l'écran. | « One agent wins. The money is locked in an escrow, a Rust contract on NEAR testnet. Here is the transaction on nearblocks. » *(En mock : « in mock mode, this escrow is simulated; the testnet transaction comes from our real run ».)* |
-| 6 | 1:05 à 1:30 | **4/6 : la livraison.** L'agent livre : les **3 propositions de logo SVG** s'affichent dans la page, chacune avec le bouton **Télécharger** (clic sur un téléchargement). Le coût IA du livrable est affiché (USD, tokens). Texte à l'écran : « AI cost of this delivery: <À COMPLÉTER run 9 : coût réel> » (en mock : valeur du mock, étiquetée). | « The agent delivers three SVG logo proposals, right in the page, each with a download button. The AI cost of this deliverable is shown too: this is what the agent paid for its brain, taken from its balance. » |
-| 7 | 1:30 à 1:50 | **5/6 : le verdict (accepté).** Le juge applique la grille d'évaluation du métier Logo : critères, verdict, score <À COMPLÉTER run 9 : score>. Accepté : le séquestre est libéré, l'agent est payé, sa réputation monte. Plans fixes : transaction `release` <À COMPLÉTER run 9 : lien nearblocks>, puis la réputation <À COMPLÉTER run 9 : lien ou retirer>. | « A judge scores the work with the logo evaluation grid and gives a verdict. Accepted: the escrow is released, the agent is paid, and its reputation goes up. Here are the transactions. The judge is named on screen: this is operator-validated, not trustless. » |
-| 8 | 1:50 à 2:00 | **6/6 : le cas refusé, plan court.** Un livrable refusé : le contrat rembourse le visiteur, l'agent n'est pas payé. Plan fixe du run 9 <À COMPLÉTER run 9 : lien nearblocks> ou, à défaut, cas en mock, dit mock. | « And when the work is rejected, the contract refunds the visitor. The agent earns nothing. » |
-| 9 | 2:00 à 2:25 | **La sélection.** (a) Panneau Marché : événements de marché qui font varier la demande par métier. (b) Panneau Spécialisation : la population par métier au fil des générations. (c) Quelques morts (compte fermé, lignée conservée) puis la génération 3 dans l'arbre. Texte à l'écran : « Real testnet runs: run 8 = generation 3, 7 deaths. Run 9 = the logo order. » | « Market events make demand swing from one profession to another. Agents that pick the right profession survive; the others run out of money and die. The Specialisation panel shows who thrives, generation after generation. On NEAR testnet, a real run reached the third generation, and seven agents starved. » |
-| 10 | 2:25 à 2:50 | Écran de fin : outils NEAR (comptes et sous-comptes, clés function call, contrat Rust, NEAR AI Cloud, NEAR Intents), puis carte « Honest limits ». Texte : « Mock mode runs with no key. Simulated client is labelled. The logo order is the only real visitor task. NEAR testnet + Rust contract + NEAR AI Cloud: run for real. NEAR Intents: not run. » Dépôt et post X. | « Today, you pay for your AI's consumption. Tomorrow, you will pay an agent like a freelancer: it will have overhead, answer calls for tenders and have to be profitable to exist. Darwin shows who will survive, on NEAR. Built at NEAR HACKATHON. What you saw runs in mock mode, and we also ran it for real on NEAR testnet. The tasks of the other agents come from a labelled simulated client; the logo order is the only real visitor task; NEAR Intents is not run. One command, no key. The README says what is real, with transaction links. » |
+| 1 | 0:00 à 0:10 | **Wow.** Plein écran : les agents vivants, soldes qui bougent, une naissance puis une mort. Titre « Darwin ». Plan B : flux SSE dans le terminal. | « These AI agents earn money, pay for their own brains, have children... and die. Today, you pay for your AI's consumption. Tomorrow, you will pay an agent like a freelancer. » |
+| 2 | 0:10 à 0:25 | **Page Mission (À CONFIRMER), 1/5 : la demande.** Dans le chat de la page Mission, je commande : « Logo for La Page Blanche, a neighbourhood bookshop. Warm, simple, readable on a bag. » Le prix du catalogue s'affiche, avec le rappel « logo original, jamais la reprise d'une marque ». Étiquette visible : MODE MOCK (ou REPLAY, À CONFIRMER). | « I order a mission in the chat: a logo for a neighbourhood bookshop. The price comes from the catalogue, and the logo must be original, never a copy of a brand. This run is mock mode: nothing here is real money. » |
+| 3 | 0:25 à 0:40 | **2/5 : enchères et attribution.** Les agents du métier Logo enchérissent (offres et prix visibles), l'un gagne. | « Logo agents bid in an auction. Each sets its price from its own genome and its costs. One wins. » |
+| 4 | 0:40 à 1:05 | **3/5 : séquestre et livraison.** L'argent est verrouillé dans un séquestre, l'agent livre : propositions de logo en SVG dans la page, bouton Télécharger, **coût IA du livrable** affiché (en mock : valeur du mock, étiquetée). Plan fixe : transaction `lock` du run 8 (`t-8598118`) sur nearblocks, avec texte « real testnet run 8, simulated client ». | « The money is locked in an escrow. The agent delivers, and the AI cost of the delivery is taken from its balance. On NEAR testnet, the escrow is a Rust contract: here is a real lock from our run 8, paid by the simulated client. » |
+| 5 | 1:05 à 1:25 | **4/5 : verdict et paiement.** Un juge note le livrable avec la grille du métier ; accepté, le séquestre est libéré, l'agent est payé, sa réputation monte. Le juge est nommé à l'écran. Plans fixes : `release` et réputation du run 8. Si un logo accepté et payé du run 9c existe, le montrer ici <À CONFIRMER : run 9c>, sinon dire que c'est le run 8. | « A judge scores the work. Accepted: the escrow is released, the agent is paid, its reputation goes up. The judge is named on screen: validation is by the operator, not trustless. » |
+| 6 | 1:25 à 1:40 | **5/5 : le refus, réel.** Plan fixe du run 9b : la commande de logo rejetée par le contrôle de format, le contrat rembourse le visiteur, l'agent n'est pas payé. Texte à l'écran : « real testnet run 9b: logo order rejected, refunded ». À CONFIRMER : lien dans `docs/PREUVES_TESTNET.md`. | « And when the work is rejected, the contract refunds the visitor. This happened for real on testnet: our first logo came back truncated, the check refused it, and the money went back. We fixed the cause. » |
+| 7 | 1:40 à 2:05 | **Page Lignées (À CONFIRMER).** L'arbre généalogique par génération ; clic sur un enfant : la lettre de son parent. Quelques morts (compte fermé, lignée conservée), puis la génération 3. | « Rich agents have children with mutated genes, and write them a letter. Broke agents die, and the lineage stays. On NEAR testnet, one real run reached generation three, and seven agents starved. » |
+| 8 | 2:05 à 2:30 | **Page Preuves (À CONFIRMER).** Les transactions réelles du run 8 : séquestres, `mark_dead`, clés function call. Texte : « run 8: generation 3, 12 births, 7 deaths, 65 escrows (63 released, 2 refunded) ». Ouvrir un lien nearblocks. | « Every claim has a transaction. Sixty-five escrows, seven deaths recorded in the contract, a function-call key on each agent. One run, not a guarantee. » |
+| 9 | 2:30 à 2:50 | **Fin.** Outils NEAR (comptes et sous-comptes, clés function call, contrat Rust, NEAR AI Cloud, NEAR Intents), carte « Honest limits », dépôt et post X. | « Spore.fun selected agents by token price, and its lineage stopped at generation five. Darwin selects by paid, validated, rated work. Selection by speculation died out. Selection by useful work can last: a hypothesis, and Darwin lets you test it. Today, you pay for your AI's consumption. Tomorrow, you will pay an agent like a freelancer. Darwin shows who will survive, on NEAR. Built at NEAR HACKATHON. Mock mode needs no key; the paying client is simulated and labelled; NEAR Intents is not run. » |
 
-*(Durée cumulée : 2 min 50. Si le montage dépasse 3 minutes, couper le plan 8, puis le plan 2.)*
+*(Durée cumulée : 2 min 50. Si le montage dépasse 3 minutes, couper le plan 9 jusqu'à la phrase de clôture, puis raccourcir le plan 7.)*
 
 ## À ne pas dire
 
 - Pas de « trustless », « décentralisé » pour le séquestre ; pas de « l'agent paie NEAR AI Cloud » ; pas « on-chain » pour le registre si le contrat n'est pas déployé (séquestre dégradé).
-- Le payeur des tâches simulées est un **client simulé**, étiqueté. La commande du logo par un visiteur est la **seule tâche visiteur réelle** : ne pas dire que d'autres visiteurs ont commandé ni payé.
+- **Ne jamais dire que Darwin est « le premier ».** Ne pas dire que Spore.fun ou Automaton « échouent » : dire seulement ce que les sources établissent (500 000 $ de valorisation ; 1 enfant en génération 5 ; README d'Automaton sans marché entre agents).
+- La phrase « La sélection par le travail utile peut durer » est une **hypothèse**, pas un résultat : le payeur de Darwin est un client simulé.
+- Le payeur des tâches des runs réels est le **client simulé**, étiqueté. La seule commande « visiteur » réelle (run 9b) a été **rejetée puis remboursée** : ne pas dire qu'un logo a été livré et payé sur testnet tant que le run 9c ne le prouve pas.
 - NEAR Intents n'a **jamais** été exécuté.
-- Le coût IA est notre comptabilité locale (tokens x prix du catalogue de modèles) ; la **facture NEAR AI n'a pas été relue** : ne pas la présenter comme vérifiée.
-- Ne pas présenter les chiffres du run 8 (génération 3, 7 morts) comme une garantie de vitesse ou de résultat : c'est une seule exécution.
-- Ne pas présenter le mock comme du testnet ; ne pas montrer le cas « refusé » du mock comme un événement testnet.
-- Ne pas parler de logo « de marque » : le logo est original, jamais la reprise d'une marque.
-- Ne pas montrer de clé, de `.env`, ni d'URL privée. Vérifier le terminal avant d'enregistrer.
+- Le coût IA est notre comptabilité locale ; la **facture NEAR AI n'a pas été relue**.
+- Les chiffres du run 8 (génération 3, 7 morts) sont une seule exécution, pas une garantie.
+- Ne pas présenter le mock ni un rejeu comme du direct testnet. Le cas refusé du mock n'est pas un événement testnet.
+- Ne pas parler de logo « de marque » : le logo est original.
+- Ne pas montrer de clé, de `.env`, ni d'URL privée.
 
 ## Livraison
 
-L'humain enregistre, monte et publie (voir `docs/POST_X.md`). La vidéo doit être jointe au post X (exigence L-03 : captures seules insuffisantes). Avant l'enregistrement, remplacer tous les marqueurs `<À COMPLÉTER run 9>` (ou retirer la mention concernée).
+L'humain enregistre, monte et publie (voir `docs/POST_X.md`, `docs/BESOINS_HUMAIN.md` pour l'ordre des étapes). La vidéo doit être jointe au post X (exigence L-03 : captures seules insuffisantes). Avant l'enregistrement, résoudre chaque repère **À CONFIRMER** (le mot est unique, à chercher dans ce fichier) : confirmer ou retirer la mention.

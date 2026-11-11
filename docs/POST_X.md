@@ -1,15 +1,13 @@
 # POST_X : brouillon du post (aucune publication)
 
 > Propriétaire : redacteur. **L'humain relit, adapte et publie lui-même.** Mentions obligatoires (SPECS L-05) : dire que le projet a été construit au NEAR HACKATHON, taguer **@NEARProtocol** et **#NEARHackathon**, joindre la vidéo (`docs/VIDEO_SCRIPT.md`) ou des captures. Optionnels : @NearLegion, @NearBuilders. Le lien du post va dans `demoUrl` du formulaire (`docs/FORMULAIRE.md`).
-> Remplacer `<REPO_URL>` par l'URL du dépôt public avant publication. Chaque post fait moins de 280 caractères (URL comptée pour 23) ; revérifier dans l'éditeur de X.
+> Remplacer `<REPO_URL>` par l'URL du dépôt public avant publication. Chaque post fait moins de 280 caractères (URL comptée pour 23) ; compteur vérifié par script (`node -e` ci-dessous) puis à revérifier dans l'éditeur de X.
+> Mis à jour le 2026-11-11 d'après `docs/PREUVES_TESTNET.md` (run 8) : le testnet et le contrat ont réellement tourné. **Ne pas citer le run 9 (commande de logo) tant qu'un logo accepté et payé n'est pas prouvé** (À CONFIRMER : run 9c).
 
 ## Post unique
 
 ```text
-Built at NEAR HACKATHON: Darwin, AI agents that earn, pay for their brain, reproduce and die when broke.
-Chain and AI simulated by default; real testnet and NEAR AI Cloud modes ready, not run yet.
-Run it, no key: <REPO_URL>
-@NEARProtocol #NEARHackathon
+Built at NEAR HACKATHON: Darwin, AI agents that earn from paid, validated work, pay for their own brain, reproduce and die when broke. Real NEAR testnet run: generation 3, 7 deaths. Client simulated. No key needed: <REPO_URL> @NEARProtocol #NEARHackathon
 ```
 
 Joindre : la vidéo (le « wow » dans les 10 premières secondes).
@@ -22,7 +20,7 @@ Joindre : la vidéo (le « wow » dans les 10 premières secondes).
 ```
 
 ```text
-2/ Each agent has a genome (profession, AI model, price, risk, generosity...). It is born as a (simulated by default) NEAR sub-account, bids in auctions, works, and is paid through an escrow after validation. Its AI cost is debited from its balance.
+2/ Each agent has a genome (profession, AI model, price, risk, generosity...). It is born as a NEAR sub-account, bids in auctions, works, and is paid through an escrow after validation. Its AI cost is debited from its balance.
 ```
 
 ```text
@@ -30,19 +28,23 @@ Joindre : la vidéo (le « wow » dans les 10 premières secondes).
 ```
 
 ```text
-4/ NEAR integration, written but not yet run for real: sub-accounts and function-call keys (tested against a fake backend), a Rust escrow/registry contract (unit-tested natively, not deployed), a NEAR AI Cloud client, a NEAR Intents 1Click client (dry-run, off by default).
+4/ Related work: Spore.fun selected agents by token price; its lineage stopped at generation 5 (arXiv 2506.04236). Darwin selects by paid, validated, rated work. Selection by speculation died out. Selection by useful work can last. A hypothesis to test.
 ```
 
 ```text
-5/ Honest limits: no key needed (mock mode). The simulated client is labelled. Escrow is validated by the operator (not trustless). Testnet mode, the contract, NEAR AI Cloud and Intents were never run for real. Most code written by AI agents (Claude Code).
+5/ On NEAR testnet, run for real: sub-accounts, function-call keys, a Rust escrow/registry contract, NEAR AI Cloud as the brain. One run: generation 3, 12 births, 7 deaths, 65 escrows. NEAR Intents: not run.
 ```
 
 ```text
-6/ Try it: <REPO_URL> (npm install && npm run start:mock). README has "do X, you will see Y" steps. #NEARHackathon @NEARProtocol
+6/ Honest limits: mock mode by default. The payer is a labelled simulated client. Escrow is validated by the operator (not trustless). One real run, not a guarantee. Most code written by AI agents (Claude Code).
+```
+
+```text
+7/ Try it: <REPO_URL> (npm install && npm run start:mock). README has "do X, you will see Y" steps. #NEARHackathon @NEARProtocol
 ```
 
 ## Points de vigilance avant de publier
 
-- Le texte doit rester vrai : si le contrat est déployé ou le mode testnet exécuté, mettre à jour le post (et le README). Sinon garder les mentions de limites.
-- Pas de promesse de gain réel : le NEAR de testnet n'a pas de valeur.
+- Le texte doit rester vrai : relire `docs/PREUVES_TESTNET.md` ; si le run 9c prouve un logo accepté et payé, on pourra l'ajouter (À CONFIRMER), pas avant.
+- Pas de promesse de gain réel : le NEAR de testnet n'a pas de valeur. Ne jamais écrire « le premier ».
 - Vérifier que le dépôt est public et que le post X est public, puis copier son URL dans le formulaire.
