@@ -2,13 +2,13 @@
 // Règles dures : aucune libération sans verdict `accepted` enregistré ; remboursement seulement sur `rejected` ou `expired` ;
 // le validateur n'est jamais l'agent payé ni l'agent qui sous-traite ; texte visiteur toujours en message `user`.
 import {
-  CATALOGUE, ChainError, TaskInputSchema, formatNear, hashObject, nearPriceOf, parseNear,
+  CATALOGUE, ChainError, TaskInputSchema, formatNear, hashObject, journalFiles, nearPriceOf, parseNear, sanitizePitch,
   type Bid, type Deliverable, type Deps, type Escrow, type Market, type Profession, type Requester, type Task, type Validation, type Yocto,
 } from "../shared/index.ts";
 import { rankBids } from "./auction.ts";
 import { MarketError } from "./errors.ts";
 import { MAX_RESULT_CHARS, brainJudge, professionRule, resultHashOf, type Validator } from "./validation.ts";
-import { DeliverableError, extractDeliverable, fileBytes } from "./deliverable.ts";
+import { DeliverableError, extractDeliverable } from "./deliverable.ts";
 import { SIMULATED_LABEL_PREFIX } from "./simulated-client.ts";
 
 export * from "./errors.ts";
@@ -231,9 +231,10 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
     for (let t: Task | undefined = task; t; t = t.parentTaskId ? tasks.get(t.parentTaskId) : undefined) {
       if (t.requester.kind === "agent" && t.requester.agentId === input.agentId) throw new MarketError("SELF_DEALING", "un agent ne peut pas enchérir sur sa propre chaîne de sous-traitance");
     }
+    const pitch = sanitizePitch(input.pitch);
     const bid: Bid = {
       id: `b-${pad(++bidSeq)}`, taskId: task.id, agentId: input.agentId, price: price.toString(), etaTicks: input.etaTicks,
-      tick: currentTick(), ...(input.pitch ? { pitch: input.pitch.slice(0, 300) } : {}),
+      tick: currentTick(), ...(pitch ? { pitch } : {}),
     };
     bids.set(bid.id, bid);
     task.bidIds.push(bid.id);
@@ -420,7 +421,7 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
       deliverables.set(task.id, d);
       emit({
         type: "deliverable.produced", tick,
-        data: { taskId: d.taskId, profession: d.profession, agentId: d.agentId, files: fileBytes(d), productionCostUsd: d.productionCostUsd, judgeCostUsd: d.judgeCostUsd, resultHash: d.resultHash },
+        data: { taskId: d.taskId, profession: d.profession, agentId: d.agentId, files: journalFiles(d.files), productionCostUsd: d.productionCostUsd, judgeCostUsd: d.judgeCostUsd, resultHash: d.resultHash },
       });
     } catch (e) {
       // format invalide : rien à stocker (le juge de métier rejette ce cas) ; toute autre erreur ne doit jamais bloquer le règlement

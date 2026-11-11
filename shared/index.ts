@@ -5,6 +5,7 @@ export * from "./hash.ts";
 export * from "./types.ts";
 export * from "./events.ts";
 export * from "./deliverable.ts";
+export * from "./pitch.ts";
 export * from "./catalogue.ts";
 export * from "./chain.ts";
 export * from "./brain.ts";
