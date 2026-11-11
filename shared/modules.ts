@@ -6,6 +6,7 @@ import type { Chain } from "./chain.ts";
 import type { Config } from "./config.ts";
 import type { Yocto } from "./money.ts";
 import type { Rng } from "./rng.ts";
+import type { Deliverable } from "./deliverable.ts";
 import type { Agent, Bid, Letter, Profession, Requester, Task, Validation } from "./types.ts";
 
 /** Dépendances injectées partout (aucun module ne construit lui-même Chain, Brain, Journal ni ne lit process.env). */
@@ -31,6 +32,9 @@ export interface Market {
   listTasks(filter?: { status?: Task["status"]; profession?: Profession }): Task[];
   /** Tâches ouvertes aux offres pour une profession. */
   openTasks(profession?: Profession): Task[];
+  /** Livrable extrait du résultat remis (L16), en mémoire ; undefined si la tâche n'a pas (encore) de livrable valide. */
+  getDeliverable(taskId: string): Deliverable | undefined;
+  listDeliverables(): Deliverable[];
 }
 
 /** Instantané complet servi par GET /api/state (l'UI s'y initialise puis suit le flux SSE). */

@@ -2,18 +2,23 @@
 // Règles dures : aucune libération sans verdict `accepted` enregistré ; remboursement seulement sur `rejected` ou `expired` ;
 // le validateur n'est jamais l'agent payé ni l'agent qui sous-traite ; texte visiteur toujours en message `user`.
 import {
-  ChainError, TaskInputSchema, hashObject, parseNear,
-  type Bid, type Deps, type Escrow, type Market, type Profession, type Requester, type Task, type Validation, type Yocto,
+  CATALOGUE, ChainError, TaskInputSchema, formatNear, hashObject, nearPriceOf, parseNear,
+  type Bid, type Deliverable, type Deps, type Escrow, type Market, type Profession, type Requester, type Task, type Validation, type Yocto,
 } from "../shared/index.ts";
 import { rankBids } from "./auction.ts";
 import { MarketError } from "./errors.ts";
-import { MAX_RESULT_CHARS, brainJudge, resultHashOf, ruleValidator, type Validator } from "./validation.ts";
+import { MAX_RESULT_CHARS, brainJudge, professionRule, resultHashOf, type Validator } from "./validation.ts";
+import { DeliverableError, extractDeliverable, fileBytes } from "./deliverable.ts";
 import { SIMULATED_LABEL_PREFIX } from "./simulated-client.ts";
 
 export * from "./errors.ts";
 export * from "./validation.ts";
 export * from "./auction.ts";
 export * from "./simulated-client.ts";
+export * from "./deliverable.ts";
+export * from "./checks.ts";
+export * from "./events.ts";
+export * from "./templates.ts";
 
 /** Étiquettes normalisées (D-024). */
 export const VISITOR_FUNDING_LABEL = "Visiteur (financé par le compte de démo)";
@@ -63,9 +68,12 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
   const masterId = chain.info().masterId;
   const accounts = { visitors: `${VISITORS_ACCOUNT_LABEL}.${masterId}`, simClient: `${SIM_CLIENT_ACCOUNT_LABEL}.${masterId}` };
   const cap = opts.visitorHourlyCap ?? (config.sim as { visitorHourlyCap?: bigint }).visitorHourlyCap ?? sim.taskBudgetMax * 10n;
-  const defaultValidator = brainJudge({ brain: deps.brain, journal, config, rule: ruleValidator() });
+  const defaultValidator = brainJudge({ brain: deps.brain, journal, config, rule: professionRule() });
   const validatorFor = (k: Requester["kind"]): Validator => opts.validators?.[k] ?? defaultValidator;
 
+  const deliverables = new Map<string, Deliverable>();
+  /** Coût IA de production (USD) cumulé par tâche : `brain.charged` `execute_task` de l'agent, rattaché à sa plus ancienne tâche attribuée non remise. */
+  const productionCost = new Map<string, number>();
   const tasks = new Map<string, Task>();
   const bids = new Map<string, Bid>();
   const escrows = new Map<string, Escrow>();
@@ -82,6 +90,10 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
   let journalTick = 0;
   journal.subscribe((e) => {
     journalTick = Math.max(journalTick, e.tick);
+    if (e.type === "brain.charged" && e.data.purpose === "execute_task") {
+      const t = [...tasks.values()].find((x) => x.status === "awarded" && x.winnerId === e.data.agentId);
+      if (t) productionCost.set(t.id, (productionCost.get(t.id) ?? 0) + e.data.costUsd);
+    }
   });
   const currentTick = (): number => Math.max(stepTick, journalTick);
   const emit = journal.emit.bind(journal);
@@ -161,7 +173,12 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
       await agentRecord(requester.agentId);
     } else {
       if (input.parentTaskId) throw new MarketError("INVALID_SUBCONTRACT", "parentTaskId réservé aux agents");
-      if (budget < sim.taskBudgetMin || budget > sim.taskBudgetMax) throw new MarketError("BUDGET_OUT_OF_RANGE", "budget hors bornes");
+      // Prix plancher du métier (catalogue L16) ; plafond = la borne de config, relevée si besoin au plancher du métier.
+      if (!CATALOGUE[input.profession]) throw new MarketError("INVALID_INPUT", `métier inconnu : ${String(input.profession)}`);
+      const floor = BigInt(nearPriceOf(input.profession));
+      if (budget < floor)
+        throw new MarketError("BUDGET_OUT_OF_RANGE", `budget minimum pour ${CATALOGUE[input.profession].label} : ${formatNear(floor, 6)} NEAR (reçu ${formatNear(budget, 6)} NEAR)`);
+      if (budget > (sim.taskBudgetMax > floor ? sim.taskBudgetMax : floor)) throw new MarketError("BUDGET_OUT_OF_RANGE", `budget maximum : ${formatNear(sim.taskBudgetMax, 6)} NEAR`);
       if (requester.kind === "simulated") {
         const label = cleanLabel(requester.label);
         requester = { kind: "simulated", label: label.startsWith(SIMULATED_LABEL_PREFIX) ? label : `${SIMULATED_LABEL_PREFIX} : ${label}`.slice(0, 80) };
@@ -388,6 +405,25 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
     }
   }
 
+  /** Extrait et conserve le livrable (si le format est valide), puis journalise `deliverable.produced`. Aucun effet sur le paiement. */
+  function recordDeliverable(task: Task, validation: Validation, judgeCostUsd: number, tick: number): void {
+    if (deliverables.has(task.id)) return;
+    try {
+      const d = extractDeliverable(task, task.winnerId!, task.result!.text, {
+        productionCostUsd: Math.round((productionCost.get(task.id) ?? 0) * 1e8) / 1e8, judgeCostUsd: Math.round(judgeCostUsd * 1e8) / 1e8, createdAt: deps.now().toISOString(),
+      });
+      d.verdict = validation.verdict;
+      d.score = validation.score;
+      deliverables.set(task.id, d);
+      emit({
+        type: "deliverable.produced", tick,
+        data: { taskId: d.taskId, profession: d.profession, agentId: d.agentId, files: fileBytes(d), productionCostUsd: d.productionCostUsd, judgeCostUsd: d.judgeCostUsd, resultHash: d.resultHash },
+      });
+    } catch (e) {
+      if (!(e instanceof DeliverableError)) throw e; // format invalide : rien à stocker (le juge de métier rejette ce cas)
+    }
+  }
+
   /** Valide le résultat remis puis règle (paiement ou remboursement). Lève si aucune validation n'a pu être enregistrée. */
   async function validateAndSettle(task: Task, tick: number): Promise<Validation> {
     const result = task.result!;
@@ -404,6 +440,7 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
     };
     task.validation = validation;
     emit({ type: "task.validated", tick, data: { taskId: task.id, validation: clone(validation) } });
+    recordDeliverable(task, validation, verdict.costUsd ?? 0, tick);
     await trySettle(task, tick);
     return validation;
   }
@@ -413,6 +450,8 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
     getTask: (id) => (tasks.has(id) ? clone(tasks.get(id)!) : undefined),
     listTasks: (f) => [...tasks.values()].filter((t) => (!f?.status || t.status === f.status) && (!f?.profession || t.profession === f.profession)).map(clone),
     openTasks: (p) => [...tasks.values()].filter((t) => t.status === "posted" && (!p || t.profession === p)).map(clone),
+    getDeliverable: (id) => (deliverables.has(id) ? clone(deliverables.get(id)!) : undefined),
+    listDeliverables: () => [...deliverables.values()].map(clone),
     getEscrow: (id) => (escrows.has(id) ? clone(escrows.get(id)!) : undefined),
     accountIds: () => ({ ...accounts }),
     visitorSpentLastHour: spent,
