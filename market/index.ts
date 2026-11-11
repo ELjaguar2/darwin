@@ -420,7 +420,8 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
         data: { taskId: d.taskId, profession: d.profession, agentId: d.agentId, files: fileBytes(d), productionCostUsd: d.productionCostUsd, judgeCostUsd: d.judgeCostUsd, resultHash: d.resultHash },
       });
     } catch (e) {
-      if (!(e instanceof DeliverableError)) throw e; // format invalide : rien à stocker (le juge de métier rejette ce cas)
+      // format invalide : rien à stocker (le juge de métier rejette ce cas) ; toute autre erreur ne doit jamais bloquer le règlement
+      if (!(e instanceof DeliverableError)) emit({ type: "system.warning", tick, data: { code: "DELIVERABLE_FAILED", message: `${task.id} : ${(e as Error).message}`.slice(0, 300) } });
     }
   }
 

@@ -90,6 +90,23 @@ export function translationBody(text: string): string {
   const m = /\r?\n\s*(?:---+|\*\*?note\s*:?\*?\*?|note\s*:)/i.exec(text);
   return (m ? text.slice(0, m.index) : text).trim();
 }
+const STOP: Record<"en" | "fr", string[]> = {
+  en: ["the", "and", "of", "to", "is", "in", "your", "you", "for", "will", "with", "that", "be", "are", "our", "this", "it", "on"],
+  fr: ["le", "la", "les", "de", "des", "du", "et", "est", "un", "une", "votre", "vous", "pour", "que", "dans", "sur", "en", "nos", "ce"],
+};
+/** Langue cible si c'est l'anglais ou le français (autres langues : pas de contrôle). */
+export function targetLanguage(prompt: string): "en" | "fr" | undefined {
+  const head = prompt.split(/«/)[0] ?? prompt;
+  if (/\b(en|into|to)\s+(anglais|english)\b/i.test(head)) return "en";
+  if (/\b(en|into|to)\s+(fran[cç]ais|french)\b/i.test(head)) return "fr";
+  return undefined;
+}
+function stopwordShare(text: string, lang: "en" | "fr"): number {
+  const words = text.toLowerCase().match(/[a-zà-ÿ']+/g) ?? [];
+  if (!words.length) return 0;
+  const set = new Set(STOP[lang]);
+  return words.filter((w) => set.has(w)).length / words.length;
+}
 function checkTranslation(d: Deliverable, task: Pick<Task, "prompt">, f: string[], n: string[]): void {
   const body = translationBody(d.rawText);
   if (body.length < 5) return void f.push("traduction vide");
@@ -101,6 +118,11 @@ function checkTranslation(d: Deliverable, task: Pick<Task, "prompt">, f: string[
   const nb = lower(body);
   for (const s of segs) if (nb.includes(lower(s))) f.push("le texte source est recopié tel quel au lieu d'être traduit");
   n.push(`rapport de longueur ${ratio.toFixed(2)}`);
+  const lang = targetLanguage(task.prompt);
+  if (lang) {
+    const other = lang === "en" ? "fr" : "en";
+    if (stopwordShare(body, lang) < 0.1 || stopwordShare(body, other) > stopwordShare(body, lang)) f.push(`le texte ne semble pas être en ${lang === "en" ? "anglais" : "français"}`);
+  }
 }
 
 // ---------- finance ----------
