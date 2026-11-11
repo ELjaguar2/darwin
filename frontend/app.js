@@ -81,8 +81,15 @@ const specOf = (p) => catalogue?.get(p) ?? null;
 const labelOf = (p) => specOf(p)?.label ?? profOf(p).label;
 
 async function loadHealth() {
-  try { const r = await api("/api/health"); if (r.ok) { store.health = r.body; markDirty("banners", "tools", "header"); } } catch { /* ignoré */ }
+  try {
+    const r = await api("/api/health");
+    if (r.ok) {
+      store.health = r.body; markDirty("banners", "tools", "header", "replay");
+      if (r.body?.replay && !replayPoll) replayPoll = setInterval(loadHealth, 4000); // mode rejeu : progression et vitesse du lecteur
+    }
+  } catch { /* ignoré */ }
 }
+let replayPoll = 0;
 
 // ---------------------------------------------------------------- SSE avec reprise
 let es = null;
@@ -187,6 +194,7 @@ function render() {
   renderQueued = false;
   const all = dirty.has("all");
   if (all || dirty.has("header")) renderHeader();
+  if (all || dirty.has("replay")) renderReplayBar();
   if (all || dirty.has("banners")) renderBanners();
   if (all || dirty.has("tools")) renderTools();
   if (all || dirty.has("agents")) renderAgents();
@@ -224,6 +232,29 @@ function renderHeader() {
 function pill(cls, strong, rest, title) {
   return h("li", { class: `pill ${cls}`, title }, h("strong", null, strong), rest ? " " + rest : "");
 }
+// Mode rejeu (L17) : bandeau permanent. Rien n'est affiché en mode live ou mock (/api/health sans champ `replay`).
+function renderReplayBar() {
+  const bar = $("replayBar");
+  const rp = store.health?.replay;
+  if (!rp) { bar.hidden = true; return; }
+  const on = rp.meta?.recordedOn ? new Date(`${rp.meta.recordedOn}T00:00:00Z`) : null;
+  const date = on && !Number.isNaN(on.getTime()) ? on.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }) : "date inconnue";
+  const rec = rp.meta?.recorded ?? {};
+  const kind = rec.chain === "near" ? "run réel testnet" : "run enregistré";
+  const phase = { playing: "en cours", paused: "en pause", ended: "terminé" }[rp.phase] ?? rp.phase;
+  const speeds = [1, 5, 20].map((v) => h("button", { type: "button", "aria-pressed": String(rp.speed === v), onclick: () => replayCtl("speed", { speed: v }) }, `x${v}`));
+  const extra = rp.phase === "ended" ? h("button", { type: "button", onclick: () => replayCtl("restart") }, "Rejouer") : null;
+  bar.replaceChildren(
+    h("b", null, rp.meta?.label ?? `Rejeu d'un ${kind} du ${date}`),
+    h("span", { class: "muted small" }, `${phase} · événement ${rp.position}/${rp.total} · les transactions sont de vrais liens nearblocks, aucune action n'est écrite pendant le rejeu`),
+    h("span", { class: "rp-ctl" }, ...speeds, extra),
+  );
+  bar.hidden = false;
+}
+async function replayCtl(name, body) {
+  try { const r = await api(`/api/replay/${name}`, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(body ?? {}) }); if (r.ok && store.health) { store.health.replay = r.body; markDirty("replay"); } } catch { /* jeton requis ou serveur arrêté : sans effet */ }
+}
+
 function renderBanners() {
   const ul = $("banners");
   const mode = store.mode;

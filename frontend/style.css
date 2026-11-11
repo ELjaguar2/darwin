@@ -50,6 +50,12 @@ a { color: var(--accent); }
 .iconbtn:hover { background: var(--surface2); }
 
 /* ---- transparence ---- */
+.replaybar { margin: 0 clamp(12px, 2vw, 28px) 10px; padding: 8px 12px; border-radius: 12px; border: 2px solid var(--accent); background: var(--surface); font-size: 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.replaybar[hidden] { display: none; }
+.replaybar b { font-weight: 700; }
+.replaybar .rp-ctl { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.replaybar button { border: 1px solid var(--line); background: var(--surface2); color: var(--text); border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+.replaybar button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .honesty { margin: 0 clamp(12px, 2vw, 28px) 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; }
 .honesty > summary { cursor: pointer; font-weight: 600; font-size: 13px; color: var(--muted); }
 .banners { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
