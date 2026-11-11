@@ -131,10 +131,10 @@ Le journal d'une mission de visiteur (`task.posted` avec `requester.kind: "visit
 | Ordre | Événement | Contenu utile pour un fil de chat |
 |---|---|---|
 | 1 | `task.posted` | `task` : titre, consigne (`prompt`), métier, budget, `requester.label` (le visiteur) |
-| 2 | `bid.placed` (0..n) | `bid` : `agentId`, `price`, `etaTicks`, `pitch` |
+| 2 | `bid.placed` (0..n) | `bid` : `agentId`, `price`, `etaTicks`, `pitch?` (L18 : une phrase de vente, une ligne, <= 240 caractères, sans balisage, tronquée au mot avec « … » ; absente des journaux run5 à run9b) |
 | 3 | `task.awarded` ou `task.expired` | gagnant, prix, nombre d'offres ; ou motif d'expiration |
 | 4 | `escrow.locked` | `payer`, `amount`, `tx` (lien nearblocks via le `chain.tx` de même hash) |
-| 5 | `brain.charged`, `deliverable.produced` | coût IA de l'agent ; fichiers produits (nom, mime, taille) ; **le contenu des fichiers n'est pas dans les journaux actuels** : `GET /api/tasks/:id/deliverable` répond 404 en replay, sauf si un journal futur porte `content` dans `files[]` |
+| 5 | `brain.charged`, `deliverable.produced` | coût IA de l'agent (`purpose: "bid"` pour le pitch en réel, `"execute_task"` pour le travail) ; fichiers produits `files[] = {name, mime, bytes, content?, truncated?}` (L18) : `bytes` = taille UTF-8 réelle du fichier complet, `content` = texte, SVG déjà assaini ou Markdown, **PUBLIC**, borné à 24 000 caractères par fichier et 64 000 par livrable (`truncated: true` si coupé). Les journaux run5 à run9b n'ont que nom/mime/taille : `GET /api/tasks/:id/deliverable` répond alors 404 en replay ; avec `content` sur tous les fichiers il est servi (`{taskId, profession, agentId, files:[{name,mime,content,truncated?}], resultHash, ..., verdict, score}`). Ordre réel : `task.validated`, puis `deliverable.produced`, puis `escrow.released`. `/api/state` et `/api/tasks` ne portent ni pitch de liste ni contenu ; seuls `/api/stream`, `/api/events`, `/api/replay/missions` et l'endpoint livrable les portent |
 | 6 | `task.submitted` | `resultHash` |
 | 7 | `task.validated` | `validation`: `verdict`, `score`, `validator`, `reason` |
 | 8 | `escrow.released` (accepté) ou `escrow.refunded` (rejeté) + `reputation.updated` | paiement `payee`/`amount`/`tx`, variation de réputation |

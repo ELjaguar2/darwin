@@ -133,7 +133,7 @@ const bids = new Map(); // taskId -> bids
 function money(y, d = 3) { return `${formatNear(y, d)} NEAR`; }
 function pitchOf(b, a) {
   const p = typeof b.pitch === "string" ? b.pitch.trim() : "";
-  if (p) return p.slice(0, 220);
+  if (p) return p.slice(0, 240);
   // le journal réel ne garde pas toujours la phrase de pitch : on résume l'offre sans rien inventer
   const eta = Number(b.etaTicks);
   return `${Number.isFinite(eta) && eta > 0 ? `Livraison en ${eta} tick${eta > 1 ? "s" : ""}` : "Offre déposée"}${a ? ` · ${labelOf(a.genome?.profession)}` : ""}.`;

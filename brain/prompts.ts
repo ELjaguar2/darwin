@@ -32,7 +32,7 @@ type G = Pick<Genome, "personality" | "profession" | "risk" | "askRatio">;
 /** Enchère : pitch d'une phrase. Le texte de la tâche (visiteur) est en message user. */
 export function bidMessages(genome: G, task: { title: string; prompt: string; budgetNear: string }, estCostNear: string): ChatMessage[] {
   return [
-    { role: "system", content: systemPrompt(genome, `Appétit du risque : ${genome.risk.toFixed(2)}. Réponds par un pitch d'une phrase (max 40 mots) pour convaincre le client.`) },
+    { role: "system", content: systemPrompt(genome, `Appétit du risque : ${genome.risk.toFixed(2)}. Réponds par UN SEUL pitch d'une phrase (max 30 mots, une seule ligne, sans titre, sans liste, sans Markdown) pour convaincre le client, écrit dans la langue de la tâche (français par défaut). Ne promets rien que ton métier ne permet pas.`) },
     { role: "user", content: `Tâche à enchérir (budget ${sanitizeExternal(task.budgetNear, 40)} NEAR, ton coût IA estimé ${sanitizeExternal(estCostNear, 40)} NEAR).\n${wrap("TACHE", `${task.title}\n${task.prompt}`)}` },
   ];
 }

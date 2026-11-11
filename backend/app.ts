@@ -279,7 +279,7 @@ export function createApp(rt: Runtime, opts: AppOptions = {}): Hono {
     const d = deliverableOf(c);
     if (!d) return c.json(errBody("UNKNOWN_DELIVERABLE", "pas de livrable pour cette tâche"), 404);
     const { rawText: _raw, ...pub } = d;
-    return c.json({ ...pub, files: d.files.map((f) => ({ name: f.name, mime: f.mime, content: f.content })) });
+    return c.json({ ...pub, files: d.files.map((f) => ({ name: f.name, mime: f.mime, content: f.content, ...(f.truncated ? { truncated: true } : {}) })) });
   });
   app.get("/api/tasks/:id/deliverable/:file", (c) => {
     const file = c.req.param("file") ?? "";

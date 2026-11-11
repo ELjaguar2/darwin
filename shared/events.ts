@@ -2,7 +2,7 @@
 // Le journal est append-only (JSONL), rejoué par SSE ; l'UI se reconstruit uniquement à partir de lui + /api/state.
 import type { Yocto } from "./money.ts";
 import type { Agent, Bid, Genome, Letter, Profession, Task, Validation, CauseOfDeath } from "./types.ts";
-import type { MarketEvent } from "./deliverable.ts";
+import type { DeliverableJournalFile, MarketEvent } from "./deliverable.ts";
 
 /** type -> charge utile (`data`). Ajouter un type = l'ajouter ici ET dans ARCHITECTURE.md §8. */
 export interface EventCatalog {
@@ -30,7 +30,7 @@ export interface EventCatalog {
   "subcontract.created": { parentTaskId: string; childTaskId: string; byAgentId: string };
   "reputation.updated": { agentId: string; delta: number; total: number; taskId: string; tx?: string };
   // freelance réel (L16)
-  "deliverable.produced": { taskId: string; profession: Profession; agentId: string; files: { name: string; mime: string; bytes: number }[]; productionCostUsd: number; judgeCostUsd: number; resultHash: string };
+  "deliverable.produced": { taskId: string; profession: Profession; agentId: string; files: DeliverableJournalFile[]; productionCostUsd: number; judgeCostUsd: number; resultHash: string };
   "market.event": { event: MarketEvent };
   // économie / IA
   "brain.charged": { agentId: string; purpose: string; model: string; promptTokens: number; completionTokens: number; reasoningTokens: number; cost: Yocto; costUsd: number; nearUsdRate: number; priceSource: "models" | "mock"; mock: boolean; tx?: string };
