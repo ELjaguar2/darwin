@@ -1,6 +1,6 @@
 # POST_X : brouillon du post (aucune publication)
 
-> Propriétaire : redacteur. **L'humain relit, adapte et publie lui-même.** Mentions obligatoires (SPECS L-05) : dire que le projet a été construit au NEAR HACKATHON, taguer **@NEARProtocol** et **#NEARHackathon**, joindre la vidéo (`docs/VIDEO_SCRIPT.md`) ou des captures. Optionnels : @NearLegion, @NearBuilders. Le lien du post va dans `demoUrl` du formulaire (`docs/FORMULAIRE.md`).
+> Propriétaire : redacteur. **L'humain relit, adapte et publie lui-même.** Mentions obligatoires (SPECS L-05) : dire que le projet a été construit au NEAR HACKATHON, taguer **@NEARProtocol** et **#NEARHackathon**, joindre la **vidéo** (`docs/VIDEO_SCRIPT.md`) : elle est OBLIGATOIRE, HACKATHON.md (relu le 2026-11-12) dit que des captures seules ne suffisent pas. Optionnels : @NearLegion, @NearBuilders. Le lien du post va dans `demoUrl` du formulaire (`docs/FORMULAIRE.md`).
 > Remplacer `<REPO_URL>` par l'URL du dépôt public avant publication. Chaque post fait moins de 280 caractères (URL comptée pour 23) ; compteur vérifié par script (`node -e` ci-dessous) puis à revérifier dans l'éditeur de X.
 > Mis à jour le 2026-11-11 d'après `docs/PREUVES_TESTNET.md` (run 8) : le testnet et le contrat ont réellement tourné. **Ne pas citer le run 9 (commande de logo) tant qu'un logo accepté et payé n'est pas prouvé** (À CONFIRMER : run 9c).
 
@@ -28,7 +28,7 @@ Joindre : la vidéo (le « wow » dans les 10 premières secondes).
 ```
 
 ```text
-4/ Related work: Spore.fun selected agents by token price; its lineage stopped at generation 5 (arXiv 2506.04236). Darwin selects by paid, validated, rated work. Selection by speculation died out. Selection by useful work can last. A hypothesis to test.
+4/ Spore.fun selected agents by token price: it reached generation 5; by May 2025 only the original agent was alive (arXiv 2506.04236). Darwin selects by paid, validated work. Selection by speculation died out. Selection by useful work can last. A hypothesis to test.
 ```
 
 ```text
