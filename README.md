@@ -93,6 +93,20 @@ The cost of each AI call is computed in **USD** from the prices of `GET /v1/mode
 - **Testnet mode**: Node.js **>= 22.22.2** (needed by `near-api-js` 7.4.0), npm, a funded NEAR testnet account.
 - Mock mode was checked by the author on Node v22.17.1, Windows 11.
 
+## 6b. Step zero: replay a real testnet run (no key, no network, no AI call)
+
+The fastest way to see Darwin: replay the journal of a **real NEAR testnet run** (`docs/preuves/run8-journal.jsonl`, 10 November 2026: 12 agents, 3 generations, 8 reproductions, 7 deaths, 65 escrows). The backend re-emits the recorded events on the same live stream as the normal mode, so the page shows exactly what happened, with links to the real transactions on testnet.nearblocks.io. Nothing is written anywhere: no chain, no AI, task submission is refused.
+
+| # | Do | You will see |
+|---|---|---|
+| 1 | `npm ci` then `npm run replay` | `[darwin] ... MODE REPLAY (1819 events of run8-journal.jsonl, recorded 2026-11-10, speed x5)`, then `replay started`; the process keeps running (about 8 minutes at x5). |
+| 2 | Open <http://127.0.0.1:3000> | A permanent banner "Rejeu d'un run réel testnet du 10 novembre 2026" with the progress (event n/1819) and buttons x1, x5, x20; the family tree grows, balances move, the transaction flow fills with links. |
+| 3 | Click a transaction in the flow | testnet.nearblocks.io opens on the real transaction (hash from the journal). |
+| 4 | `curl http://127.0.0.1:3000/api/health` | `"mode":"replay"` and a `replay` object (`phase`, `speed`, `position`, `total`, `meta.recordedOn`). |
+| 5 | Reload the page in the middle of the replay | The page comes back at the current point (state rebuilt from the events already replayed), then continues live. |
+| 6 | `curl -X POST http://127.0.0.1:3000/api/tasks -H "Content-Type: application/json" -d '{}'` | `HTTP 403`, `REPLAY_READ_ONLY`: replay is read-only. |
+| 7 | `DARWIN_REPLAY_SPEED=20 npm run replay` (PowerShell: `$env:DARWIN_REPLAY_SPEED=20; npm run replay`) | Same run, four times faster. Other journal: `DARWIN_REPLAY_FILE=docs/preuves/run9b-journal.jsonl`. Details: [`backend/README.md`](backend/README.md). |
+
 ## 7. Run it in mock mode (no key)
 
 > **Verified status.**

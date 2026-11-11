@@ -92,3 +92,50 @@ Livrables : pas de `deliverable.zip` (aucune dépendance de compression ajoutée
 - Le journal complet reste en mémoire (`shared/bus.ts`) : suffisant pour le preset `demo` (900 ticks) ; en `normal` infini il grossit sans borne.
 - Arrêt propre vérifié par test (`shutdown()`) mais pas par signal sous Windows (Node n'y émet pas SIGINT à un `kill`).
 - Le mode testnet n'a été exercé qu'avec le faux backend NEAR (pas de clé ni de réseau dans cet environnement).
+
+## Mode replay (L17) : rejouer un run réel
+
+`npm run replay` relit un journal de run (JSONL `{seq,ts,tick,type,data}`) et réémet ses événements dans le **même flux** (`/api/stream`, SSE) que le mode live, aux cadences du run d'origine divisées par la vitesse. Aucune clé, aucun réseau NEAR, aucun appel IA : le processus ne fait que lire un fichier. Les `explorerUrl` des `chain.tx` sont ceux du run réel (liens nearblocks vers de vraies transactions).
+
+| Variable | Défaut | Effet |
+|---|---|---|
+| `DARWIN_MODE=replay` | posé par `npm run replay` | active le mode (secrets retirés de l'environnement lu) |
+| `DARWIN_REPLAY_FILE` | `docs/preuves/run8-journal.jsonl` | journal à rejouer (run8, run9c, ...) ; fichier invalide = arrêt avec la ligne en cause |
+| `DARWIN_REPLAY_SPEED` | `5` | x1, x5, x20... (0,25 à 100) |
+| `DARWIN_REPLAY_LOOP` | `0` | `1` : recommence 5 s après la fin (le flux envoie `event: reset`) |
+| `DARWIN_REPLAY_MAX_GAP_MS` | `8000` | un silence plus long dans le journal d'origine est raccourci à cette valeur (avant division par la vitesse) |
+| `DARWIN_REPLAY_LABEL` | (date du journal) | remplace le texte du bandeau |
+
+Pas d'argument CLI : `DARWIN_REPLAY_SPEED=20 DARWIN_REPLAY_FILE=docs/preuves/run9b-journal.jsonl npm run replay` (en PowerShell : `$env:DARWIN_REPLAY_SPEED=20; npm run replay`). La page est sur <http://127.0.0.1:3000>.
+
+**API.** Même surface que le live (`/api/state`, `/api/events`, `/api/tasks`, `/api/agents`, `/api/lineage`, `/api/letters/:id`, `/api/stream`...), servie par la réduction des événements déjà émis : un client qui arrive en cours de route reçoit `/api/state` avec `lastSeq` exact, puis le flux depuis `lastSeq`, sans trou. Ajouts :
+
+| Route | Rôle |
+|---|---|
+| `GET /api/health` | `mode: "replay"` et `replay: {phase: playing\|paused\|ended, speed, loop, position, total, rounds, meta}` ; `meta = {file, events, startedAt, endedAt, recordedOn (AAAA-MM-JJ lue du 1er événement), originalDurationMs, ticks, skipped, renumbered, recorded:{mode,preset,chain,brain,seed}, label?}` |
+| `GET /api/state` | idem avec `mode: "replay"` et `replay` |
+| `GET /api/replay` | l'objet `replay` ci-dessus |
+| `POST /api/replay/speed` `{speed}`, `/pause`, `/resume`, `/restart` | contrôle de la lecture ; `Authorization: Bearer` exigé si `DARWIN_ADMIN_TOKEN` est défini ; 400 `REPLAY_BAD_SPEED` |
+| `GET /api/replay/missions` | missions de visiteurs : `{missions:[{taskId,title,profession,requester,status,events:[DarwinEvent]}]}`, événements dans l'ordre (fil de chat) |
+| `POST /api/tasks`, `POST /api/sim/*` | **403 `REPLAY_READ_ONLY`** (refus avant toute validation ; aucune écriture chaîne/IA n'existe dans ce mode) |
+
+Fin de rejeu : `phase: "ended"` (le dernier état reste affiché) ; `POST /api/replay/restart` ou `DARWIN_REPLAY_LOOP=1` repartent de zéro, les clients connectés reçoivent `event: reset` (le frontend vide son affichage) puis les événements depuis `seq: 1`.
+
+**Validation du journal** (`backend/replay.ts`) : une ligne JSON par événement avec `type` connu, `ts` ISO croissant, `tick` numérique, `data` objet. Erreur claire avec numéro de ligne sinon ; type inconnu = ligne écartée (compte dans `meta.skipped`) ; dernière ligne tronquée tolérée ; `seq` renumérotés 1..N si besoin (`meta.renumbered`) car le flux exige des `seq` sans trou. Les `system.warning/error` sont masqués une seconde fois (`redact.ts`).
+
+### Événements d'une mission de visiteur (fil de chat)
+
+Le journal d'une mission de visiteur (`task.posted` avec `requester.kind: "visitor"`) enchaîne, tous reconnaissables par `data.taskId` (sauf `task.posted` : `data.task.id`, et `bid.placed` : `data.bid.taskId`) :
+
+| Ordre | Événement | Contenu utile pour un fil de chat |
+|---|---|---|
+| 1 | `task.posted` | `task` : titre, consigne (`prompt`), métier, budget, `requester.label` (le visiteur) |
+| 2 | `bid.placed` (0..n) | `bid` : `agentId`, `price`, `etaTicks`, `pitch` |
+| 3 | `task.awarded` ou `task.expired` | gagnant, prix, nombre d'offres ; ou motif d'expiration |
+| 4 | `escrow.locked` | `payer`, `amount`, `tx` (lien nearblocks via le `chain.tx` de même hash) |
+| 5 | `brain.charged`, `deliverable.produced` | coût IA de l'agent ; fichiers produits (nom, mime, taille) ; **le contenu des fichiers n'est pas dans les journaux actuels** : `GET /api/tasks/:id/deliverable` répond 404 en replay, sauf si un journal futur porte `content` dans `files[]` |
+| 6 | `task.submitted` | `resultHash` |
+| 7 | `task.validated` | `validation`: `verdict`, `score`, `validator`, `reason` |
+| 8 | `escrow.released` (accepté) ou `escrow.refunded` (rejeté) + `reputation.updated` | paiement `payee`/`amount`/`tx`, variation de réputation |
+
+Run8 ne contient aucune mission de visiteur (clients simulés seulement) ; run9a/run9b en contiennent (missions rejetée/expirée, journal posé dans `docs/preuves/`).
