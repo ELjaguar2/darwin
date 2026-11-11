@@ -27,6 +27,16 @@ export function nearNumber(y) {
   try { return Number(BigInt(y ?? 0) / (YOCTO / 1000000n)) / 1e6; } catch { return 0; }
 }
 
+/** Petit montant (coût du cerveau IA) : jamais « 0.00 » trompeur. 2 décimales dès 0.01 NEAR, 4 en dessous, « < 0.0001 » sous le seuil, « 0 » si nul. */
+export function formatNearSmall(y) {
+  let v;
+  try { v = BigInt(y ?? 0); } catch { return "?"; }
+  const a = v < 0n ? -v : v;
+  if (a === 0n) return "0";
+  if (a < YOCTO / 10000n) return (v < 0n ? "-" : "") + "< 0.0001";
+  return formatNear(v, a < YOCTO / 100n ? 4 : 2);
+}
+
 export function signedNear(y, digits = 2) {
   const s = formatNear(y, digits);
   return s.startsWith("-") ? s : "+" + s;

@@ -2,7 +2,7 @@
 // Aucune logique métier : le métier et le budget proposés par la barre sont une aide de saisie (le serveur valide et applique ses bornes).
 // Aucun innerHTML : texte en nœuds Text, livrables via deliverable.js (SVG uniquement en <img data:>, jamais injecté).
 import { store, core, api, on, txUrl, aliveAgents, labelOfJob } from "./core.js";
-import { h, formatNear, nearNumber, big, nearInput, parseNearToYocto, shortHash, errorMessages, requesterBadge } from "./format.js";
+import { h, formatNear, formatNearSmall, nearNumber, big, nearInput, parseNearToYocto, shortHash, errorMessages, requesterBadge } from "./format.js";
 import { jobOf, icon, avatar, firstName } from "./jobs.js";
 import { buildChatDeliverable } from "./chat-deliverable.js";
 
@@ -71,7 +71,14 @@ export function renderStrip() {
   }
   // l'ordre suit la naissance
   list.forEach((a, i) => { const c = cards.get(a.id); if (c && strip.children[i] !== c.btn && !c.btn.classList.contains("leaving")) strip.insertBefore(c.btn, strip.children[i] ?? null); });
-  $("stripEmpty").hidden = list.length > 0;
+  const empty = $("stripEmpty");
+  empty.hidden = list.length > 0;
+  if (!list.length) {
+    const all = [...store.agents.values()];
+    const gen = all.reduce((m, a) => Math.max(m, Number(a.generation) || 0), 0);
+    const ended = core.mode === "replay" && core.replayInfo?.phase === "ended";
+    empty.textContent = all.length ? `${ended ? "Rejeu terminé · " : ""}Plus aucun agent vivant · génération ${gen}` : ended ? "Rejeu terminé" : "En attente des premiers agents…";
+  }
 }
 let stripTimer = 0;
 const scheduleStrip = () => { if (!stripTimer) stripTimer = setTimeout(() => { stripTimer = 0; renderStrip(); }, 120); };
@@ -106,11 +113,11 @@ function enqueue(fn, silent) { if (silent) { flushQueue(); fn(true); } else { qu
 
 function requesterTag(t) {
   const r = t.requester;
-  if (mine.has(t.id)) return { text: "vous", cls: "tag-me", title: "Mission postée depuis cette page" };
+  if (mine.has(t.id)) return { text: "vous · financé par le compte de démo", cls: "tag-me", title: "Mission postée depuis cette page ; le budget est avancé par le compte de démonstration." };
   if (r?.kind === "simulated") return { text: "simulé", cls: "tag-sim", title: "Client artificiel : cette mission ne vient pas d'un humain." };
   if (r?.kind === "agent") return { text: "sous-traitance", cls: "tag-agent", title: "Mission confiée par un agent à un autre." };
   const b = requesterBadge(r, t.badge);
-  return { text: r?.label ? String(r.label) : "visiteur", cls: "tag-visitor", title: b.title ?? "" };
+  return { text: `${r?.label ? String(r.label) : "visiteur"} · financé par le compte de démo`, cls: "tag-visitor", title: b.title ?? "" };
 }
 
 function ensureThread(task, silent) {
@@ -167,7 +174,7 @@ function msgNode(th, m) {
     }
     case "bid": return bubble(m.agentId, h("div", null, h("span", { class: "price" }, money(m.price, 3)), h("span", { class: "pitch" }, m.pitch)), "bid");
     case "award": return h("div", { class: "msg sys" }, h("span", { class: "pill-sys" }, "★ ", h("b", null, m.name), ` remporte la mission · ${money(m.price, 3)}${m.bids ? ` · ${m.bids} offre${m.bids > 1 ? "s" : ""}` : ""}`), txChip(m.tx, "Séquestre verrouillé"));
-    case "work": return bubble(m.agentId, h("div", { class: "work" }, h("span", { class: "dots", "aria-hidden": "true" }, h("i"), h("i"), h("i")), `réfléchit${m.cost ? ` · cerveau payé ${money(m.cost, 3)}` : ""}`), "work");
+    case "work": return bubble(m.agentId, h("div", { class: "work" }, h("span", { class: "dots", "aria-hidden": "true" }, h("i"), h("i"), h("i")), `réfléchit${m.cost ? ` · cerveau payé ${formatNearSmall(m.cost)} NEAR` : ""}`), "work");
     case "submit": return bubble(m.agentId, h("div", null, "Livrable remis", m.hash ? h("code", { class: "hash" }, shortHash(m.hash)) : null), "submit");
     case "deliverable": return h("div", { class: "msg deliv" }, m.node);
     case "verdict": return h("div", { class: `msg judge ${m.ok ? "ok" : "ko"}` }, h("div", { class: "bub" },
@@ -269,6 +276,8 @@ export function ingest(ev, { silent = false } = {}) {
         const msg = { kind: "deliverable", node: buildChatDeliverable(inline, d) };
         push(th, msg, s);
         // le contenu (texte, SVG) vient de l'API ; sans contenu (rejeu d'un journal), la liste des fichiers reste affichée
+        // en rejeu, le contenu éventuel est déjà dans files[] : on n'interroge pas l'API (404 attendu pour les anciens journaux)
+        if (core.mode === "replay") return;
         api(`/api/tasks/${encodeURIComponent(d.taskId)}/deliverable`).then((r) => {
           if (r.ok && r.body && Array.isArray(r.body.files)) { msg.node = buildChatDeliverable(r.body, d); renderThread(th); }
         }).catch(() => { /* conservé tel quel */ });
@@ -362,9 +371,10 @@ function renderMode() {
   $("mSend").disabled = replay;
   $("jobBtn").disabled = replay;
   $("budgetInput").disabled = replay;
-  input.placeholder = replay ? "Missions désactivées pendant le rejeu" : "Décrivez votre mission…";
+  input.placeholder = replay ? "Missions désactivées en rejeu" : "Décrivez votre mission…";
   $("composer").classList.toggle("off", replay);
   $("replayNote").hidden = !replay;
+  $("publicNote").hidden = replay;
 }
 
 let cooldown = 0;

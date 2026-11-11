@@ -305,3 +305,13 @@ body[data-page="lignees"] { height: 100dvh; overflow: hidden; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
 
 .feed, .composer { scroll-margin-top: 90px; }
+
+/* NB-2 : en rejeu, les notifications se placent sous le bandeau (boutons x1/x5/x20 toujours accessibles) */
+body[data-mode="replay"] .toasts { top: 170px; } /* repli ; valeur exacte posée par darwin.js sous le bandeau */
+.conn[data-ended="true"] .dot { background: var(--muted); animation: none; }
+
+/* V-6 / V-7 : avertissements visibles */
+.c-public { margin-top: 10px; font-size: 15px; color: var(--muted); } .c-public b { color: var(--warn); }
+.esc-badge { font-size: 13px; font-weight: 800; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--warn); color: var(--warn); white-space: nowrap; }
+.esc-badge[hidden] { display: none; }
+@media (max-width: 640px) { .esc-badge { font-size: 11px; padding: 2px 8px; } }

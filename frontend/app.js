@@ -2,7 +2,7 @@
 // Aucune logique métier ici : la page reflète le journal d'événements. Aucun innerHTML (tout via textContent / h()).
 import { Store, EVENT_TYPES } from "./store.js";
 import { Tree } from "./tree.js";
-import { big, formatNear, signedNear, nearNumber, shortHash, profOf, requesterBadge, STATUS_LABEL, h, errorMessages, TESTNET_EXPLORER, PROFESSIONS, PROFESSION_IDS, parseNearToYocto, nearInput, usd, multLabel } from "./format.js";
+import { big, formatNear, formatNearSmall, signedNear, nearNumber, shortHash, profOf, requesterBadge, STATUS_LABEL, h, errorMessages, TESTNET_EXPLORER, PROFESSIONS, PROFESSION_IDS, parseNearToYocto, nearInput, usd, multLabel } from "./format.js";
 import { buildDeliverable } from "./deliverable.js";
 
 const $ = (id) => document.getElementById(id);
@@ -559,7 +559,7 @@ async function renderLetters() {
       h("dl", { class: "kv" },
         h("div", null, h("dt", null, "Solde"), h("dd", null, a.status === "dead" ? "0" : formatNear(a.balance, 3), " NEAR")),
         h("div", null, h("dt", null, "Gagné"), h("dd", null, formatNear(a.earned ?? 0, 2))),
-        h("div", null, h("dt", null, "Payé à l'IA"), h("dd", null, formatNear(a.spentBrain ?? 0, 2))),
+        h("div", null, h("dt", null, "Payé à l'IA"), h("dd", null, formatNearSmall(a.spentBrain ?? 0))),
         h("div", null, h("dt", null, "Réputation"), h("dd", null, a.reputation ?? 0)),
         h("div", null, h("dt", null, "Tâches faites"), h("dd", null, a.tasksDone ?? 0)),
         h("div", null, h("dt", null, "Enfants"), h("dd", null, (a.childrenIds ?? []).length))),
