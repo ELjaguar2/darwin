@@ -41,6 +41,8 @@ export interface EventCatalog {
   "intents.quote": { dry: true; originAsset: string; destinationAsset: string; amountIn: string; amountOut?: string; note?: string };
   "system.warning": { code: string; message: string };
   "system.error": { code: string; message: string };
+  // --- L16 moteur : indicateurs de spécialisation ---
+  "population.snapshot": { tick: number; byProfession: Record<Profession, number>; byGeneration: Record<string, Record<Profession, number>> };
 }
 
 export type EventType = keyof EventCatalog;
@@ -53,6 +55,7 @@ export const EVENT_TYPES = [
   "deliverable.produced", "market.event",
   "brain.charged", "balance.changed", "funding.received",
   "chain.tx", "intents.quote", "system.warning", "system.error",
+  "population.snapshot", // L16
 ] as const satisfies readonly EventType[];
 
 export type DarwinEvent<T extends EventType = EventType> = {
