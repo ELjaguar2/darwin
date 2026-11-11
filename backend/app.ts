@@ -63,6 +63,8 @@ export interface AppOptions {
   limits?: { api?: number; postTask?: number; adminFailures?: number; streamsPerIp?: number; streamsTotal?: number };
   pingMs?: number;
   now?: () => number;
+  /** Mode replay uniquement (D-044) : "open" (défaut) = contrôle de la lecture sans jeton ; "locked" = jeton d'administration exigé. */
+  replayControl?: "open" | "locked";
 }
 
 const defaultIp = (c: Context): string => {
@@ -449,8 +451,10 @@ export function createApp(rt: Runtime, opts: AppOptions = {}): Hono {
         missions: [...replay.state.missions.values()].map((m) => ({ ...m, events: m.events.map((e) => all.get(e.seq) ?? e) })),
       });
     });
+    // D-044 : le rejeu n'a aucun pouvoir d'écriture ; contrôle ouvert par défaut, jeton exigé si DARWIN_REPLAY_CONTROL=locked.
+    const replayGuard: MiddlewareHandler = opts.replayControl === "locked" ? admin : async (_c, next) => { await next(); };
     const ctl = (name: string, run: (body: Record<string, unknown>) => void) =>
-      app.post(`/api/replay/${name}`, admin, async (c) => {
+      app.post(`/api/replay/${name}`, replayGuard, async (c) => {
         let body: Record<string, unknown> = {};
         try {
           const j = await c.req.json();
@@ -473,6 +477,9 @@ export function createApp(rt: Runtime, opts: AppOptions = {}): Hono {
   }
 
   app.all("/api/*", (c) => c.json(errBody("NOT_FOUND", "route inconnue"), 404));
+
+  // Ancienne interface : /classique -> /?classique (même comportement que le faux serveur de frontend/dev)
+  app.get("/classique", (c) => c.redirect("/?classique", 302));
 
   // ---- statique frontend/ (un autre agent y travaille) ----
   const frontendDir = opts.frontendDir ?? fileURLToPath(new URL("../frontend", import.meta.url));

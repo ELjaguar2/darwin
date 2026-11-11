@@ -44,7 +44,8 @@ export async function runReplayMode(io: { say: (m: string) => void; fail: (m: st
     return fail(e instanceof ReplayError ? e.message : safeErrorMessage(e), 2);
   }
   const rt = createReplayRuntime(config, replay);
-  const app = createApp(rt);
+  const locked = /^locked$/i.test((env.DARWIN_REPLAY_CONTROL ?? "").trim());
+  const app = createApp(rt, { replayControl: locked ? "locked" : "open" });
   const { host, port } = config.server;
   const server = await new Promise<Server>((res, rej) => {
     const s = serve({ fetch: app.fetch, hostname: host, port }, () => res(s as Server));
@@ -69,5 +70,10 @@ export async function runReplayMode(io: { say: (m: string) => void; fail: (m: st
   process.on("SIGINT", () => void shutdown("SIGINT"));
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
   await rt.startSim();
+  say(locked
+    ? config.server.adminToken
+      ? "contrôle du rejeu verrouillé (DARWIN_REPLAY_CONTROL=locked) : jeton d'administration exigé"
+      : "ATTENTION : DARWIN_REPLAY_CONTROL=locked sans DARWIN_ADMIN_TOKEN : le contrôle du rejeu est ouvert (aucun jeton défini)"
+    : "contrôle du rejeu (vitesse, pause) ouvert à tout visiteur : vitesse partagée ; pour une démo publique, DARWIN_REPLAY_CONTROL=locked");
   say("rejeu démarré");
 }

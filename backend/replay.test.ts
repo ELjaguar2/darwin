@@ -169,12 +169,12 @@ describe("lecteur : cadence et vitesses", () => {
 });
 
 describe("API en mode replay", () => {
-  function appFor(opts: { text?: string; steps?: number; env?: Record<string, string> } = {}) {
+  function appFor(opts: { text?: string; steps?: number; env?: Record<string, string>; control?: "open" | "locked" } = {}) {
     const m = manual(opts.text, { speed: 5 });
     m.step(opts.steps ?? 0);
     const config = loadConfig(replayEnv({ ...opts.env }));
     const rt = createReplayRuntime(config, m.replay);
-    return { ...m, rt, app: createApp(rt) };
+    return { ...m, rt, app: createApp(rt, opts.control ? { replayControl: opts.control } : {}) };
   }
   const json = async (r: Response | Promise<Response>) => (await r).json() as Promise<any>;
 
@@ -242,7 +242,7 @@ describe("API en mode replay", () => {
     expect(m.missions[0].events[0].data.task.title).toBe("Mission t-1");
   });
 
-  it("contrôle de la lecture : vitesse valide/invalide, pause, reprise ; jeton exigé s'il est configuré", async () => {
+  it("contrôle de la lecture : vitesse valide/invalide, pause, reprise ; ouvert par défaut, jeton exigé si locked", async () => {
     const { app, replay } = appFor({ steps: 1 });
     const post = (p: string, body?: unknown, h: Record<string, string> = {}) => app.request(p, { method: "POST", headers: { "content-type": "application/json", ...h }, body: body === undefined ? undefined : JSON.stringify(body) });
     expect((await json(post("/api/replay/speed", { speed: 20 }))).speed).toBe(20);
@@ -254,10 +254,32 @@ describe("API en mode replay", () => {
     expect(replay.status().speed).toBe(20);
 
     const tok = ["jeton", "admin", "0123456789", "abcdefghij"].join("-");
-    const guarded = appFor({ steps: 1, env: { DARWIN_ADMIN_TOKEN: tok } });
-    const r = await guarded.app.request("/api/replay/speed", { method: "POST", headers: { "content-type": "application/json" }, body: '{"speed":20}' });
-    expect(r.status).toBe(401);
-    expect(guarded.replay.status().speed).toBe(5);
+    const raw = (a: ReturnType<typeof appFor>, p: string, h: Record<string, string> = {}) => a.app.request(p, { method: "POST", headers: { "content-type": "application/json", ...h }, body: '{"speed":20}' });
+
+    // D-044 : par défaut le contrôle est ouvert, même si DARWIN_ADMIN_TOKEN est défini dans l'environnement
+    const open = appFor({ steps: 1, env: { DARWIN_ADMIN_TOKEN: tok } });
+    expect((await raw(open, "/api/replay/speed")).status).toBe(200);
+    expect(open.replay.status().speed).toBe(20);
+    expect((await open.app.request("/api/replay/pause", { method: "POST" })).status).toBe(200);
+    expect((await open.app.request("/api/replay/resume", { method: "POST" })).status).toBe(200);
+    expect((await open.app.request("/api/replay/restart", { method: "POST" })).status).toBe(200);
+    // /api/sim/* reste fermé en replay
+    expect((await open.app.request("/api/sim/stop", { method: "POST" })).status).toBe(403);
+    expect((await open.app.request("/api/sim/start", { method: "POST", headers: { authorization: `Bearer ${tok}` } })).status).toBe(403);
+
+    // mode locked : jeton exigé
+    const locked = appFor({ steps: 1, control: "locked", env: { DARWIN_ADMIN_TOKEN: tok } });
+    expect((await raw(locked, "/api/replay/speed")).status).toBe(401);
+    expect(locked.replay.status().speed).toBe(5);
+    expect((await raw(locked, "/api/replay/speed", { authorization: "Bearer " + tok })).status).toBe(200);
+    expect(locked.replay.status().speed).toBe(20);
+  });
+
+  it("/classique redirige vers /?classique", async () => {
+    const { app } = appFor();
+    const r = await app.request("/classique");
+    expect(r.status).toBe(302);
+    expect(r.headers.get("location")).toBe("/?classique");
   });
 
   it("fin de rejeu et redémarrage : reset envoyé aux clients connectés, état vidé", async () => {

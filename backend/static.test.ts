@@ -11,6 +11,13 @@ async function mk(frontendDir: string) {
 }
 
 describe("statique : liste blanche et CSP sans style inline", () => {
+  it("/classique redirige vers /?classique (backend live)", async () => {
+    const app = await mk(join(process.cwd(), "frontend"));
+    const r = await app.request("/classique");
+    expect(r.status).toBe(302);
+    expect(r.headers.get("location")).toBe("/?classique");
+  });
+
   it("page et scripts servis ; dev/, screens/, .md, fichiers cachés et traversées refusés", async () => {
     const app = await mk(join(process.cwd(), "frontend"));
     for (const ok of ["/", "/index.html", "/app.js", "/store.js", "/style.css", "/favicon.svg"]) expect((await app.request(ok)).status, ok).toBe(200);

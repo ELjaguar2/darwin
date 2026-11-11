@@ -104,6 +104,7 @@ Livrables : pas de `deliverable.zip` (aucune dépendance de compression ajoutée
 | `DARWIN_REPLAY_SPEED` | `5` | x1, x5, x20... (0,25 à 100) |
 | `DARWIN_REPLAY_LOOP` | `0` | `1` : recommence 5 s après la fin (le flux envoie `event: reset`) |
 | `DARWIN_REPLAY_MAX_GAP_MS` | `8000` | un silence plus long dans le journal d'origine est raccourci à cette valeur (avant division par la vitesse) |
+| `DARWIN_REPLAY_CONTROL` | `open` | `locked` : les routes `/api/replay/speed\|pause\|resume\|restart` exigent `DARWIN_ADMIN_TOKEN`. **Démo publique multi-visiteurs : la vitesse est partagée, lancer avec `locked`** |
 | `DARWIN_REPLAY_LABEL` | (date du journal) | remplace le texte du bandeau |
 
 Pas d'argument CLI : `DARWIN_REPLAY_SPEED=20 DARWIN_REPLAY_FILE=docs/preuves/run9b-journal.jsonl npm run replay` (en PowerShell : `$env:DARWIN_REPLAY_SPEED=20; npm run replay`). La page est sur <http://127.0.0.1:3000>.
@@ -115,7 +116,7 @@ Pas d'argument CLI : `DARWIN_REPLAY_SPEED=20 DARWIN_REPLAY_FILE=docs/preuves/run
 | `GET /api/health` | `mode: "replay"` et `replay: {phase: playing\|paused\|ended, speed, loop, position, total, rounds, meta}` ; `meta = {file, events, startedAt, endedAt, recordedOn (AAAA-MM-JJ lue du 1er événement), originalDurationMs, ticks, skipped, renumbered, recorded:{mode,preset,chain,brain,seed}, label?}` |
 | `GET /api/state` | idem avec `mode: "replay"` et `replay` |
 | `GET /api/replay` | l'objet `replay` ci-dessus |
-| `POST /api/replay/speed` `{speed}`, `/pause`, `/resume`, `/restart` | contrôle de la lecture ; `Authorization: Bearer` exigé si `DARWIN_ADMIN_TOKEN` est défini ; 400 `REPLAY_BAD_SPEED` |
+| `POST /api/replay/speed` `{speed}`, `/pause`, `/resume`, `/restart` | contrôle de la lecture ; **sans jeton par défaut** (D-044, même si `DARWIN_ADMIN_TOKEN` est défini) ; avec `DARWIN_REPLAY_CONTROL=locked`, `Authorization: Bearer` exigé ; 400 `REPLAY_BAD_SPEED` |
 | `GET /api/replay/missions` | missions de visiteurs : `{missions:[{taskId,title,profession,requester,status,events:[DarwinEvent]}]}`, événements dans l'ordre (fil de chat) |
 | `POST /api/tasks`, `POST /api/sim/*` | **403 `REPLAY_READ_ONLY`** (refus avant toute validation ; aucune écriture chaîne/IA n'existe dans ce mode) |
 
