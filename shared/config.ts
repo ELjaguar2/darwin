@@ -80,8 +80,9 @@ export const PRESETS: Record<"mock" | "testnet", Record<Preset, SimParams>> = {
     // la latence RPC testnet fait qu'un tick réel dure environ une minute.
     selection: {
       tickMs: 10000, founders: 6, maxPopulation: 18, maxTicks: 0,
-      birthCapital: N("0.1"), metabolism: N("0.005"), minVital: N("0.03"), reproCooldownTicks: 4,
-      simClientRatePerTick: 1.5, taskBudgetMin: N("0.02"), taskBudgetMax: N("0.1"),
+      // L17 (D-043) : calibre en mock par `scripts/calibrate-selection.ts` (avant : capital 0,1, metabolisme 0,005, client 1,5/tick).
+      birthCapital: N("0.12"), metabolism: N("0.0035"), minVital: N("0.03"), reproCooldownTicks: 4,
+      simClientRatePerTick: 2, taskBudgetMin: N("0.02"), taskBudgetMax: N("0.1"),
       bidWindowTicks: 1, taskDeadlineTicks: 4, mutationRate: 0.4, mutationSd: 0.2,
       nearUsdRate: 3, maxTokensPerCall: 300, settleEveryTicks: 4, visitorHourlyCap: N("0.5"), priceScale: 1, visitorBidWindowTicks: 3, visitorTaskDeadlineTicks: 6,
     },
