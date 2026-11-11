@@ -19,7 +19,7 @@ Deuxième passe : `accounts/` (L2), `intents/` (L9) et `backend/` (L7) sont revu
 
 ## 2. État du scan de secrets
 
-Script : `scripts/scan-secrets.mjs` (`npm run scan:secrets`, alias `npm run scan-secrets`). Sans dépendance. Il scanne les fichiers suivis par git et les lignes ajoutées de l'historique (`git log -p`) : clés NEAR `ed25519:`/`secp256k1:`, clés PEM, phrases de récupération de 12 à 24 mots précédées d'un mot-clé, clés `sk-`, `Bearer` long, JWT, affectation non vide (16 caractères ou plus) de `NEAR_MASTER_PRIVATE_KEY`, `NEARAI_API_KEY`, `INTENTS_JWT`, `DARWIN_ADMIN_TOKEN` ; fichier `.env*` suivi (hors `.env.example`). Valeurs toujours masquées (4 premiers caractères + longueur). Code de sortie 1 si détection. Options : `--ref <branche>` (arbre et historique de cette branche), `--no-history`, `--no-files`.
+Script : `scripts/scan-secrets.mjs` (`npm run scan:secrets`, alias `npm run scan-secrets`). Sans dépendance. Il scanne les fichiers suivis par git et les lignes ajoutées de l'historique (`git log -p`) : clés NEAR `ed25519:`/`secp256k1:`, clés PEM, phrases de récupération de 12 à 24 mots précédées d'un mot-clé, clés `sk-`, `Bearer` long, JWT, affectation non vide (16 caractères ou plus) de `NEAR_MASTER_PRIVATE_KEY`, `NEARAI_API_KEY`, `INTENTS_JWT`, `DARWIN_ADMIN_TOKEN` ; fichier `.env*` suivi (hors `.env.example`). Valeurs toujours masquées (4 premiers caractères + longueur). Code de sortie 1 si détection. Options : `--ref <branche>` (arbre et historique de cette branche), `--no-history`, `--no-files`, `--no-allowlist`. Depuis L17 (voir §2.1) les 7 valeurs factices de l'historique sont exemptées par `scripts/scan-secrets.allowlist.json` : le scan complet sort 0, et `--no-allowlist` les fait réapparaître.
 
 Le script a été vérifié sur un dépôt jetable contenant des valeurs factices de chaque type (détection de chacun, rien d'affiché en clair). Limites connues : une phrase de récupération sans mot-clé voisin n'est pas détectée ; un secret de moins de 16 caractères non préfixé non plus.
 
@@ -39,7 +39,21 @@ Le scan signale 7 valeurs (la consigne en annonçait 6 ; la 7e est `cle-api-sk` 
 - la « clé NEAR » fait 30 caractères au total ; une vraie clé ed25519 NEAR en fait environ 96 (`ed25519:` + base58 de 64 octets) ;
 - la valeur « jwt » fait 21 caractères et n'a pas les trois segments d'un JWT ; aucune clé réelle n'a jamais été saisie dans le dépôt (le scan est propre sur les 41 autres commits, et `.env` n'a jamais été suivi : `git ls-files` ne contient que `.env.example`).
 
-Options :
+**Verdict L17 (2026-11-11) : format NON réel, option C appliquée (exception ciblée), pas de réécriture.** Vérification sans afficher les valeurs (script de mesure local, longueur, entropie, test de motifs) sur les 9 chaînes des lignes 42, 53, 229, 376, 403 du commit `4eb92ea` :
+
+| Valeur (fragment) | Longueur | Motif de secret réel correspondant ? |
+|---|---|---|
+| `sk-s...` (lignes 42, 53) | 29 | non : ni OpenAI (`sk-...T3BlbkFJ...` ou `sk-proj-` + 40 car. ou plus), ni Anthropic (`sk-ant-api03-` + 80 car. ou plus) |
+| `sk-t...` (376), `sk-a...` (403) | 28, 25 | non (mêmes motifs) |
+| `tok-...` (42, 53), `le-b...` (229) | 17, 16 | non : jetons inventés, aucun format de fournisseur |
+| `ed25...` (53) | 30 | non : une clé NEAR réelle fait 96 caractères (`ed25519:` + base58 de 64 octets) ; le corps contient des caractères hors base58 |
+| `jwt-...` (53) | 21 | non : pas de trois segments `eyJ...eyJ...` |
+
+Le push protection de GitHub (secret scanning) repose sur des motifs de fournisseurs à préfixe et longueur fixes ; aucune de ces valeurs n'en satisfait un. Il n'existe pas, à ma connaissance, de motif NEAR dans cette liste (non vérifié en ligne : la liste publique de GitHub n'a pas été consultée depuis ce poste), et la valeur « ed25519 » est de toute façon trop courte pour être décodable en clé. `gitleaks` et `trufflehog` ne sont pas installés sur ce poste : non testés. Réserve : la règle générique `generic-api-key` de gitleaks (mot-clé `api_key` + chaîne d'entropie élevée) pourrait signaler la ligne 42 (`NEARAI_API_KEY: "sk-s..."`, entropie 4,1) ; c'est un faux positif de scanner tiers, pas un secret. Exception appliquée : `scripts/scan-secrets.allowlist.json`, une entrée par (commit, fichier, type de règle) avec l'empreinte sha256 (16 premiers hex) de chaque valeur, aucune valeur stockée, justification écrite dans le fichier ; une autre valeur, un autre fichier, un autre commit ou un secret de l'arbre actuel reste détecté. Les exceptions ne s'appliquent qu'à l'historique. Scan complet après exception : 176 fichiers, 75 commits, sortie 0 ; `--no-allowlist` retrouve les 7 détections.
+
+Si l'humain préfère malgré tout un historique sans aucune de ces valeurs (jury avec gitleaks), l'option B ci-dessous reste valable (procédure : sauvegarde `git clone --mirror`, retrait des worktrees, `git filter-repo --replace-text <fichier>` ou `git filter-branch --tree-filter` limité au commit `4eb92ea`, `git reflog expire --expire=now --all && git gc --prune=now`, scan sans allowlist, `npm test`). `git filter-repo` n'est pas installé ici : la procédure n'a pas été répétée, rien n'a été réécrit.
+
+Options (analyse initiale, avant L17) :
 
 | Option | Avantages | Inconvénients |
 |---|---|---|
@@ -209,7 +223,7 @@ BLOQUANT = interdit la fusion ; À CORRIGER = avant l'étape indiquée ; FUSIONN
 | L7-backend | fusionné | FUSIONNABLE | aucun | testnet public : liste blanche `Host`, jeton fort, IP derrière proxy |
 | L8-frontend | fusionné | FUSIONNABLE | aucun | déploiement public : ne pas servir `frontend/dev` ni `screens`, retirer `style-src 'unsafe-inline'`, avertissement « données publiques » dans le formulaire |
 
-**Historique git : 7 valeurs factices détectées par le scan (§2.1).** Ce n'est pas un secret, mais le scan de publication reste en échec tant que l'option B (réécriture) n'est pas faite ou que l'option A n'est pas actée par l'humain. À traiter AVANT la publication du dépôt.
+**Historique git : 7 valeurs factices (§2.1).** Verdict L17 : format non réel, exemptées dans `scripts/scan-secrets.allowlist.json` ; le scan complet sort 0. La réécriture (option B) reste facultative, au choix de l'humain.
 
 Aucun secret réel détecté, aucun crédit sans preuve constaté (le module Intents n'est branché à aucun solde), aucune libération sans verdict `accepted` constatée, `NearChain` refuse tout réseau autre que testnet. Les trois points « À corriger » qui touchent à l'argent (séquestre dégradé, recontrôle du devis Intents, preuve persistée) sont à faire avant la mise en service de l'étape correspondante ci-dessous.
 
@@ -231,12 +245,12 @@ Aucun secret réel détecté, aucun crédit sans preuve constaté (le module Int
 
 ### 5.2 Avant la publication du dépôt (par l'humain, règle 5)
 
-- [ ] Décision sur l'historique (§2.1) : option B recommandée (réécrire `4eb92ea` sur une copie de sauvegarde, après la dernière fusion, branches `lot/*` et `.claude/worktrees/` traités), sinon option A actée dans `docs/DECISIONS.md`.
+- [x] Historique (§2.1) : valeurs factices de format non réel, exception ciblée appliquée (L17), scan complet à 0. Facultatif pour l'humain : option B (réécriture) si le jury utilise gitleaks.
 - [ ] `node scripts/scan-secrets.mjs` (toutes branches, fichiers et historique) sort 0 ; plus d'ancienne ref (`git reflog expire --expire=now --all && git gc --prune=now`).
 - [ ] `git ls-files` : aucun `.env`, `data/`, `*.key`, `*.pem`, `.near-credentials/`.
 - [ ] `.env.example` : secrets vides, `INTENTS_ENABLED=false`, `INTENTS_DRY_ONLY=true`, `HOST=127.0.0.1`.
 - [ ] README : modèle de confiance (l'opérateur est oracle, D-024), mode `mock` / `dégradé` signalé, limites connues, aucune promesse « trustless ».
-- [ ] Clés et jetons utilisés pendant le développement (clé NEAR AI, clé du compte maître testnet, jeton admin) : régénérés ou révoqués s'ils ont servi hors de ce poste.
+- [ ] Clés et jetons utilisés pendant le développement : clé du compte maître testnet FAITE (§6) ; clé NEAR AI et jeton admin : régénérés ou révoqués s'ils ont servi hors de ce poste (HUMAIN, §6.3).
 - [ ] Aucune donnée personnelle dans `docs/` ni dans les journaux versionnés.
 
 ### 5.3 Avant le déploiement testnet
@@ -260,3 +274,37 @@ Aucun secret réel détecté, aucun crédit sans preuve constaté (le module Int
 - [ ] Preuve de dépôt recoupée à la main (explorateur de la chaîne de destination) avant d'annoncer quoi que ce soit ; une preuve `mock:true` n'est jamais présentée comme réelle.
 - [ ] Clé partenaire `INTENTS_JWT` : jamais dans un fichier suivi, jamais collée dans un chat ou un post ; révoquée après la démo si elle a été exposée.
 - [ ] Aucun lien entre le module Intents et les soldes des agents (le crédit mainnet n'est pas branché) : le dire dans le README.
+
+## 6. Rotation de la clé du compte maître testnet (L17, 2026-11-11)
+
+Compte `darwin-master-7k2.testnet`, testnet seulement. Script réutilisable : `scripts/rotate-master-key.mjs` (dry-run par défaut ; `--apply` exécute ; `--keep-old` garde l'ancienne clé ; `--resume <fichier>` reprend après un arrêt ; `--backup-dir` ; `--rpc url1,url2` ou `NEAR_RPC_URL`). Refuse tout réseau autre que testnet, n'affiche que des fragments de clés publiques, sauvegarde le `.env` et la nouvelle clé hors dépôt avant toute transaction, réessaie avec délai croissant sur 429. Lancer depuis un dossier où `near-api-js` est installé (`node scripts/rotate-master-key.mjs`).
+
+### 6.1 Déroulé et preuves
+
+| Étape | Résultat | Preuve (testnet, publique) |
+|---|---|---|
+| Dry-run | une seule clé full access (`ed25519:Hag7...17o8`) | aucune écriture |
+| a) sauvegarde `.env` | faite, hors dépôt (dossier temporaire de la session) | : |
+| b) nouvelle paire ed25519 | générée, sauvegardée hors dépôt AVANT toute transaction (`ed25519:4dXQ...nReh`) | : |
+| c) AddKey full access, signée par l'ancienne clé | OK. Le 1er passage a arrêté à l'étape d) : la finalité du RPC avait quelques secondes de retard, la clé figurait bien on-chain au contrôle suivant. Le script interroge maintenant jusqu'à 60 s, et `--resume` a permis de reprendre sans régénérer. Le hash de cette transaction n'a pas été relevé (arrêt avant l'affichage) ; la clé est visible dans la liste des clés d'accès du compte | liste des clés (RPC `view_access_key_list`) |
+| d) vérification RPC | nouvelle clé présente en FullAccess (2 clés à cet instant) | idem |
+| e) `.env` mis à jour (ligne `NEAR_MASTER_PRIVATE_KEY`, valeur non affichée) | relecture du fichier cohérente, clé publique dérivée = nouvelle clé | : |
+| f) contrôle avec la NOUVELLE clé seule | OK : 1 yoctoNEAR du compte vers lui-même | `2umNF7mMRM37HgbFozbEtyYxnJFyk5P8f2xRDaAbKgQ1` |
+| g) DeleteKey de l'ancienne clé, signée par la nouvelle | OK | `CGW41ncCqP7QryKXBL83ygtDjMsnohbWB75v8wxCDLFd` |
+| Vérification finale | seule clé restante : `ed25519:4dXQ...nReh` (full) ; l'ancienne a disparu | liste des clés |
+| Contrôle après suppression | OK, compte utilisable | `EajzUV4zx5579aVngK7wEVAmEQJepm1iovEowaQ15yif` |
+
+Les hashes se consultent sur `https://testnet.nearblocks.io/txns/<hash>`. Aucune clé complète dans ce document, les journaux ni les commits ; `.env` reste ignoré par git.
+
+### 6.2 Résidus constatés
+
+- `~/.near-credentials/testnet/darwin-master-7k2.testnet/` (trousseau near-cli) contient encore l'ANCIENNE clé, désormais morte on-chain donc sans danger ; à supprimer pour éviter la confusion. Le compte contrat `darwin-contract-7k2.testnet` a sa propre clé (non touchée ; `contracts/deploy-testnet.sh` signe avec elle).
+- Les sauvegardes hors dépôt (ancien `.env` avec ancienne clé et ancienne clé NEAR AI encore valide, nouvelle clé) sont dans le dossier temporaire de la session de l'agent : les supprimer une fois la rotation validée.
+- Le nouveau `NEAR_MASTER_PRIVATE_KEY` n'est que dans le `.env` du dépôt principal. Les autres copies de `.env` (autres postes, worktrees) auraient l'ancienne clé : à mettre à jour.
+
+### 6.3 À FAIRE PAR L'HUMAIN (à reprendre dans `docs/BESOINS_HUMAIN.md`)
+
+1. Relancer un test testnet complet avec le nouveau `.env` (ex. `npm run start`) pour confirmer, côté application, que le compte maître signe bien ; supprimer `~/.near-credentials/testnet/darwin-master-7k2.testnet*` (clé morte).
+2. Supprimer les sauvegardes hors dépôt de la rotation (voir 6.2) après vérification.
+3. Régénérer la clé NEAR AI (`NEARAI_API_KEY`, console cloud.near.ai) et le jeton `DARWIN_ADMIN_TOKEN` s'ils ont quitté ce poste : une rotation de clé de plateforme se fait dans la console du fournisseur, pas par cet agent. Non faite.
+4. Facultatif : réécriture de l'historique (§2.1, option B) si le jury doit scanner avec gitleaks ; décision irréversible réservée à l'humain.
