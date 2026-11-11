@@ -258,7 +258,14 @@ export class ReplayState {
         this.mission(d.taskId, ev);
         break;
       }
-      case "task.validated": { const t = task(d.taskId); if (t) t.validation = structuredClone(d.validation); this.mission(d.taskId, ev); break; }
+      case "task.validated": {
+        const t = task(d.taskId);
+        if (t) t.validation = structuredClone(d.validation);
+        const dv = this.deliverables.get(d.taskId); // livrable déjà reçu (ordre inhabituel) : le verdict le rejoint
+        if (dv && d.validation) { dv.verdict = d.validation.verdict; dv.score = d.validation.score; }
+        this.mission(d.taskId, ev);
+        break;
+      }
       case "escrow.released": {
         const t = task(d.taskId);
         if (t) t.status = "settled";
@@ -278,12 +285,12 @@ export class ReplayState {
         break;
       }
       case "deliverable.produced": {
-        this.deliverableMeta.set(d.taskId, d);
+        this.deliverableMeta.set(d.taskId, { ...d, files: d.files.map(({ content: _c, ...meta }: any) => meta) }); // sans contenu : il est servi par `deliverables`
         // Un journal plus riche peut embarquer le contenu des fichiers (champ `content`) : alors le livrable est servi.
         if (Array.isArray(d.files) && d.files.every((f: any) => typeof f?.name === "string" && typeof f?.mime === "string" && typeof f?.content === "string")) {
           const v = task(d.taskId)?.validation;
           this.deliverables.set(d.taskId, {
-            taskId: d.taskId, profession: d.profession, agentId: d.agentId, files: d.files.map((f: any) => ({ name: f.name, mime: f.mime, content: f.content })),
+            taskId: d.taskId, profession: d.profession, agentId: d.agentId, files: d.files.map((f: any) => ({ name: f.name, mime: f.mime, content: f.content, ...(f.truncated === true ? { truncated: true } : {}) })),
             rawText: "", resultHash: d.resultHash, productionCostUsd: d.productionCostUsd, judgeCostUsd: d.judgeCostUsd, createdAt: ev.ts, verdict: v?.verdict, score: v?.score,
           });
         }

@@ -23,6 +23,7 @@ export function buildChatDeliverable(d, meta) {
     root.append(h("div", { class: "cd-logos" }, logos.map((f) => {
       const name = String(f.name ?? "");
       if (!SAFE_NAME.test(name)) return h("p", { class: "muted small" }, "Fichier ignoré : nom non conforme.");
+      if (f.truncated) return h("p", { class: "muted small" }, `${name} : SVG trop volumineux pour le journal (${f.bytes ?? "?"} o), aperçu indisponible.`);
       return h("figure", { class: "cd-logo" },
         h("img", { src: svgDataUri(f.content), alt: `Proposition de logo ${name}`, loading: "lazy", decoding: "async", referrerpolicy: "no-referrer" }),
         h("figcaption", null, h("code", null, name)));
@@ -35,7 +36,7 @@ export function buildChatDeliverable(d, meta) {
     const body = isMermaid(f)
       ? h("pre", { class: "md-code" }, h("code", null, content.slice(0, MAX_INLINE_CHARS)))
       : isMarkdown(f) ? renderMarkdown(content) : h("div", { class: "md" }, h("pre", { class: "plain" }, content.slice(0, MAX_INLINE_CHARS)));
-    const box = h("div", { class: "cd-text clamp" }, body);
+    const box = h("div", { class: "cd-text clamp" }, body, f.truncated ? h("p", { class: "muted small" }, `… contenu tronqué dans le journal (${f.bytes ?? "?"} o au total).`) : null);
     const more = h("button", { type: "button", class: "cd-more", onclick: () => { const clamped = box.classList.toggle("clamp"); more.textContent = clamped ? "Tout lire" : "Réduire"; } }, "Tout lire");
     root.append(h("div", { class: "cd-file" },
       h("div", { class: "cd-head" }, h("code", null, name), isMermaid(f) ? h("span", { class: "muted small" }, " source du schéma (rendu désactivé)") : null,
