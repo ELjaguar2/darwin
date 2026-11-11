@@ -1,7 +1,7 @@
 // Catalogue des événements du journal. Source de vérité : docs/ARCHITECTURE.md §8.
 // Le journal est append-only (JSONL), rejoué par SSE ; l'UI se reconstruit uniquement à partir de lui + /api/state.
 import type { Yocto } from "./money.ts";
-import type { Agent, Bid, Genome, Letter, Task, Validation, CauseOfDeath } from "./types.ts";
+import type { Agent, Bid, Genome, Letter, Profession, Task, Validation, CauseOfDeath } from "./types.ts";
 
 /** type -> charge utile (`data`). Ajouter un type = l'ajouter ici ET dans ARCHITECTURE.md §8. */
 export interface EventCatalog {
@@ -37,6 +37,8 @@ export interface EventCatalog {
   "intents.quote": { dry: true; originAsset: string; destinationAsset: string; amountIn: string; amountOut?: string; note?: string };
   "system.warning": { code: string; message: string };
   "system.error": { code: string; message: string };
+  // --- L16 moteur : indicateurs de spécialisation ---
+  "population.snapshot": { tick: number; byProfession: Record<Profession, number>; byGeneration: Record<string, Record<Profession, number>> };
 }
 
 export type EventType = keyof EventCatalog;
@@ -48,6 +50,7 @@ export const EVENT_TYPES = [
   "task.validated", "escrow.released", "escrow.refunded", "subcontract.created", "reputation.updated",
   "brain.charged", "balance.changed", "funding.received",
   "chain.tx", "intents.quote", "system.warning", "system.error",
+  "population.snapshot", // L16
 ] as const satisfies readonly EventType[];
 
 export type DarwinEvent<T extends EventType = EventType> = {

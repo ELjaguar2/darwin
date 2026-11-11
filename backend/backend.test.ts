@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, existsSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, existsSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -11,7 +11,7 @@ import { MAX_OPEN_TASKS_PER_IP, assertSafeBinding, createApp } from "./app.ts";
 import { redactText } from "./redact.ts";
 import { RateLimiter } from "./rate-limit.ts";
 import { createRuntime, type Runtime } from "./runtime.ts";
-import { createStore } from "./store.ts";
+import { createStore, loadSavedState, SavedStateError } from "./store.ts";
 
 const tmp: string[] = [];
 const mkdtmp = () => {
@@ -30,7 +30,7 @@ const F_ADMIN = FAKE("tok", "secret", "abcdef", "0123456789");
 const F_JWT = FAKE("jwt", "secret", "xyz", "123456");
 const F_NEAR = "ed25519" + ":" + "ABCDEFGHIJKLMNOPQRSTUV";
 const F_GOOD = FAKE("le", "bon", "jeton", "123", "abcdefghijklmnop");
-const TASK = { title: "Slogan thé", prompt: "Écris un slogan pour une boutique de thé bio.", profession: "writer", budgetNear: "1.5", requesterLabel: "Alice" };
+const TASK = { title: "Slogan thé", prompt: "Écris un slogan pour une boutique de thé bio.", profession: "marketing", budgetNear: "1.5", requesterLabel: "Alice" };
 const post = (app: ReturnType<typeof createApp>, body: unknown, headers: Record<string, string> = {}) =>
   app.request("/api/tasks", { method: "POST", headers: { "content-type": "application/json", ...headers }, body: typeof body === "string" ? body : JSON.stringify(body) });
 
@@ -373,6 +373,17 @@ describe("persistance", () => {
     const lineage = JSON.parse(readFileSync(join(dir, "lineage.json"), "utf8"));
     expect(lineage.nodes.length).toBe(state.agents.length);
     expect(readFileSync(join(dir, "journal.jsonl"), "utf8")).not.toMatch(/ed25519:|Bearer /);
+    expect(loadSavedState(join(dir, "state.json")).agents.length).toBe(state.agents.length); // relecture d'un état courant : acceptée
+  });
+
+  it("rejette proprement un état sauvegardé avec d'anciens métiers (writer, coder...)", () => {
+    const dir = mkdtmp();
+    const old = join(dir, "state.json");
+    writeFileSync(old, JSON.stringify({ agents: [{ id: "a-0001", genome: { profession: "writer" } }, { id: "a-0002", genome: { profession: "coder" } }] }));
+    expect(() => loadSavedState(old)).toThrow(SavedStateError);
+    expect(() => loadSavedState(old)).toThrow(/métiers obsolètes \[writer, coder\].*logo, finance/);
+    writeFileSync(old, "{pas du json");
+    expect(() => loadSavedState(old)).toThrow(/illisible/);
   });
 });
 
