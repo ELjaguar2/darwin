@@ -3,7 +3,13 @@
 import { z } from "zod";
 import type { Yocto } from "./money.ts";
 
-export const PROFESSIONS = ["writer", "translator", "summarizer", "analyst", "coder"] as const;
+/**
+ * Catalogue « Freelance réel » (lot L16) : 6 métiers dont les livrables sont réellement produits.
+ * logo = 3 propositions SVG originales ; finance = analyse à partir de chiffres fournis ; architecture = document + schéma Mermaid ;
+ * marketing = texte de rédaction ; translation = traduction ; legal = checklist juridique simple (avec avertissement « pas un avis juridique »).
+ * Détail (prix de référence, grilles, juges) : shared/catalogue.ts et docs/CATALOGUE_FREELANCE.md.
+ */
+export const PROFESSIONS = ["logo", "finance", "architecture", "marketing", "translation", "legal"] as const;
 export type Profession = (typeof PROFESSIONS)[number];
 
 /** Bornes de chaque gène (utilisées par la mutation et la validation). */
@@ -137,7 +143,7 @@ export interface Letter {
 export const TaskInputSchema = z.object({
   title: z.string().min(3).max(120),
   prompt: z.string().min(10).max(4000),
-  profession: z.enum(PROFESSIONS).default("writer"),
+  profession: z.enum(PROFESSIONS).default("logo"),
   budgetNear: z.string().regex(/^\d+(\.\d{1,6})?$/), // en NEAR ; bornes vérifiées avec la config
   requesterLabel: z.string().min(1).max(60).default("visiteur"),
 });
