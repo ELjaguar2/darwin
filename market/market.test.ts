@@ -235,6 +235,12 @@ describe("visiteurs et client simulé", () => {
     const t = await s.market.postVisitorTask({ title: "Titre ok", prompt: "Une demande assez longue.", budgetNear: "1", requesterLabel: "Léa" });
     expect(t.requester.kind).toBe("visitor");
     expect(VISITOR_FUNDING_LABEL).toBe("Visiteur (financé par le compte de démo)");
+    // sans réglage visiteur : mêmes délais que les tâches simulées
+    expect(t.biddingEndsTick - t.createdTick).toBe(s.config.sim.bidWindowTicks);
+    const long = await setup({}, { DARWIN_VISITOR_BID_WINDOW_TICKS: "3", DARWIN_VISITOR_TASK_DEADLINE_TICKS: "6" });
+    const t2 = await long.market.postVisitorTask({ title: "Titre ok", prompt: "Une demande assez longue.", budgetNear: "1" });
+    expect(t2.biddingEndsTick - t2.createdTick).toBe(3);
+    expect(t2.deadlineTick - t2.biddingEndsTick).toBe(6);
   });
 
   it("comptes visitors et sim-client créés et financés par le marché (funding source demo / master)", async () => {

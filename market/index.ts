@@ -190,11 +190,14 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
       }
     }
 
-    const biddingEndsTick = tick + sim.bidWindowTicks;
+    // Une commande de visiteur peut avoir des délais plus longs que les tâches simulées (config visitor*Ticks ; testnet : 3 et 6 ticks)
+    // pour laisser aux agents le temps de finir leur travail en cours (au run 9, deux commandes de logo ont expiré faute d'agent libre en 1 tick).
+    const isVisitor = requester.kind === "visitor";
+    const biddingEndsTick = tick + (isVisitor ? (sim.visitorBidWindowTicks ?? sim.bidWindowTicks) : sim.bidWindowTicks);
     const task: Task = {
       id: `t-${pad(++taskSeq)}`, requester, profession: input.profession, title: input.title.trim().slice(0, 120), prompt: input.prompt,
       budget: budget.toString(), status: "posted", createdTick: tick, biddingEndsTick,
-      deadlineTick: biddingEndsTick + sim.taskDeadlineTicks, bidIds: [],
+      deadlineTick: biddingEndsTick + (isVisitor ? (sim.visitorTaskDeadlineTicks ?? sim.taskDeadlineTicks) : sim.taskDeadlineTicks), bidIds: [],
       ...(input.parentTaskId ? { parentTaskId: input.parentTaskId } : {}),
     };
     tasks.set(task.id, task);

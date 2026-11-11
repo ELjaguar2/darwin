@@ -24,6 +24,8 @@ export interface SimParams {
   nearUsdRate: number; // USD pour 1 NEAR (conversion des coûts IA ; paramètre, pas un cours réel)
   maxTokensPerCall: number;
   settleEveryTicks: number; // regroupement des débits on-chain (métabolisme, coûts IA) tous les N ticks
+  visitorBidWindowTicks?: number; // fenêtre d'enchères d'une commande de visiteur (défaut : bidWindowTicks)
+  visitorTaskDeadlineTicks?: number; // délai de livraison d'une commande de visiteur (défaut : taskDeadlineTicks)
   priceScale: number; // multiplicateur des prix du catalogue (mock : unités « confortables » x40 ; testnet : 1 = prix réels du catalogue)
   visitorHourlyCap: bigint; // plafond de dépense par heure (horloge réelle) du compte `visitors` ; au-delà, POST /api/tasks = 429 (D-025)
 }
@@ -63,25 +65,25 @@ export const PRESETS: Record<"mock" | "testnet", Record<Preset, SimParams>> = {
       birthCapital: N("0.3"), metabolism: N("0.002"), minVital: N("0.05"), reproCooldownTicks: 15,
       simClientRatePerTick: 0.7, taskBudgetMin: N("0.02"), taskBudgetMax: N("0.1"),
       bidWindowTicks: 1, taskDeadlineTicks: 6, mutationRate: 0.3, mutationSd: 0.15,
-      nearUsdRate: 3, maxTokensPerCall: 400, settleEveryTicks: 4, visitorHourlyCap: N("0.5"), priceScale: 1,
+      nearUsdRate: 3, maxTokensPerCall: 400, settleEveryTicks: 4, visitorHourlyCap: N("0.5"), priceScale: 1, visitorBidWindowTicks: 3, visitorTaskDeadlineTicks: 6,
     },
     demo: {
       tickMs: 3000, founders: 3, maxPopulation: 8, maxTicks: 400,
       birthCapital: N("0.2"), metabolism: N("0.004"), minVital: N("0.05"), reproCooldownTicks: 8,
       simClientRatePerTick: 0.9, taskBudgetMin: N("0.02"), taskBudgetMax: N("0.1"),
       bidWindowTicks: 1, taskDeadlineTicks: 4, mutationRate: 0.4, mutationSd: 0.2,
-      nearUsdRate: 3, maxTokensPerCall: 300, settleEveryTicks: 4, visitorHourlyCap: N("0.5"), priceScale: 1,
+      nearUsdRate: 3, maxTokensPerCall: 300, settleEveryTicks: 4, visitorHourlyCap: N("0.5"), priceScale: 1, visitorBidWindowTicks: 3, visitorTaskDeadlineTicks: 6,
     },
     // « selection » : la sélection est visible en un seul run réel (morts ET génération 3). Population plafonnée large,
     // capital de naissance modeste, métabolisme fort (un agent sans contrat meurt en une dizaine de ticks), gains
     // supérieurs au métabolisme pour les bons agents (ils se reproduisent), reproduction rapide. Ticks de 10 s :
     // la latence RPC testnet fait qu'un tick réel dure environ une minute.
     selection: {
-      tickMs: 10000, founders: 4, maxPopulation: 16, maxTicks: 0,
+      tickMs: 10000, founders: 6, maxPopulation: 18, maxTicks: 0,
       birthCapital: N("0.1"), metabolism: N("0.005"), minVital: N("0.03"), reproCooldownTicks: 4,
       simClientRatePerTick: 1.5, taskBudgetMin: N("0.02"), taskBudgetMax: N("0.1"),
       bidWindowTicks: 1, taskDeadlineTicks: 4, mutationRate: 0.4, mutationSd: 0.2,
-      nearUsdRate: 3, maxTokensPerCall: 300, settleEveryTicks: 4, visitorHourlyCap: N("0.5"), priceScale: 1,
+      nearUsdRate: 3, maxTokensPerCall: 300, settleEveryTicks: 4, visitorHourlyCap: N("0.5"), priceScale: 1, visitorBidWindowTicks: 3, visitorTaskDeadlineTicks: 6,
     },
   },
 };
@@ -191,6 +193,8 @@ export function loadConfig(env: Env = process.env): Config {
     settleEveryTicks: num(env, "DARWIN_SETTLE_EVERY_TICKS", base.settleEveryTicks),
     visitorHourlyCap: near(env, "DARWIN_VISITOR_HOURLY_CAP_NEAR", base.visitorHourlyCap),
     priceScale: num(env, "DARWIN_PRICE_SCALE", base.priceScale),
+    visitorBidWindowTicks: optNum(env, "DARWIN_VISITOR_BID_WINDOW_TICKS") ?? base.visitorBidWindowTicks,
+    visitorTaskDeadlineTicks: optNum(env, "DARWIN_VISITOR_TASK_DEADLINE_TICKS") ?? base.visitorTaskDeadlineTicks,
   };
   if (sim.minVital >= sim.birthCapital) throw new Error("DARWIN_MIN_VITAL doit être < DARWIN_BIRTH_CAPITAL");
   if (sim.taskBudgetMin > sim.taskBudgetMax) throw new Error("DARWIN_TASK_BUDGET_MIN doit être <= DARWIN_TASK_BUDGET_MAX");
