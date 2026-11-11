@@ -19,6 +19,7 @@
     "scan-secrets": "node scripts/scan-secrets.mjs",
     "scan:secrets": "node scripts/scan-secrets.mjs",
     "ai:probe": "tsx brain/tools/probe-models.ts",
+    "ai:logo-validation": "tsx brain/tools/logo-validation.ts",
     "ai:usage-report": "tsx brain/tools/usage-report.ts",
     "ai:verify-attestation": "node scripts/verify-attestation.mjs"
   },

@@ -1,0 +1,20 @@
+{
+  "model": "Qwen/Qwen3.6-35B-A3B-FP8",
+  "requestedModel": "Qwen/Qwen3.6-35B-A3B-FP8",
+  "finishReason": "stop",
+  "maxTokensSent": 3000,
+  "usage": {
+    "prompt_tokens": 424,
+    "total_tokens": 1212,
+    "completion_tokens": 788,
+    "prompt_tokens_details": null,
+    "reasoning_tokens": 0,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "responseId": "8bd04a8430e74bb0afca670e25b073fd",
+  "costUsd": 0.0009388800000000001,
+  "priceVerified": true,
+  "at": "2026-11-11T22:32:06.833Z"
+}

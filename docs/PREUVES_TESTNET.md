@@ -315,3 +315,24 @@ Transactions par type : create_account 8, register_agent 8, transfer 61, escrow_
 | 5 à 7 | `JUDGE_COST_UNKNOWN` | préfixe du modèle servi différent de l'identifiant du catalogue | prix cherché sur l'identifiant demandé (run 8 : 0) |
 
 Réglages du run 8 : `DARWIN_PRESET=selection` seul. Réglages des runs 6 et 7 : `DARWIN_PRESET=demo`, `DARWIN_TICK_MS=10000`, `DARWIN_BIRTH_CAPITAL=0.1`, `DARWIN_METABOLISM=0.002`, `DARWIN_MIN_VITAL=0.02`, `DARWIN_REPRO_COOLDOWN_TICKS=5`, `DARWIN_SIM_CLIENT_RATE=1.5`, `DARWIN_MAX_POPULATION=14` (run 7 seulement), Node 22.23.4, RPC `https://test.rpc.fastnear.com`.
+
+## 10. Validation du logo par un appel NEAR AI réel (L17, piste C)
+
+Date : 2026-11-11 (22:32 UTC). **Un seul appel réel** (aucun second), `npm run ai:logo-validation` (`brain/tools/logo-validation.ts`). Chemin de code réel : `executeMessages` (consignes du catalogue `logo`), `max_tokens` = `max(sim.maxTokensPerCall, CATALOGUE.logo.maxOutputTokens)` = 3000 comme `engine/index.ts`, garde-fous et budget du `NearAiBrain`, puis `extractDeliverable` et `runChecks` du marché. Brief : « Logo pour Atelier Lumio » (entreprise fictive, secteur luminaires, style chaleureux et minimal). Modèle : `Qwen/Qwen3.6-35B-A3B-FP8` (liste blanche, prix du catalogue en direct, `verified=true` : 0,17 USD/M en entrée, 1,10 USD/M en sortie). Pire cas calculé avant l'appel : 0,00339 USD pour un plafond par appel de 0,05 USD.
+
+| Contrôle | Résultat |
+|---|---|
+| `finish_reason` | `stop` (pas `length`) ; `max_tokens` envoyé : 3000 |
+| Tokens (`usage`) | prompt 424, completion 788 (dont raisonnement 0), total 1212 |
+| Coût | 0,000939 USD (environ 0,00085 EUR à 1,10), soit 0,3 % du plafond par appel ; cumul du budget IA après l'appel : 0,0412 USD |
+| Blocs ```svg | 3 exactement (408, 416 et 491 caractères) |
+| Parseur XML (Python `xml.etree`, indépendant du code du dépôt) | 3 documents bien formés, racine `svg` avec xmlns, `viewBox="0 0 256 256"`, 5 éléments chacun |
+| Contenu actif | aucun script, foreignObject, image, `on*=`, href ou `url()` externe (contrôle par regex indépendant et par `sanitizeSvg`) |
+| `extractDeliverable` et `runChecks` (règle `rule:logo`) | acceptés : 3 SVG distincts, aucune marque de `BRANDS_TO_AVOID` |
+| Troncature due au plafond de coût | non : 788 tokens produits pour 3000 autorisés, plafond de coût jamais atteint |
+
+**Verdict : VALIDÉ** pour le chemin production + extraction + contrôles déterministes. Cause de la troncature du run 9b : `max_tokens` plafonné à 400 (`maxTokensPerCall`) pour un livrable de 3 SVG ; corrigée par le plafond dur `maxTokensHardCap` (commit 7cb869d), confirmée ici (788 tokens suffisent, marge de 3,8 fois). Aucune correction supplémentaire n'a été nécessaire.
+
+Réserves : (1) un seul échantillon, un seul modèle ; un modèle plus bavard ou à raisonnement peut consommer davantage (les modèles à raisonnement de la liste blanche sont bridés par `extraBody`). (2) Qualité modeste : le texte entre blocs reprend le gabarit littéral « Idee du logo » au lieu d'une phrase d'idée, sans effet sur l'extraction. (3) Le juge IA (grille d'originalité, pertinence) n'a pas été appelé ici : seuls les contrôles déterministes sont validés. (4) Les prix de ce modèle sont ceux du catalogue du jour, pas une valeur figée.
+
+Fichiers : `docs/preuves/logo-validation/` (`reponse-brute.txt` réponse brute du modèle, `logo-1.svg` à `logo-3.svg` extraits, `meta.json` usage/coût/`finish_reason`/identifiant de réponse). Ni clé ni en-tête d'autorisation ne sont écrits. Test sans réseau : `brain/l17-logo.test.ts` rejoue cette réponse réelle dans l'extraction et les contrôles.
