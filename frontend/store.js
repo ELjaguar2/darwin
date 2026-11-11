@@ -12,7 +12,7 @@ export const EVENT_TYPES = [
   "deliverable.produced", "market.event", "population.snapshot", // L16
 ];
 
-const MAX_FEED = 120;
+const MAX_FEED = 400;
 const MAX_CHRONICLE = 120;
 const MAX_TASKS = 200;
 

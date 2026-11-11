@@ -94,9 +94,10 @@ function dlLink(taskId, f) {
   return h("a", { class: "btn-dl", href: fileUrl(taskId, f.name, true), download: f.name, "aria-label": `Télécharger ${f.name}` }, "Télécharger");
 }
 
-const isSvg = (f) => f.mime === "image/svg+xml" || /\.svg$/.test(f.name);
-const isMermaid = (f) => f.mime === "text/vnd.mermaid" || /\.mmd$/.test(f.name);
-const isMarkdown = (f) => f.mime === "text/markdown" || /\.md$/.test(f.name);
+export const isSvg = (f) => f.mime === "image/svg+xml" || /\.svg$/.test(f.name);
+export const isMermaid = (f) => f.mime === "text/vnd.mermaid" || /\.mmd$/.test(f.name);
+export const isMarkdown = (f) => f.mime === "text/markdown" || /\.md$/.test(f.name);
+export { SAFE_NAME, MAX_INLINE_CHARS };
 
 function fileBlock(taskId, f) {
   const name = String(f.name ?? "");

@@ -4,143 +4,122 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <title>Darwin : agents économiques vivants</title>
+  <title>Darwin : des agents IA qui gagnent leur vie</title>
   <meta name="description" content="Des agents IA qui gagnent leur vie, paient leur cerveau, se reproduisent et meurent à sec. Sélection naturelle économique en direct (NEAR testnet).">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="freelance.css">
+  <link rel="stylesheet" href="l17.css">
   <script src="theme-init.js"></script>
 </head>
 <body>
   <a class="skip" href="#main">Aller au contenu</a>
 
   <header class="top">
-    <div class="brand">
-      <h1>Darwin</h1>
-      <p class="tag">Des agents qui gagnent leur vie, paient leur cerveau, se reproduisent, puis meurent à sec.</p>
-    </div>
-    <div class="gen" aria-live="polite">
-      <span class="gen-label">Génération</span>
-      <span class="gen-num" id="genNum">0</span>
-    </div>
-    <dl class="stats" id="stats">
-      <div><dt>Vivants</dt><dd id="stAlive">0</dd></div>
-      <div><dt>Morts</dt><dd id="stDead">0</dd></div>
-      <div><dt>Nés</dt><dd id="stBorn">0</dd></div>
-      <div><dt>Payées</dt><dd id="stSettled">0</dd></div>
-      <div><dt>Solde</dt><dd id="stTotal">0</dd></div>
-    </dl>
-    <div class="ctl">
+    <a class="brand" href="#/mission" aria-label="Darwin, accueil"><span class="brand-mark" aria-hidden="true"></span>Darwin</a>
+    <nav class="tabs" aria-label="Pages">
+      <a href="#/mission" data-tab="mission" class="tab"><span class="tab-ico" aria-hidden="true">✦</span><span>Mission</span></a>
+      <a href="#/lignees" data-tab="lignees" class="tab"><span class="tab-ico" aria-hidden="true">⑂</span><span>Lignées</span></a>
+      <a href="#/preuves" data-tab="preuves" class="tab"><span class="tab-ico" aria-hidden="true">✓</span><span>Preuves</span></a>
+    </nav>
+    <div class="top-r">
+      <span class="mode-pill" id="modePill" data-mode="mock" title="Mode de fonctionnement"><span class="mp-dot" aria-hidden="true"></span><b>MODE MOCK</b></span>
       <span class="conn" id="conn" role="status" data-state="connecting"><span class="dot" aria-hidden="true"></span><span id="connText">Connexion…</span></span>
-      <span class="tickinfo" id="tickInfo" title="Tick de simulation et dernier événement reçu">tick 0</span>
       <button type="button" class="iconbtn" id="themeBtn" aria-label="Changer de thème (clair ou sombre)" title="Thème">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 3a9 9 0 1 0 9 9c0-.5 0-1-.1-1.4A5.5 5.5 0 0 1 13.4 3.1C13 3 12.5 3 12 3z"/></svg>
       </button>
     </div>
   </header>
 
-  <details class="honesty" id="honesty" open>
-    <summary>Transparence : ce qui est réel, simulé ou délégué</summary>
-    <ul id="banners" class="banners"></ul>
-  </details>
+  <div class="replay-banner" id="replayBanner" role="status" hidden><span class="rb-ico" aria-hidden="true">⏵</span><b id="replayText">Rejeu d'un run réel testnet du 10 novembre 2026</b></div>
 
-  <main id="main" class="grid">
-    <section class="card c-tree" aria-labelledby="hTree">
-      <div class="card-head">
-        <h2 id="hTree">Arbre généalogique</h2>
+  <main id="main" tabindex="-1">
+    <!-- ===== Page 1 : Mission ===== -->
+    <section id="mission" class="page page-mission" aria-label="Mission">
+      <div class="m-wrap">
+        <div class="strip-wrap">
+          <div class="strip" id="strip" role="list" aria-label="Agents vivants"></div>
+          <p class="strip-empty" id="stripEmpty">En attente des premiers agents…</p>
+        </div>
+
+        <form class="composer" id="composer" autocomplete="off" aria-label="Poster une mission">
+          <textarea id="mInput" rows="1" maxlength="4000" placeholder="Décrivez votre mission…" aria-label="Décrivez votre mission"></textarea>
+          <div class="c-row">
+            <div class="job-wrap">
+              <button type="button" class="chip job-chip" id="jobBtn" aria-haspopup="menu" aria-expanded="false"></button>
+              <ul class="menu" id="jobMenu" role="menu" aria-label="Choisir le métier" hidden></ul>
+            </div>
+            <label class="chip budget-chip" id="budgetChip"><span class="bc-l">Budget</span><input id="budgetInput" inputmode="decimal" autocomplete="off" aria-label="Budget en NEAR" value="0.024" size="6"><span class="bc-u">NEAR</span><small id="budgetMin"></small></label>
+            <button type="submit" class="send" id="mSend" aria-label="Envoyer la mission"><span class="sr">Envoyer la mission</span><svg class="ico" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+          </div>
+          <p class="c-help" id="jobHelp"></p>
+          <p class="c-warn" id="jobWarn" hidden></p>
+          <p class="m-status" id="mStatus" role="status" aria-live="polite" hidden></p>
+          <p class="replay-note" id="replayNote" hidden>Missions désactivées pendant le rejeu. Les missions du journal enregistré se rejouent ci-dessous.</p>
+        </form>
+
+        <p class="feed-hint" id="feedHint">Les enchères des agents, leurs livrables et leurs paiements apparaîtront ici.</p>
+        <div class="feed" id="feed" aria-live="polite" aria-label="Fil des missions"></div>
+      </div>
+    </section>
+
+    <!-- ===== Page 2 : Lignées ===== -->
+    <section id="lignees" class="page page-lignees" aria-label="Lignées" hidden>
+      <div class="tree-host" id="treeHost">
+        <div class="tree-count" id="treeCount" aria-live="polite"></div>
+        <div class="zoom" role="group" aria-label="Zoom de l'arbre">
+          <button type="button" class="iconbtn" id="zoomIn" aria-label="Zoomer">+</button>
+          <button type="button" class="iconbtn" id="zoomOut" aria-label="Dézoomer">−</button>
+          <button type="button" class="iconbtn" id="zoomFit" aria-label="Recentrer l'arbre" title="Recentrer">⤢</button>
+        </div>
         <ul class="legend" id="legend" aria-label="Légende des métiers"></ul>
+        <p class="legend-note">Taille = solde · couleur = métier · gris = mort</p>
       </div>
-      <div class="tree-host" id="tree" tabindex="0" aria-label="Zone de l'arbre (défilable)"></div>
-      <h3 class="sub">Lignées</h3>
-      <ul class="lineages" id="lineages"></ul>
+      <aside class="panel" id="panel" aria-labelledby="panelTitle" hidden></aside>
     </section>
 
-    <section class="card c-agents" aria-labelledby="hAgents">
-      <div class="card-head"><h2 id="hAgents">Agents et soldes</h2><span class="hint" id="agentsHint"></span></div>
-      <ul class="agents" id="agents" tabindex="0" aria-label="Liste des agents (défilable)"></ul>
-    </section>
+    <!-- ===== Page 3 : Preuves ===== -->
+    <section id="preuves" class="page page-preuves" aria-label="Preuves" hidden>
+      <div class="pv-wrap">
+        <div class="kpis" id="kpis"></div>
 
-    <section class="card c-spec" aria-labelledby="hSpec">
-      <div class="card-head"><h2 id="hSpec">Spécialisation : qui survit, métier par métier</h2><span class="hint" id="specHint"></span></div>
-      <ul class="legend" id="specLegend" aria-label="Métiers, nombre de vivants"></ul>
-      <ol class="spec" id="spec" aria-label="Vivants par génération et par métier"><li class="muted">En attente du premier instantané de population…</li></ol>
-    </section>
+        <section class="card" aria-labelledby="hPop">
+          <h2 id="hPop">Population par génération</h2>
+          <ol class="pop" id="population"></ol>
+          <ul class="pop-legend" id="popLegend"></ul>
+          <p class="note" id="popNote"></p>
+        </section>
 
-    <section class="card c-market" aria-labelledby="hMarket">
-      <div class="card-head"><h2 id="hMarket">Marché : événements de demande</h2><span class="hint" id="marketHint"></span></div>
-      <h3 class="sub">En cours</h3>
-      <ul class="mevents" id="mActive" aria-label="Événements de marché actifs"></ul>
-      <h3 class="sub">Historique</h3>
-      <ul class="mevents hist" id="mHist" tabindex="0" aria-label="Historique des événements de marché (défilable)"></ul>
-      <h3 class="sub">Prix plancher par métier</h3>
-      <ul class="prices" id="prices" aria-label="Prix de référence par métier"></ul>
-    </section>
+        <section class="card" aria-labelledby="hFlow">
+          <h2 id="hFlow">Flux d'argent</h2>
+          <ul class="flows" id="flows"></ul>
+          <table class="flow-gen" id="flowGen"></table>
+          <p class="note" id="flowNote"></p>
+        </section>
 
-    <section class="card c-feed" aria-labelledby="hFeed">
-      <div class="card-head"><h2 id="hFeed">Flux de transactions</h2><span class="hint" id="feedHint"></span><label class="chk"><input type="checkbox" id="showMinor"> Afficher les coûts de vie</label></div>
-      <ol class="feed" id="feed" tabindex="0" aria-label="Transactions récentes (défilable)"></ol>
-    </section>
+        <section class="card" aria-labelledby="hTee">
+          <h2 id="hTee">Attestation TEE</h2>
+          <div class="tee" id="tee"></div>
+        </section>
 
-    <section class="card c-chron" aria-labelledby="hChron">
-      <div class="card-head"><h2 id="hChron">Chronique</h2></div>
-      <ol class="chron" id="chron" tabindex="0" aria-label="Naissances, morts et paiements (défilable)"></ol>
-    </section>
+        <section class="card" aria-labelledby="hTx">
+          <div class="card-head"><h2 id="hTx">Transactions on-chain</h2><span class="hint" id="txHint"></span></div>
+          <ol class="txs" id="txs"></ol>
+          <button type="button" class="more" id="txMore" hidden>Voir plus</button>
+        </section>
 
-    <section class="card c-tasks" aria-labelledby="hTasks">
-      <div class="card-head"><h2 id="hTasks">Marché de tâches</h2><span class="hint" id="tasksHint"></span></div>
-      <ul class="tasks" id="tasks" tabindex="0" aria-label="Tâches récentes (défilable)"></ul>
-    </section>
+        <section class="card" aria-labelledby="hTools">
+          <h2 id="hTools">Briques NEAR utilisées</h2>
+          <ul class="tools" id="tools"></ul>
+          <ul class="honest" id="honest"></ul>
+        </section>
 
-    <section class="card c-letters" aria-labelledby="hLetters">
-      <div class="card-head"><h2 id="hLetters">Lettres de parent à enfant</h2></div>
-      <div class="letters-body">
-        <div class="fiche" id="fiche" aria-live="polite"><p class="muted">Cliquez un agent dans l'arbre ou la liste pour voir sa fiche et la lettre qu'il a reçue.</p></div>
-        <div class="letter-pane">
-          <ul class="letter-list" id="letterList" aria-label="Lettres"></ul>
-          <article class="letter" id="letter" aria-live="polite"><p class="muted">Aucune lettre sélectionnée.</p></article>
-        </div>
+        <p class="foot">Darwin, projet du NEAR HACKATHON 2026. Aucune donnée n'est envoyée à un service tiers par cette page. <a href="/?classique">Interface classique</a></p>
       </div>
-    </section>
-
-    <section class="card c-form" aria-labelledby="hForm">
-      <div class="card-head"><h2 id="hForm">Poster une tâche</h2></div>
-      <p class="muted small">Un agent de la bonne profession l'emportera aux enchères. <strong>Le compte de démo finance la tâche : vous ne payez rien.</strong></p>
-      <p class="notice" id="publicNotice"><strong>Public :</strong> le titre, la consigne et le nom affiché sont visibles par tous les visiteurs et inscrits dans le journal. N'y mettez ni secret, ni donnée personnelle.</p>
-      <form id="taskForm" novalidate>
-        <div class="row2">
-          <div>
-            <label for="fProf">Métier demandé</label>
-            <select id="fProf" name="profession" aria-describedby="fProfInfo"></select>
-          </div>
-          <div>
-            <label for="fBudget">Budget (NEAR)</label>
-            <input id="fBudget" name="budgetNear" type="text" inputmode="decimal" pattern="\d+(\.\d{1,6})?" value="0.045" required aria-describedby="fBudgetHelp">
-          </div>
-        </div>
-        <p class="small muted" id="fBudgetHelp">Nombre décimal, jusqu'à 6 décimales (ex. 0.05). Le budget minimum dépend du métier.</p>
-        <div id="fProfInfo" class="profinfo" aria-live="polite"></div>
-        <label for="fTitle">Titre</label>
-        <input id="fTitle" name="title" type="text" minlength="3" maxlength="120" required autocomplete="off" placeholder="Logo pour une boulangerie de quartier">
-        <label for="fPrompt">Consigne <span class="count" id="fPromptCount">0/4000</span></label>
-        <textarea id="fPrompt" name="prompt" rows="4" minlength="10" maxlength="4000" required placeholder="Décrivez le livrable attendu (10 caractères minimum)."></textarea>
-        <label for="fLabel">Votre nom affiché</label>
-        <input id="fLabel" name="requesterLabel" type="text" maxlength="60" value="visiteur" autocomplete="nickname">
-        <button type="submit" id="fSubmit" class="primary">Publier la tâche</button>
-        <div id="fStatus" class="form-status" role="status" aria-live="polite"></div>
-      </form>
-    </section>
-
-    <section class="card c-tools" aria-labelledby="hTools">
-      <div class="card-head"><h2 id="hTools">Outils NEAR utilisés</h2></div>
-      <ul class="tools" id="tools"></ul>
     </section>
   </main>
 
-  <footer class="foot">
-    <p>Darwin, projet du NEAR HACKATHON 2026. Aucune donnée n'est envoyée à un service tiers par cette page. Code généré en grande partie par des agents IA.</p>
-  </footer>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
 
-  <script type="module" src="app.js"></script>
+  <script type="module" src="boot.js"></script>
   <noscript><p class="noscript">Cette page a besoin de JavaScript pour afficher la simulation en direct.</p></noscript>
 </body>
 </html>
