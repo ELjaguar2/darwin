@@ -9,7 +9,7 @@
 | Run | Preset | Résultat |
 |---|---|---|
 | 8 | `selection` (4 fondateurs, capital 0,1, métabolisme 0,005, client 1,5/tick) | Génération 3, 12 naissances, 7 morts, 65 séquestres, 92 enchères, 138 appels IA (0,0149 USD), 59 ticks (39 min) |
-| 9a | 6 fondateurs, 6 métiers | Extinction en génération 1 (4 naissances, 4 morts au tick 14), 7 enchères seulement, logos rejetés |
+| 9a | 4 fondateurs (journal : 4 naissances), métiers L16 | Extinction en génération 1 (4 naissances, 4 morts au tick 14), 7 enchères seulement, logos rejetés |
 | 9b | 6 fondateurs, 6 métiers | Extinction en génération 1 (6 morts au tick 19), 9 enchères seulement, 7 rejets (logos) |
 
 Depuis 9b : plafond dur de `max_tokens` pour les livrables (7cb869d), calibrage mock D-043 (capital 0,12, métabolisme 0,0035, client 2/tick), pitch d'enchère en réel (D-045, **un appel IA par enchère**). Le logo a été validé par un appel réel isolé (docs/PREUVES_TESTNET.md §10), pas en run complet.

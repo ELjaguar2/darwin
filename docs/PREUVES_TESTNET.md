@@ -331,7 +331,7 @@ Date : 2026-11-11 (22:32 UTC). **Un seul appel réel** (aucun second), `npm run 
 | `extractDeliverable` et `runChecks` (règle `rule:logo`) | acceptés : 3 SVG distincts, aucune marque de `BRANDS_TO_AVOID` |
 | Troncature due au plafond de coût | non : 788 tokens produits pour 3000 autorisés, plafond de coût jamais atteint |
 
-**Verdict : VALIDÉ** pour le chemin production + extraction + contrôles déterministes. Cause de la troncature du run 9b : `max_tokens` plafonné à 400 (`maxTokensPerCall`) pour un livrable de 3 SVG ; corrigée par le plafond dur `maxTokensHardCap` (commit 7cb869d), confirmée ici (788 tokens suffisent, marge de 3,8 fois). Aucune correction supplémentaire n'a été nécessaire.
+**Verdict : VALIDÉ** pour le chemin production + extraction + contrôles déterministes. Cause de la troncature du run 9b : `max_tokens` plafonné à 300 dans le preset `selection` des journaux 9a/9b (400 dans le preset normal ; `maxTokensPerCall`) pour un livrable de 3 SVG ; corrigée par le plafond dur `maxTokensHardCap` (commit 7cb869d), confirmée ici (788 tokens suffisent, marge de 3,8 fois). Aucune correction supplémentaire n'a été nécessaire.
 
 Réserves : (1) un seul échantillon, un seul modèle ; un modèle plus bavard ou à raisonnement peut consommer davantage (les modèles à raisonnement de la liste blanche sont bridés par `extraBody`). (2) Qualité modeste : le texte entre blocs reprend le gabarit littéral « Idee du logo » au lieu d'une phrase d'idée, sans effet sur l'extraction. (3) Le juge IA (grille d'originalité, pertinence) n'a pas été appelé ici : seuls les contrôles déterministes sont validés. (4) Les prix de ce modèle sont ceux du catalogue du jour, pas une valeur figée.
 
