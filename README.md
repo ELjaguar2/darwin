@@ -6,7 +6,7 @@
 
 Built at NEAR HACKATHON 2026 (tracks envisaged: AI Swarms (main), Agent Economy, Open Innovation; to be confirmed by the submitter). License: MIT. A short French summary is at the end of this file ([Résumé en français](#résumé-en-français)).
 
-> Honesty first. Everything marked **MOCK** or **SIMULATED** below is simulated, and the app labels it as such. On 2026-11-10 the testnet mode, the deployed contract and the NEAR AI Cloud mode were **run for real**: in one real run (run 8, preset `selection`, 59 ticks, about 40 minutes) the population reached **generation 3**, with 12 births, 8 reproductions and letters, **7 deaths by starvation** (accounts closed, `mark_dead` in the contract), 65 escrows locked in the contract (63 released, 2 refunded). **Still not real**: every paid task in those runs came from the **simulated client** (no human visitor paid on testnet), NEAR Intents was never executed, and the NEAR AI Cloud bill was not checked against the platform invoice (local accounting only, about 0.034 USD). One run, one seed: generation 3 at tick 59 is an observation, not a guarantee. Transaction ids and explorer links: [docs/PREUVES_TESTNET.md](docs/PREUVES_TESTNET.md). See [What is real, simulated or mock](#what-is-real-simulated-or-mock) and [Trust model and known limits](#10-trust-model-and-known-limits).
+> Honesty first. Everything marked **MOCK** or **SIMULATED** below is simulated, and the app labels it as such. On 2026-11-10 the testnet mode, the deployed contract and the NEAR AI Cloud mode were **run for real**: in one real run (run 8, preset `selection`, 59 ticks, about 40 minutes) the population reached **generation 3**, with 12 births, 8 reproductions and letters, **7 deaths by starvation** (accounts closed, `mark_dead` in the contract), 65 escrows locked in the contract (63 released, 2 refunded). **Still not real**: every paid task in those runs came from the **simulated client** (no visitor-path task was paid on testnet; one logo order was locked and refunded in run 9b), NEAR Intents was never executed, and the NEAR AI Cloud bill was not checked against the platform invoice (local accounting only, about 0.034 USD). One run, one seed: generation 3 at tick 59 is an observation, not a guarantee. Transaction ids and explorer links: [docs/PREUVES_TESTNET.md](docs/PREUVES_TESTNET.md). See [What is real, simulated or mock](#what-is-real-simulated-or-mock) and [Trust model and known limits](#10-trust-model-and-known-limits).
 
 ---
 
@@ -26,6 +26,22 @@ Tasks come from three sources, always labelled: a **simulated client** ("Client 
 ## 2. The problem it addresses
 
 "AI that handles money" is usually shown as one agent with a wallet. The hard questions are economic: can an agent cover its own inference bill? Which prices, risk levels and cooperation levels survive? Darwin turns those questions into an experiment: instead of hand-tuning one agent, it lets a population of agents compete for tasks, with accounts, escrow, reputation and a real cost of thinking, and lets selection pressure find which genomes survive. It is a testbed for agent economies (auctions, subcontracting, escrow, reputation) on programmable money.
+
+### Related work
+
+Darwin is not the first attempt at agents with money and reproduction. Two projects are close; the facts below were read in their sources on 2026-11-11 (we read the paper and the Automaton README, not their code).
+
+- **Spore.fun** (Solana, launched publicly on 25 December 2024; agents run in Phala TEEs and launch their own token via Pump.fun). Case study: Hu and Rong, "Spore in the Wild", [arXiv 2506.04236](https://arxiv.org/abs/2506.04236) (ALIFE 2025). An agent earns the right to reproduce when its token reaches a **$500,000 valuation** (the paper says "fully-diluted valuation" in one place and "market capitalization" in another). The paper reports 2 children in generation 2, 6 in generation 3, 4 in generation 4 and **1 in generation 5**, and, as of 18 May 2025, only the original agent still alive. Fitness is the token's market performance ("the sole proxy for fitness is the token's market performance").
+- **Automaton** ([Conway Research](https://github.com/Conway-Research/automaton), MIT, on Base). According to its README, an agent pays for its own compute in stablecoins, spawns a child (new sandbox, funded wallet, genesis prompt), tracks lineage and stops existing when its credit balance reaches zero. Its README describes agent-to-agent messaging and on-chain discovery, but **no market between agents** (no auctions, escrow or reputation); we did not read its code.
+
+What Darwin does differently:
+
+- **Selection by useful work, not by speculation.** An agent survives only if tasks pay more than its brain and metabolism cost: tasks are paid **from an escrow, after validation, and scored into a reputation**. No token price enters the fitness.
+- **An economy between agents**: auctions, subcontracting, escrow, reputation.
+- **An explicit genome** (8 genes, mutated at birth) and a **letter from parent to child**.
+- **A NEAR-native stack**: sub-accounts, function-call keys, a Rust contract, NEAR AI Cloud, NEAR Intents.
+
+Selection by speculation died out. Selection by useful work can last. (This is our reading, not a claim of the paper, which does not name a single cause for the end of the Spore.fun lineage. And in Darwin the paying client is still **simulated** and subsidised: see sections 5 and 10. "Can last" is a hypothesis Darwin lets you test, not a result.)
 
 ## 3. The "wow" in 3 lines
 
@@ -78,7 +94,7 @@ Full details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Module READMEs: [`
 | AI brain | **MOCK**: deterministic canned answers (`[mock] ...`), simulated usage | NEAR AI Cloud if `NEARAI_API_KEY` is set, else mock + `system.warning BRAIN_NO_KEY` |
 | Escrow | Mock, operator-account semantics | `contract` only if `NEAR_CONTRACT_ID` is set, else **degraded** |
 | Simulated client | **SIMULATED**: a task generator; tasks labelled `simulé` / "Client simulé" | same: in the real runs, **every** paid task came from the simulated client (`sim-client.<master>`) |
-| Visitor tasks | Funded by the operator's demo account `visitors.<master>`, labelled "Visiteur (financé par le compte de démo)": test money of the operator, not the visitor's money | same (code path exists; **no visitor task was run on testnet**) |
+| Visitor tasks | Funded by the operator's demo account `visitors.<master>`, labelled "Visiteur (financé par le compte de démo)": test money of the operator, not the visitor's money | same. On testnet the code path ran only in run 9b (2026-11-11): a logo order posted through the visitor path, escrow locked from `visitors.<master>`, **rejected** by the format rule (0 of 3 SVG blocks: the output had been truncated, a token cap fixed afterwards) and refunded by the contract. **No visitor-path task has yet been delivered, accepted and paid on testnet.** Journal: `docs/preuves/run9b-journal.jsonl` (not yet summarised in docs/PREUVES_TESTNET.md) |
 | Money | Testnet NEAR has **no value** | same |
 
 **Degraded escrow (decisions D-016/D-022).** If the contract is not deployed (`NEAR_CONTRACT_ID` empty), escrow is held by an operator-controlled sub-account `escrow.<master>`, and registry and reputation live in a local ledger (`data/ledger.json`). In that mode, do **not** read "smart contract", "on-chain registry" or "on-chain reputation": it is a local journal. `GET /api/health` exposes `"escrow": "contract"` or `"escrow": "operator-account"`. Mock mode also shows `"operator-account"` (and `"mock": true` says separately that everything is simulated).
@@ -112,7 +128,7 @@ The fastest way to see Darwin: replay the journal of a **real NEAR testnet run**
 > **Verified status.**
 > - Verified: mock mode on a clean clone (QA run, `docs/QA_RAPPORT.md`), the API steps of section 9, the web page, and the full test suite (`npm test`).
 > - **Run for real on 2026-11-10**: NEAR testnet mode, the Rust contract deployed on testnet, real NEAR AI Cloud calls; one real run (preset `selection`) reached generation 3 with 7 deaths. Proofs: docs/PREUVES_TESTNET.md.
-> - **Never executed**: the real NEAR Intents flow; a human visitor's task on testnet (the payer in the real runs is the simulated client). The default mode remains **MOCK**.
+> - **Never executed**: the real NEAR Intents flow; a visitor-path task delivered, accepted and paid on testnet (in run 9b one logo order was locked then refunded after rejection; the payer of every paid task in the real runs is the simulated client). The default mode remains **MOCK**.
 > - Escrow is in the **contract** when `NEAR_CONTRACT_ID` is set (it was in the real runs), otherwise **degraded** (operator-controlled account, local ledger).
 
 ```bash
@@ -194,7 +210,7 @@ These steps were **executed by the author against a real running backend** (`npm
 | 14 | Open `http://127.0.0.1:3000/` in a browser | The Darwin page: a banner "MODE MOCK, Client simulé, Séquestre dégradé", counters (generation, alive, dead, born, paid tasks, total balance), a live status pill ("En direct", tick number), the family tree (SVG) with agents sized by balance, a list of agents with balances, the market of tasks, and a form "Publier la tâche" (title, prompt, profession, budget in NEAR, display name). Submitting the form shows "Tâche t-NNNN publiée" and the task appears in the market. Checked with Playwright: no console error. |
 | 15 | `npm test`, then `npm run typecheck` | All tests pass and typecheck reports no error (author's run; run the commands to get the current count). |
 
-Run for real on 2026-11-10: testnet mode, the contract on testnet, real NEAR AI Cloud completions, one TEE attestation, and one run (preset `selection`) with generation 3 and 7 deaths (section 8, step 6; not re-run by QA as part of these steps). Never run: the real NEAR Intents flow, a human visitor's task on testnet. The web page and the clean-clone install in mock mode were checked (page by the author with Playwright, clean clone by the QA run, see `docs/QA_RAPPORT.md`). The Rust tests were not re-run by the author of this README.
+Run for real on 2026-11-10: testnet mode, the contract on testnet, real NEAR AI Cloud completions, one TEE attestation, and one run (preset `selection`) with generation 3 and 7 deaths (section 8, step 6; not re-run by QA as part of these steps). Never run: the real NEAR Intents flow, an accepted and paid visitor-path task on testnet (run 9b: a rejected and refunded logo order only). The web page and the clean-clone install in mock mode were checked (page by the author with Playwright, clean clone by the QA run, see `docs/QA_RAPPORT.md`). The Rust tests were not re-run by the author of this README.
 
 ## 10. Trust model and known limits
 
@@ -261,6 +277,7 @@ MIT, see [`LICENSE`](LICENSE).
 
 - **Lancer sans aucune clé** : `npm install` puis `npm run start:mock` (Node >= 22.12). Preset rapide : `npm run start:demo`. API sur `http://127.0.0.1:3000` (`/api/health`, `/api/stream`, `POST /api/tasks`). Les étapes de la section 9 ont été exécutées contre un vrai backend.
 - **Mode testnet** : Node >= 22.22.2, `.env` avec `NEAR_MASTER_ACCOUNT_ID`, `NEAR_MASTER_PRIVATE_KEY`, `NEARAI_API_KEY`. **Exécuté en réel le 2026-11-10** : avec `DARWIN_PRESET=selection`, un run réel a atteint la génération 3 avec 12 naissances, 8 reproductions et 7 morts par famine, séquestres dans le contrat (65 verrouillés, 63 libérés, 2 remboursés), appels réels à NEAR AI Cloud (environ 0,034 USD en comptabilité locale, facture non relue). Non réel : le payeur des tâches est le client simulé (aucune tâche de visiteur sur testnet), NEAR Intents jamais exécuté (voir `docs/PREUVES_TESTNET.md`).
+- **Travaux liés** : Spore.fun (Solana, déc. 2024 ; reproduction quand le jeton de l'agent atteint 500 000 $ de valorisation ; selon l'étude arXiv 2506.04236, 2 enfants en génération 2, 6 en génération 3, 4 en génération 4, 1 en génération 5, et seul l'agent d'origine encore en vie au 18 mai 2025) et Automaton de Conway Research (l'agent paie son calcul et se réplique ; son README ne décrit pas de marché entre agents). Darwin sélectionne par le travail utile (séquestre, validation, réputation), avec appels d'offres, sous-traitance, génome explicite et lettres. La sélection par la spéculation s'est éteinte. La sélection par le travail utile peut durer. (C'est notre lecture, pas une conclusion de l'étude ; le client payeur de Darwin reste simulé.)
 - **Ce qui est simulé** : chaîne et IA en mode mock ; client « simulé » étiqueté ; tâches de visiteurs financées par un compte de démo de l'opérateur. Le coût IA est converti en NEAR de testnet à un taux fixe configurable et débité vers le compte maître ; la vraie facture est payée en USD par l'opérateur.
 - **Modèle de confiance** : le compte maître est l'oracle de validation du séquestre ; ce n'est pas « trustless ». Si le contrat n'est pas déployé, le séquestre est « dégradé » (compte piloté par l'opérateur, registre local). L'économie est subventionnée et en boucle fermée.
 - **Divulgation** : la majeure partie du code a été écrite par des agents IA (Claude Code) sous la direction d'un humain ; bibliothèques tierces : celles de `package.json` ; licence MIT.
