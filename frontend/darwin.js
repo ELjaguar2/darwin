@@ -1,5 +1,5 @@
 // Interface L17 : routage à trois onglets, bandeau de mode toujours visible, notifications discrètes, thème.
-import { store, core, on, start } from "./core.js";
+import { store, core, api, on, start } from "./core.js";
 import { h, formatNear } from "./format.js";
 import { firstName } from "./jobs.js";
 import { initMission, renderStrip } from "./mission.js";
@@ -36,14 +36,32 @@ function renderMeta() {
   pill.title = m === "replay" ? "Les données viennent d'un journal enregistré, pas d'une simulation en cours." : m === "testnet" ? "Réseau de test NEAR : transactions vérifiables, aucun fonds réel." : "Aucune transaction réelle : chaîne et IA simulées en mémoire.";
   const ban = $("replayBanner");
   ban.hidden = m !== "replay";
-  if (m === "replay") {
-    const label = typeof core.replayInfo?.label === "string" && core.replayInfo.label ? core.replayInfo.label.slice(0, 140) : "Rejeu d'un run réel testnet du 10 novembre 2026";
-    $("replayText").textContent = label;
-  }
+  if (m === "replay") renderReplay();
   document.body.dataset.mode = m;
   const c = $("conn");
   c.dataset.state = core.conn.state;
   $("connText").textContent = m === "replay" && core.conn.state === "live" ? "Rejeu en cours" : core.conn.text;
+}
+
+function renderReplay() {
+  const rp = core.replayInfo ?? {};
+  const meta = rp.meta ?? {};
+  const on = meta.recordedOn ? new Date(`${meta.recordedOn}T00:00:00Z`) : null;
+  const date = on && !Number.isNaN(on.getTime()) ? on.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }) : null;
+  const kind = meta.recorded?.chain === "near" || !meta.recorded ? "run réel testnet" : "run enregistré";
+  const label = typeof meta.label === "string" && meta.label ? meta.label.slice(0, 140) : `Rejeu d'un ${kind}${date ? ` du ${date}` : ""}`;
+  const phase = { playing: "en cours", paused: "en pause", ended: "terminé" }[rp.phase] ?? "";
+  const pct = rp.total ? Math.min(100, Math.round((Number(rp.position) / Number(rp.total)) * 100)) : 0;
+  const ban = $("replayBanner");
+  const speeds = [1, 5, 20].map((v) => h("button", { type: "button", "aria-pressed": String(rp.speed === v), onclick: () => replayCtl("speed", { speed: v }) }, `x${v}`));
+  const extra = rp.phase === "ended" ? h("button", { type: "button", onclick: () => replayCtl("restart") }, "Rejouer") : null;
+  ban.replaceChildren(h("span", { class: "rb-ico", "aria-hidden": "true" }, "⏵"), h("b", { id: "replayText" }, label),
+    h("span", { class: "rb-prog", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": String(pct), "aria-label": "Progression du rejeu" }, h("i", { css: { width: `${pct}%` } })),
+    h("span", { class: "rb-txt" }, `${phase}${rp.total ? ` · ${pct} %` : ""}`),
+    h("span", { class: "rp-ctl" }, ...speeds, extra));
+}
+async function replayCtl(name, body) {
+  try { const r = await api(`/api/replay/${name}`, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(body ?? {}) }); if (r.ok && r.body && core.health) { core.health.replay = r.body; core.replayInfo = r.body; renderMeta(); } } catch { /* jeton requis ou serveur arrêté : sans effet */ }
 }
 
 // ------------------------------------------------------------------ notifications discrètes

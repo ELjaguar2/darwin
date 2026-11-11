@@ -20,7 +20,7 @@ function renderKpis() {
   const all = [...store.agents.values()], alive = all.filter((a) => a.status === "alive").length;
   const gen = Math.max(store.generations, ...all.map((a) => a.generation), 0);
   $("kpis").replaceChildren(
-    kpi("générations", gen), kpi("vivants", alive), kpi("morts", all.length - alive), kpi("missions payées", store.totals.tasksSettled ?? 0),
+    kpi(gen > 1 ? "générations" : "génération", gen), kpi(alive > 1 ? "vivants" : "vivant", alive), kpi(all.length - alive > 1 ? "morts" : "mort", all.length - alive), kpi("missions payées", store.totals.tasksSettled ?? 0),
     kpi("NEAR gagnés", formatNear(ledger.totals.earned, 2), "par les agents"));
 }
 

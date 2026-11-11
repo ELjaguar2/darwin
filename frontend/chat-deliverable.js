@@ -15,7 +15,7 @@ export function buildChatDeliverable(d, meta) {
       h("div", { class: "cd-head" }, h("strong", null, "Livrable"), m.length ? ` · ${m.length} fichier${m.length > 1 ? "s" : ""}` : ""),
       h("ul", { class: "cd-files" }, m.map((f) => h("li", null, h("code", null, String(f.name ?? "").slice(0, 64)), h("span", { class: "muted" }, ` ${String(f.mime ?? "").slice(0, 40)} · ${f.bytes ?? "?"} o`)))),
       meta?.resultHash ? h("p", { class: "muted small" }, "empreinte ", h("code", null, shortHash(meta.resultHash))) : null,
-      h("p", { class: "muted small" }, "Contenu non disponible (journal rejoué ou livrable absent) : seules les métadonnées sont affichées."));
+      h("p", { class: "muted small" }, "Livrable non enregistré dans le journal : seules les métadonnées sont affichées."));
     return root;
   }
   const logos = files.filter(isSvg), rest = files.filter((f) => !isSvg(f));

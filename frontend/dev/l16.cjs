@@ -20,7 +20,7 @@ const ok = (c, m) => { c ? pass++ : fail++; console.log((c ? "OK   " : "FAIL ") 
   const p = await ctx.newPage();
   p.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
   p.on("pageerror", (e) => errs.push("PAGEERROR " + e.message));
-  await p.goto(BASE + "/?debug");
+  await p.goto(BASE + "/?classique&debug");
   await p.waitForTimeout(Number(process.env.WAIT ?? 22000));
 
   // (5) arbre : métiers 6 couleurs
@@ -110,7 +110,7 @@ const ok = (c, m) => { c ? pass++ : fail++; console.log((c ? "OK   " : "FAIL ") 
   const m = await ctx.newPage();
   await m.setViewportSize({ width: 375, height: 812 });
   m.on("pageerror", (e) => errs.push("MOBILE PAGEERROR " + e.message));
-  await m.goto(BASE + "/?debug"); await m.waitForTimeout(6000);
+  await m.goto(BASE + "/?classique&debug"); await m.waitForTimeout(6000);
   const sw = await m.evaluate(() => [document.documentElement.scrollWidth, innerWidth]);
   ok(sw[0] <= sw[1] + 1, `mobile 375 : pas de scroll horizontal (${sw})`);
   await m.locator(".c-spec").scrollIntoViewIfNeeded();

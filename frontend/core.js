@@ -28,6 +28,7 @@ function computeMode() {
   core.mode = replay ? "replay" : (store.mode === "testnet" || h?.mode === "testnet" || !mock) ? "testnet" : "mock";
   core.replayInfo = replay ? (h?.replay && typeof h.replay === "object" ? h.replay : s?.replay && typeof s.replay === "object" ? s.replay : {}) : null;
   fire("meta");
+  if (replay && !core.replayPoll) core.replayPoll = setInterval(loadHealth, 3000); // progression du lecteur
 }
 
 // ------------------------------------------------------------------ réseau

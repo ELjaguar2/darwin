@@ -185,14 +185,14 @@ function summaryLine(th) {
   const t = th.task;
   const win = t.winnerId ? firstName(store.agents.get(t.winnerId)) : null;
   const state = th.state === "paid" ? ["payé ✓", "ok"] : th.state === "refund" ? ["remboursé", "ko"] : th.state === "expired" ? ["expirée", "ko"] : ["en cours", "live"];
-  return h("button", { type: "button", class: "t-sum", "aria-expanded": String(th.isOpen), onclick: () => { th.open = !th.isOpen; renderThread(th); } },
+  return h("button", { type: "button", class: "t-sum", "aria-expanded": String(th.isOpen), onclick: () => { th.open = !th.isOpen; th.collapsedByUser = !th.open; renderThread(th); } },
     h("span", { class: `st ${state[1]}` }, state[0]),
     h("span", { class: "t-title" }, t.title),
     h("span", { class: "t-meta" }, win ? `${win} · ` : "", money(th.paid ?? t.awardPrice ?? t.budget, 3)),
     h("span", { class: "chev", "aria-hidden": "true" }, th.isOpen ? "▾" : "▸"));
 }
 function renderThread(th) {
-  th.isOpen = th.open ?? !th.done;
+  th.isOpen = th.open ?? (!th.done || (mine.has(th.id) && !th.collapsedByUser) || Date.now() - th.doneAt < 9000);
   const body = h("div", { class: "t-body" });
   for (const m of th.msgs) {
     const n = msgNode(th, m);
@@ -206,7 +206,7 @@ function renderThread(th) {
 }
 function finishThread(th, state) {
   th.done = true; th.state = state; th.doneAt = Date.now();
-  setTimeout(() => { if (th.open === null && th.el.isConnected) renderThread(th); }, 9000); // se replie seul après quelques secondes
+  setTimeout(() => { if (th.open === null && !mine.has(th.id) && th.el.isConnected) renderThread(th); }, 9000); // se replie seul après quelques secondes
 }
 function push(th, msg, silent) { msg.silent = silent; th.msgs.push(msg); renderThread(th); }
 
@@ -265,7 +265,8 @@ export function ingest(ev, { silent = false } = {}) {
     case "deliverable.produced": {
       enqueue((s) => {
         const th = threads.get(d.taskId); if (!th) return;
-        const msg = { kind: "deliverable", node: buildChatDeliverable(null, d) };
+        const inline = Array.isArray(d.files) && d.files.some((f) => typeof f?.content === "string") ? { taskId: d.taskId, files: d.files } : null; // journal futur : contenu dans files[]
+        const msg = { kind: "deliverable", node: buildChatDeliverable(inline, d) };
         push(th, msg, s);
         // le contenu (texte, SVG) vient de l'API ; sans contenu (rejeu d'un journal), la liste des fichiers reste affichée
         api(`/api/tasks/${encodeURIComponent(d.taskId)}/deliverable`).then((r) => {

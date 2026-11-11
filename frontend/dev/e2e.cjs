@@ -22,7 +22,7 @@ const ok = (name, cond, info = "") => { results.push([cond ? "OK " : "KO ", name
     const p = await ctx.newPage();
     p.on("console", (m) => { if (["error", "warning"].includes(m.type()) && !/Failed to load resource/.test(m.text())) errs.push(m.type() + ": " + m.text()); });
     p.on("pageerror", (e) => errs.push("PAGEERROR " + e.message));
-    await p.goto(url);
+    await p.goto(String(url).replace(/[/]+$/, "") + "/?classique");
     return p;
   };
 
