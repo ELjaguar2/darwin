@@ -1,6 +1,6 @@
 // Client SIMULÉ : poste des tâches variées à un rythme de Poisson. Toujours `requester.kind = "simulated"`,
 // libellé toujours préfixé « Client simulé » (jamais présenté comme un vrai client). Financé par le compte maître.
-import { CATALOGUE, PROFESSIONS, type Deps, type Market, type Profession, type Task } from "../shared/index.ts";
+import { PROFESSIONS, scaledPrice, type Deps, type Market, type Profession, type Task } from "../shared/index.ts";
 import { createMarketEvents, type MarketEvents } from "./events.ts";
 import { simTemplate } from "./templates.ts";
 
@@ -38,8 +38,8 @@ export function pickWeightedProfession(weights: Record<Profession, number>, u: n
 }
 
 /** Budget du client simulé : prix plancher du métier x facteur aléatoire dans [1, 1,5] (jamais sous le plancher). */
-export function simBudget(profession: Profession, u: number): bigint {
-  const floor = CATALOGUE[profession].nearPrice;
+export function simBudget(profession: Profession, u: number, scale = 1): bigint {
+  const floor = scaledPrice(profession, scale);
   return floor + (floor * BigInt(Math.floor(Math.min(0.999999, Math.max(0, u)) * 500_000))) / 1_000_000n;
 }
 
@@ -59,7 +59,7 @@ export function createSimulatedClient(deps: Deps, market: Market, events: Market
         posted.push(
           await market.postTask({
             requester: { kind: "simulated", label: `${SIMULATED_LABEL_PREFIX} #${rng.int(1, 9)}` },
-            profession, title: tpl.title, prompt: tpl.prompt, budget: simBudget(profession, rng.next()).toString(),
+            profession, title: tpl.title, prompt: tpl.prompt, budget: simBudget(profession, rng.next(), config.sim.priceScale).toString(),
           }),
         );
       }

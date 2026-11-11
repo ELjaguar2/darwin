@@ -17,7 +17,7 @@ const SVG = (inner = '<circle cx="128" cy="128" r="60" fill="#336699"/>') => `<s
 const fence = (lang: string, body: string) => "```" + lang + "\n" + body + "\n```";
 
 async function setup(env: Record<string, string> = {}) {
-  const config = loadConfig({ DARWIN_BID_WINDOW_TICKS: "1", DARWIN_TASK_DEADLINE_TICKS: "3", ...env });
+  const config = loadConfig({ DARWIN_PRICE_SCALE: "1", DARWIN_BID_WINDOW_TICKS: "1", DARWIN_TASK_DEADLINE_TICKS: "3", ...env });
   const chain = new MockChain();
   const journal = createJournal();
   const brain = new MockBrain();

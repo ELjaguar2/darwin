@@ -1,6 +1,6 @@
 // Politique de décision d'un agent : enchérir (prix, risque), sous-traiter. Pure, déterministe, sans effet de bord.
 import { costYocto, type Agent, type Task } from "../shared/index.ts";
-import { CATALOGUE } from "./catalogue-stub.ts"; // A LA FUSION : import { CATALOGUE } from "../shared/catalogue.ts"
+import { scaledPrice } from "../shared/catalogue.ts";
 import { bal, type Ctx } from "./context.ts";
 import { resolveModel } from "./economy.ts";
 
@@ -30,7 +30,7 @@ export function decideBid(ctx: Ctx, a: Agent, task: Task): { price: bigint; etaT
   const floor = (cost * 11n) / 10n;
   if (price < floor) price = floor;
   // Prix plancher du métier (catalogue) : un freelance ne brade pas sous le tarif de référence de son métier.
-  const professionFloor = CATALOGUE[a.genome.profession].nearPrice;
+  const professionFloor = scaledPrice(a.genome.profession, ctx.deps.config.sim.priceScale);
   if (price < professionFloor) price = professionFloor;
   if (price > budget) return null; // tâche non rentable pour cet agent
   return { price, etaTicks: 1 };

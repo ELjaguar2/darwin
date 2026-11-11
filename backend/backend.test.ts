@@ -118,7 +118,7 @@ describe("POST /api/tasks", () => {
     const professions = [...new Set(rt.engine.getState().agents.map((x) => x.genome.profession))]; // métiers représentés parmi les fondateurs
     const ids: string[] = [];
     for (const profession of professions) {
-      const r = await post(app, { ...TASK, profession, budgetNear: "2" });
+      const r = await post(app, { ...TASK, profession, budgetNear: "3.5" });
       expect(r.status).toBe(201);
       const t = await json(r);
       expect(t.requester.kind).toBe("visitor");

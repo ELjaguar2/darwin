@@ -5,6 +5,7 @@ import { NearChain, createChain, type CreateChainExtras } from "../accounts/inde
 import { createBrain, type Guardrails } from "../brain/index.ts";
 import { createEngine } from "../engine/index.ts";
 import { createMarket, type TaskMarket } from "../market/index.ts";
+import { createSimulatedClient } from "../market/simulated-client.ts";
 import {
   createJournal, createRng,
   type Bid, type Brain, type Chain, type Config, type DarwinEvent, type Deps, type Engine, type Journal,
@@ -117,7 +118,8 @@ export function createRuntime(config: Config, opts: RuntimeOptions = {}): Runtim
 
   const deps: Deps = { config, chain, brain, journal, rng: createRng(config.seed), now };
   const market = createMarket(deps, { taskSeqStart: idOffset("DARWIN_TASK_SEQ_START", chain.info().kind, 10, now), fundingMargin: chain.info().kind === "mock" ? 0n : 200_000_000_000_000_000_000_000n });
-  const engine = createEngine(deps, market, { emitChainTx, autoRun: opts.autoRun ?? true, agentSeqStart: idOffset("DARWIN_AGENT_SEQ_START", chain.info().kind, 0.25, now) });
+  const simulatedClient = createSimulatedClient(deps, market);
+  const engine = createEngine(deps, market, { simulatedClient, emitChainTx, autoRun: opts.autoRun ?? true, agentSeqStart: idOffset("DARWIN_AGENT_SEQ_START", chain.info().kind, 0.25, now) });
   stopEngine = () => { void engine.stop().catch(() => {}); };
 
   // Index des offres (le journal fait foi pour l'historique).

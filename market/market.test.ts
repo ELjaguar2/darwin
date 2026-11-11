@@ -12,7 +12,7 @@ const GOOD = "Voici une réponse complète et soignée à la demande du client, 
 const genome = { profession: "marketing", model: "mock/small", askRatio: 0.7, risk: 0.5, reproThreshold: 2, generosity: 0.2, cooperation: 0.5, personality: "x" } as const;
 
 async function setup(opts: MarketOptions = {}, env: Record<string, string> = {}) {
-  const config = loadConfig({ DARWIN_BID_WINDOW_TICKS: "1", DARWIN_TASK_DEADLINE_TICKS: "3", ...env });
+  const config = loadConfig({ DARWIN_PRICE_SCALE: "1", DARWIN_BID_WINDOW_TICKS: "1", DARWIN_TASK_DEADLINE_TICKS: "3", ...env });
   const chain = new MockChain();
   const journal = createJournal();
   const deps: Deps = { config, chain, brain: new MockBrain(), journal, rng: createRng(1), now: () => new Date(), };

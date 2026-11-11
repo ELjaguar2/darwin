@@ -2,6 +2,8 @@
 import {
   PROFESSIONS, type Agent, type Profession, type Deps, type Engine, type Letter, type Market, type SimState, type Task,
 } from "../shared/index.ts";
+import { CATALOGUE } from "../shared/catalogue.ts";
+import { executeMessages } from "../brain/prompts.ts";
 import { bal, type Ctx, type EngineOptions } from "./context.ts";
 import { chargeBrain, debit, flushAll, resolveModel, syncBalances, warnOnce } from "./economy.ts";
 import { canReproduce, createFounders, die, reproduce } from "./lifecycle.ts";
@@ -82,6 +84,14 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
   }
 
   async function simulatedClient() {
+    if (options.simulatedClient) {
+      try {
+        await options.simulatedClient.tick(ctx.tick);
+      } catch (e) {
+        warnOnce(ctx, "POST_TASK_FAILED", (e as Error).message);
+      }
+      return;
+    }
     const n = await poisson(sim.simClientRatePerTick);
     const span = sim.taskBudgetMax - sim.taskBudgetMin;
     for (let i = 0; i < n; i++) {
@@ -128,8 +138,8 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
     try {
       const price = resolveModel(ctx, a);
       const resp = await deps.brain.complete({
-        agentId: a.id, purpose: "execute_task", model: price.id, maxTokens: sim.maxTokensPerCall,
-        messages: [{ role: "system", content: a.genome.personality }, { role: "user", content: t.prompt }],
+        agentId: a.id, purpose: "execute_task", model: price.id, maxTokens: Math.max(sim.maxTokensPerCall, CATALOGUE[t.profession].maxOutputTokens),
+        messages: executeMessages(a.genome, { title: t.title, prompt: t.prompt, profession: t.profession }),
       });
       await chargeBrain(ctx, a, "execute_task", resp, price);
       const sub = decideSubcontract(ctx, a, BigInt(t.budget));

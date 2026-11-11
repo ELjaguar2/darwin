@@ -175,7 +175,7 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
       if (input.parentTaskId) throw new MarketError("INVALID_SUBCONTRACT", "parentTaskId réservé aux agents");
       // Prix plancher du métier (catalogue L16) ; plafond = la borne de config, relevée si besoin au plancher du métier.
       if (!CATALOGUE[input.profession]) throw new MarketError("INVALID_INPUT", `métier inconnu : ${String(input.profession)}`);
-      const floor = BigInt(nearPriceOf(input.profession));
+      const floor = BigInt(nearPriceOf(input.profession, deps.config.sim.priceScale));
       if (budget < floor)
         throw new MarketError("BUDGET_OUT_OF_RANGE", `budget minimum pour ${CATALOGUE[input.profession].label} : ${formatNear(floor, 6)} NEAR (reçu ${formatNear(budget, 6)} NEAR)`);
       if (budget > (sim.taskBudgetMax > floor ? sim.taskBudgetMax : floor)) throw new MarketError("BUDGET_OUT_OF_RANGE", `budget maximum : ${formatNear(sim.taskBudgetMax, 6)} NEAR`);

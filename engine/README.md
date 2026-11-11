@@ -9,7 +9,6 @@
 | `lifecycle.ts` | naissance (sous-compte + registre), reproduction, lettre parent -> enfant, mort |
 | `economy.ts` | débits (métabolisme, coût IA via `costYocto`), règlement groupé, synchronisation des soldes |
 | `policy.ts` | décisions d'un agent : enchère (son métier seulement, jamais sous le prix plancher du métier), risque, sous-traitance |
-| `catalogue-stub.ts` | STUB temporaire de `shared/catalogue.ts` (L16), à supprimer à la fusion avec la branche marché |
 | `stub-market.ts` | `Market` minimal pour les tests (l'implémentation réelle est dans `market/`, L6) |
 
 ## Règles de comportement

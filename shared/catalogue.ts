@@ -148,7 +148,9 @@ export const CATALOGUE: Record<Profession, ProfessionSpec> = {
   },
 };
 
-export const nearPriceOf = (p: Profession): Yocto => CATALOGUE[p].nearPrice.toString();
+export const nearPriceOf = (p: Profession, scale = 1): Yocto => scaledPrice(p, scale).toString();
+/** Prix du catalogue x échelle de la config (`sim.priceScale`). */
+export const scaledPrice = (p: Profession, scale = 1): bigint => (CATALOGUE[p].nearPrice * BigInt(Math.round(scale * 1000))) / 1000n;
 
 /** Contrôle de cohérence (utilisé par les tests) : somme des poids = 1, prix = refUsd x facteur. */
 export function checkCatalogue(): string[] {
