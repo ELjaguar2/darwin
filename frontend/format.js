@@ -52,13 +52,36 @@ export function explorerUrl(hash, { explicit, chainKind, base } = {}) {
 }
 
 export const PROFESSIONS = {
-  writer: { label: "Rédacteur", glyph: "R", cls: "p-writer" },
-  translator: { label: "Traducteur", glyph: "T", cls: "p-translator" },
-  summarizer: { label: "Synthèse", glyph: "S", cls: "p-summarizer" },
-  analyst: { label: "Analyste", glyph: "A", cls: "p-analyst" },
-  coder: { label: "Codeur", glyph: "C", cls: "p-coder" },
+  logo: { label: "Logo", glyph: "L", cls: "p-logo" },
+  finance: { label: "Analyse financière", glyph: "F", cls: "p-finance" },
+  architecture: { label: "Architecture logicielle", glyph: "A", cls: "p-architecture" },
+  marketing: { label: "Rédaction marketing", glyph: "M", cls: "p-marketing" },
+  translation: { label: "Traduction", glyph: "T", cls: "p-translation" },
+  legal: { label: "Checklist juridique", glyph: "J", cls: "p-legal" },
 };
-export const profOf = (p) => PROFESSIONS[p] ?? { label: String(p ?? "?"), glyph: "?", cls: "p-writer" };
+export const PROFESSION_IDS = Object.keys(PROFESSIONS);
+/** Métier inconnu (valeur inattendue) : libellé brut, couleur neutre. */
+export const profOf = (p) => PROFESSIONS[p] ?? { label: String(p ?? "?"), glyph: "?", cls: "p-unknown" };
+
+/** Montant décimal en NEAR ("0.045") -> yocto (BigInt) ; null si invalide. Calcul exact, sans flottant. */
+export function parseNearToYocto(str) {
+  const m = /^(\d+)(?:\.(\d{1,24}))?$/.exec(String(str ?? "").trim());
+  if (!m) return null;
+  return BigInt(m[1]) * YOCTO + BigInt((m[2] ?? "").padEnd(24, "0"));
+}
+/** yocto -> NEAR décimal sans zéros inutiles (6 décimales max), ex. "0.045". */
+export function nearInput(y) {
+  const s = formatNear(y, 6);
+  return s.includes(".") ? s.replace(/0+$/, "").replace(/\.$/, "") : s;
+}
+/** Coût d'IA en USD (très petit) : "0,0012 $". */
+export function usd(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "?";
+  return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: n < 0.01 ? 5 : 3 }) + " $";
+}
+/** Multiplicateur de demande : 3 -> "×3", 0.3 -> "×0,3". */
+export const multLabel = (m) => "×" + Number(m).toLocaleString("fr-FR", { maximumFractionDigits: 2 });
 
 const TX_KIND = {
   create_account: "Naissance (compte créé)", transfer: "Transfert", lock_escrow: "Séquestre verrouillé",
@@ -75,7 +98,7 @@ export function requesterBadge(r, serverBadge) {
   return { text: "sous-traitance", title: "Tâche confiée par un agent à un autre.", cls: "b-agent" };
 }
 
-export const STATUS_LABEL = { posted: "enchères", awarded: "attribuée", submitted: "remise", settled: "payée", rejected: "rejetée", expired: "expirée" };
+export const STATUS_LABEL = { posted: "enchères", awarded: "attribuée", submitted: "livrée", settled: "payée", rejected: "remboursée", expired: "expirée" };
 
 /** Petit constructeur DOM sûr. h("div", {class:"x", onclick}, "texte", enfant...) */
 export function h(tag, attrs, ...kids) {

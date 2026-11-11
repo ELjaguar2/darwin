@@ -2,7 +2,8 @@
 // Aucune logique métier ici : la page reflète le journal d'événements. Aucun innerHTML (tout via textContent / h()).
 import { Store, EVENT_TYPES } from "./store.js";
 import { Tree } from "./tree.js";
-import { big, formatNear, signedNear, nearNumber, shortHash, profOf, requesterBadge, STATUS_LABEL, h, errorMessages, TESTNET_EXPLORER } from "./format.js";
+import { big, formatNear, signedNear, nearNumber, shortHash, profOf, requesterBadge, STATUS_LABEL, h, errorMessages, TESTNET_EXPLORER, PROFESSIONS, PROFESSION_IDS, parseNearToYocto, nearInput, usd, multLabel } from "./format.js";
+import { buildDeliverable } from "./deliverable.js";
 
 const $ = (id) => document.getElementById(id);
 const store = new Store();
@@ -56,9 +57,28 @@ async function loadState() {
     if (ev.ok && Array.isArray(list)) for (const e of list) { if (e.seq <= store.lastSeq) store.apply(e, { live: false }); }
   } catch { /* ignoré */ }
   await loadHealth();
+  await loadCatalogue();
   setTimeout(() => { tree.live = true; }, 600);
   markDirty("all");
 }
+
+// Catalogue des métiers (GET /api/catalogue). Repli propre si 404 ou erreur : libellés locaux, sans prix ni grille.
+let catalogue = null; // Map id -> {id,label,refUsd,nearPrice,deliverable,rubric,acceptScore}
+let catalogueEvents = null; // MarketEvent[] actifs côté serveur (null = inconnu)
+async function loadCatalogue() {
+  try {
+    const r = await api("/api/catalogue");
+    if (r.ok && Array.isArray(r.body?.professions)) {
+      catalogue = new Map(r.body.professions.filter((p) => p && typeof p.id === "string").map((p) => [p.id, p]));
+      catalogueEvents = Array.isArray(r.body.activeEvents) ? r.body.activeEvents : null;
+      for (const e of catalogueEvents ?? []) store.addMarketEvent(e);
+    } else { catalogue = null; catalogueEvents = null; }
+  } catch { catalogue = null; catalogueEvents = null; }
+  buildProfessionSelect();
+  markDirty("market", "spec", "legend");
+}
+const specOf = (p) => catalogue?.get(p) ?? null;
+const labelOf = (p) => specOf(p)?.label ?? profOf(p).label;
 
 async function loadHealth() {
   try { const r = await api("/api/health"); if (r.ok) { store.health = r.body; markDirty("banners", "tools", "header"); } } catch { /* ignoré */ }
@@ -111,7 +131,7 @@ function connect() {
     store.reset(); Object.assign(store, keep);
     for (const [, n] of tree.nodes) n.g.remove();
     tree.nodes.clear(); tree.gEdges.replaceChildren(); tree.edges.clear(); tree.gFx.replaceChildren();
-    selectedAgent = null; selectedLetter = null; agentRows.clear(); feedRows.clear(); chronRows.clear(); $("chron").replaceChildren();
+    delivCache.clear(); selectedAgent = null; selectedLetter = null; agentRows.clear(); feedRows.clear(); chronRows.clear(); $("chron").replaceChildren();
     $("agents").replaceChildren(); $("feed").replaceChildren();
     tree.schedule(); markDirty("all");
   });
@@ -149,7 +169,11 @@ function applyEvent(ev) {
       break;
     case "escrow.released": { const a = store.agentByAccount(d.payee); if (a) tree.pulse(a.id); markDirty("tasks", "chron", "feed", "header"); break; }
     case "letter.written": markDirty("letters", "chron"); break;
-    case "sim.tick": markDirty("header"); break;
+    case "sim.tick": markDirty("header", "market"); break;
+    case "market.event": markDirty("market"); break;
+    case "population.snapshot": markDirty("spec"); break;
+    case "deliverable.produced": delivCache.delete(d.taskId); markDirty("tasks"); break;
+    case "task.validated": delivCache.delete(d.taskId); break;
     case "sim.started": case "sim.paused": case "sim.resumed": case "sim.stopped": markDirty("header", "banners", "chron"); break;
     case "system.warning": case "system.error": markDirty("banners"); break;
     default: break;
@@ -171,6 +195,9 @@ function render() {
   if (all || dirty.has("chron")) renderChron();
   if (all || dirty.has("tasks")) renderTasks();
   if (all || dirty.has("letters")) renderLetters();
+  if (all || dirty.has("legend")) renderLegend();
+  if (all || dirty.has("spec")) renderSpec();
+  if (all || dirty.has("market")) renderMarket();
   dirty.clear();
 }
 
@@ -338,21 +365,132 @@ function renderChron() {
   for (const k of [...chronRows.keys()]) if (!keep.has(k)) chronRows.delete(k);
 }
 
+// --- légende des métiers (arbre) et spécialisation
+function renderLegend() {
+  const sw = (id) => h("li", null, h("span", { class: `sw ${profOf(id).cls}`, "aria-hidden": "true" }, profOf(id).glyph), labelOf(id));
+  $("legend").replaceChildren(...PROFESSION_IDS.map(sw), h("li", { class: "lg-note" }, "Taille = solde, anneau = lignée, gris = mort"));
+}
+function renderSpec() {
+  const snap = store.snapshot;
+  const gens = snap ? Object.keys(snap.byGeneration).map(Number).filter(Number.isFinite).sort((a, b) => a - b) : [];
+  const totals = Object.fromEntries(PROFESSION_IDS.map((p) => [p, 0]));
+  const rows = gens.map((g) => {
+    const rec = snap.byGeneration[String(g)] ?? {};
+    const parts = PROFESSION_IDS.map((p) => [p, Math.max(0, Number(rec[p]) || 0)]);
+    parts.forEach(([p, n]) => { totals[p] += n; });
+    return { g, parts, sum: parts.reduce((s, [, n]) => s + n, 0) };
+  });
+  const maxSum = Math.max(1, ...rows.map((r) => r.sum));
+  const alive = Object.values(totals).reduce((s, n) => s + n, 0);
+  $("specHint").textContent = snap ? `${alive} vivants · tick ${snap.tick}` : "";
+  const dom = PROFESSION_IDS.filter((p) => totals[p] > 0).sort((a, b) => totals[b] - totals[a])[0];
+  $("specLegend").replaceChildren(...PROFESSION_IDS.map((p) => h("li", { class: totals[p] === 0 && snap ? "zero" : null },
+    h("span", { class: `sw ${profOf(p).cls}`, "aria-hidden": "true" }, profOf(p).glyph), `${labelOf(p)} `, h("b", null, snap ? totals[p] : ""))));
+  if (!snap) { $("spec").replaceChildren(h("li", { class: "muted" }, "En attente du premier instantané de population…")); return; }
+  if (!rows.length) { $("spec").replaceChildren(h("li", { class: "muted" }, "Aucun agent vivant.")); return; }
+  const out = rows.map((r) => {
+    const label = `Génération ${r.g} : ${r.parts.filter(([, n]) => n).map(([p, n]) => `${labelOf(p)} ${n}`).join(", ") || "aucun vivant"}`;
+    return h("li", { class: "spec-row", "aria-label": label },
+      h("span", { class: "spec-gen", "aria-hidden": "true" }, `Gén. ${r.g}`),
+      h("span", { class: "spec-bar", "aria-hidden": "true", css: { width: `${Math.max(r.sum ? 6 : 0, (r.sum / maxSum) * 100)}%` } },
+        ...r.parts.filter(([, n]) => n > 0).map(([p, n]) => h("span", { class: `seg ${profOf(p).cls}`, title: `${labelOf(p)} : ${n}`, css: { flexGrow: String(n) } }, h("b", null, n)))),
+      h("span", { class: "spec-n", "aria-hidden": "true" }, r.sum ? `${r.sum} vivant${r.sum > 1 ? "s" : ""}` : "éteinte"));
+  });
+  if (dom) out.push(h("li", { class: "spec-note muted small" }, `Métier dominant : ${labelOf(dom)} (${totals[dom]} sur ${alive}). Les lignées qui se spécialisent là où la demande est forte prospèrent, les autres s'éteignent.`));
+  $("spec").replaceChildren(...out);
+}
+
+// --- marché : événements de demande, historique, prix plancher
+function renderMarket() {
+  const tick = store.tick;
+  const server = catalogueEvents && catalogueEvents.length ? catalogueEvents : null;
+  const active = server ?? store.activeMarketEvents();
+  const activeIds = new Set(active.map((e) => e.id));
+  const evLi = (e, isActive) => {
+    const up = e.demandMultiplier >= 1;
+    const left = Math.max(0, (e.endTick ?? 0) - tick);
+    return h("li", { class: `mev ${up ? "up" : "down"}${isActive ? " on" : ""}` },
+      h("span", { class: "mev-mult", "aria-label": `Demande ${up ? "en hausse" : "en baisse"} ${multLabel(e.demandMultiplier)}` }, (up ? "▲ " : "▼ ") + multLabel(e.demandMultiplier)),
+      h("span", { class: "mev-main" }, h("b", { class: "mev-title" }, e.title), " ", h("span", { class: `sw sm ${profOf(e.profession).cls}`, "aria-hidden": "true" }, profOf(e.profession).glyph), h("span", { class: "muted small" }, ` ${labelOf(e.profession)}`)),
+      h("span", { class: "mev-left" }, isActive ? (left === 0 ? "dernier tick" : `${left} tick${left > 1 ? "s" : ""} restant${left > 1 ? "s" : ""}`) : `terminé (tick ${e.endTick})`));
+  };
+  $("marketHint").textContent = active.length ? `${active.length} en cours` : "marché calme";
+  $("mActive").replaceChildren(...(active.length ? active.map((e) => evLi(e, true)) : [h("li", { class: "muted small" }, "Aucun événement en cours : la demande suit les prix de référence.")]));
+  const hist = store.marketEvents.filter((e) => !activeIds.has(e.id)).slice(0, 20);
+  $("mHist").replaceChildren(...(hist.length ? hist.map((e) => evLi(e, false)) : [h("li", { class: "muted small" }, "Aucun événement passé.")]));
+  $("prices").replaceChildren(...PROFESSION_IDS.map((p) => {
+    const s = specOf(p);
+    return h("li", null, h("span", { class: `sw sm ${profOf(p).cls}`, "aria-hidden": "true" }, profOf(p).glyph), h("span", null, labelOf(p)),
+      h("b", null, s ? `${nearInput(s.nearPrice)} NEAR` : "n/d"), s ? h("small", { class: "muted" }, `réf. ${s.refUsd} $`) : null);
+  }));
+}
+
+// --- tâches : cycle de vie + livrable
+const delivCache = new Map(); // taskId -> {state: "loading"|"ok"|"none"|"err", node?}
+function ensureDeliverable(t) {
+  const c = delivCache.get(t.id);
+  if (c) return c;
+  const entry = { state: "loading", node: null };
+  delivCache.set(t.id, entry);
+  api(`/api/tasks/${encodeURIComponent(t.id)}/deliverable`).then((r) => {
+    if (delivCache.get(t.id) !== entry) return; // invalidé entre-temps
+    if (r.ok && r.body && Array.isArray(r.body.files)) { entry.state = "ok"; entry.node = buildDeliverable(r.body, specOf(r.body.profession ?? t.profession), labelOf(r.body.profession ?? t.profession)); }
+    else entry.state = r.status === 404 ? "none" : "err";
+    markDirty("tasks");
+  }).catch(() => { if (delivCache.get(t.id) === entry) { entry.state = "err"; markDirty("tasks"); } });
+  return entry;
+}
+function lifecycle(t) {
+  const bids = t.bids ?? store.bidCount.get(t.id) ?? (t.bidIds?.length ?? 0);
+  const past = (...s) => s.includes(t.status);
+  const refunded = t.status === "rejected" || t.escrow?.status === "refunded";
+  const steps = [
+    { label: "Publiée", done: true },
+    { label: "Enchères", done: bids > 0 || !past("posted"), note: bids ? `${bids} offre${bids > 1 ? "s" : ""}` : "" },
+    { label: "Attribuée", done: !!t.winnerId || past("awarded", "submitted", "settled", "rejected"), tx: [t.escrow?.lockTx, "séquestre"] },
+    { label: "Livrée", done: !!t.result || store.deliverables.has(t.id) || past("submitted", "settled", "rejected") },
+    { label: "Validée", done: !!t.validation, note: t.validation ? (t.validation.verdict === "accepted" ? "accepté" : "rejeté") : "" },
+    refunded ? { label: "Remboursée", done: true, bad: true, tx: [t.escrow?.settleTx, "remboursement"] }
+      : t.status === "expired" ? { label: "Expirée", done: true, bad: true }
+      : { label: "Payée", done: t.status === "settled", tx: [t.escrow?.settleTx, "paiement"] },
+  ];
+  const cur = steps.findIndex((s) => !s.done);
+  return h("ol", { class: "life", "aria-label": "Cycle de vie de la tâche" }, steps.map((s, i) => h("li", { class: `${s.done ? "done" : i === cur ? "now" : ""}${s.bad ? " bad" : ""}`, "aria-current": i === cur ? "step" : null },
+    h("span", { class: "life-dot", "aria-hidden": "true" }, s.done ? (s.bad ? "✕" : "✓") : String(i + 1)),
+    h("span", { class: "life-l" }, s.label, s.note ? h("small", null, s.note) : null, s.tx && s.tx[0] ? txChip(s.tx[0], s.tx[1]) : null))));
+}
+function txChip(hash, label) {
+  const url = store.feedByHash.get(hash)?.url;
+  const mock = /^mock_/.test(hash) || store.chain.kind === "mock";
+  return url
+    ? h("a", { class: "txchip", href: url, target: "_blank", rel: "noopener noreferrer", title: `Voir la transaction (${label}) sur l'explorateur`, "aria-label": `Transaction de ${label} ${hash}, nouvel onglet` }, shortHash(hash), " ↗")
+    : h("code", { class: "txchip", title: `${label} : ${hash}${mock ? " (hash fictif, aucune transaction réelle)" : ""}` }, shortHash(hash), mock ? " · mock" : "");
+}
+function deliverableBlock(t) {
+  const known = store.deliverables.has(t.id) || t.validation || t.result || ["submitted", "settled", "rejected"].includes(t.status);
+  if (!known || (!openTaskIds.has(t.id) && !delivCache.has(t.id))) return null; // on ne charge que les tâches ouvertes
+  const e = ensureDeliverable(t);
+  if (e.state === "ok") return e.node;
+  return h("p", { class: "muted small" }, e.state === "loading" ? "Chargement du livrable…" : e.state === "none" ? "Livrable non disponible sur ce serveur (texte brut ci-dessus)." : "Livrable momentanément indisponible.");
+}
+
 // --- tâches
 function renderTasks() {
-  const list = [...store.tasks.values()].sort((a, b) => b.id.localeCompare(a.id)).slice(0, 14);
+  const sorted = [...store.tasks.values()].sort((a, b) => b.id.localeCompare(a.id));
+  const list = sorted.filter((t, i) => i < 14 || openTaskIds.has(t.id)); // une tâche ouverte reste affichée même quand de nouvelles arrivent
   $("tasksHint").textContent = store.tasksOpen != null ? `${store.tasksOpen} ouvertes` : "";
   $("tasks").replaceChildren(...list.map((t) => {
     const rb = requesterBadge(t.requester, t.badge);
     const win = t.winnerId ? store.name(t.winnerId) : null;
     const price = t.awardPrice ?? t.escrow?.amount;
-    const det = h("details", { class: "task", open: openTaskIds.has(t.id) || null, ontoggle: (e) => { e.target.open ? openTaskIds.add(t.id) : openTaskIds.delete(t.id); } },
+    const det = h("details", { class: "task", open: openTaskIds.has(t.id) || null, ontoggle: (e) => { if (e.target.open) { openTaskIds.add(t.id); if (!delivCache.has(t.id)) markDirty("tasks"); } else openTaskIds.delete(t.id); } },
       h("summary", null,
         h("span", { class: `st st-${t.status}` }, STATUS_LABEL[t.status] ?? t.status),
         h("span", { class: "t-title" }, t.title),
         h("span", { class: "t-bud" }, formatNear(t.budget, 2), " NEAR")),
       h("div", { class: "t-body" },
-        h("p", null, h("span", { class: `badge ${rb.cls}`, title: rb.title }, rb.text), " ", h("span", { class: "muted small" }, `${t.id} · ${profOf(t.profession).label}`)),
+        h("p", null, h("span", { class: `badge ${rb.cls}`, title: rb.title }, rb.text), " ", h("span", { class: `sw sm ${profOf(t.profession).cls}`, "aria-hidden": "true" }, profOf(t.profession).glyph), " ", h("span", { class: "muted small" }, `${t.id} · ${labelOf(t.profession)}`)),
+        lifecycle(t),
         t.requester?.kind === "visitor" ? h("p", { class: "small muted" }, `Demandé par « ${t.requester.label} » (budget avancé par le compte de démo).`) : null,
         h("p", { class: "t-prompt" }, t.prompt),
         win ? h("p", { class: "small" }, `Attribuée à `, h("b", null, win), price ? ` pour ${formatNear(price, 2)} NEAR` : "", t.bids ? ` (${t.bids} offres)` : "") : null,
@@ -360,15 +498,9 @@ function renderTasks() {
         t.validation ? h("p", { class: "small" }, h("b", null, t.validation.verdict === "accepted" ? "Accepté" : "Rejeté"), ` · validé par : `, h("code", null, t.validatedBy ?? t.validation.validator), ` · score ${Number(t.validation.score).toFixed(2)}`, t.validation.reason ? ` · ${t.validation.reason}` : "") : null,
         t.result?.text ? h("p", { class: "t-result" }, t.result.text) : null,
         t.result?.resultHash ? h("p", { class: "small muted" }, "Empreinte du résultat : ", h("code", null, shortHash(t.result.resultHash))) : null,
-        txLink(t.escrow?.lockTx, "Verrouillage"), txLink(t.escrow?.settleTx, t.escrow?.status === "refunded" ? "Remboursement" : "Paiement")));
+        deliverableBlock(t)));
     return h("li", { id: `task-${t.id}` }, det);
   }));
-}
-function txLink(hash, label) {
-  if (!hash) return null;
-  const f = store.feedByHash.get(hash);
-  const url = f?.url;
-  return h("p", { class: "small" }, `${label} : `, url ? h("a", { href: url, target: "_blank", rel: "noopener noreferrer" }, shortHash(hash), " ↗") : h("code", null, shortHash(hash)), /^mock_/.test(hash) ? h("span", { class: "badge b-mock" }, "mock") : null);
 }
 
 // --- lettres et fiche agent
@@ -425,6 +557,38 @@ function setStatus(kind, title, lines = []) {
   statusBox.className = `form-status ${kind}`;
   statusBox.replaceChildren(h("strong", null, title), lines.length ? h("ul", null, lines.map((x) => h("li", null, x))) : null);
 }
+// Choix du métier : libellés et budget minimum viennent du catalogue serveur (repli : libellés locaux, sans prix).
+let budgetTouched = false;
+function buildProfessionSelect() {
+  const sel = $("fProf");
+  const keep = sel.value || "logo";
+  const ids = catalogue ? [...catalogue.keys()].filter((id) => PROFESSIONS[id]) : PROFESSION_IDS;
+  sel.replaceChildren(...(ids.length ? ids : PROFESSION_IDS).map((id) => {
+    const s = specOf(id);
+    return h("option", { value: id }, s ? `${s.label} (min. ${nearInput(s.nearPrice)} NEAR)` : labelOf(id));
+  }));
+  sel.value = [...sel.options].some((o) => o.value === keep) ? keep : sel.options[0].value;
+  onProfChange(false);
+}
+function minBudget(p) { const s = specOf(p); return s ? big(s.nearPrice) : null; }
+function onProfChange(userAction = true) {
+  const p = $("fProf").value;
+  const s = specOf(p);
+  const min = minBudget(p);
+  if (min != null) {
+    const cur = parseNearToYocto($("fBudget").value);
+    if (!budgetTouched || cur == null || cur < min) { $("fBudget").value = nearInput(min); budgetTouched = false; } // saisie volontaire au-dessus du minimum : conservée
+    $("fBudgetHelp").textContent = `Budget minimum pour ce métier : ${nearInput(min)} NEAR (prix de référence d'un freelance humain : ${s.refUsd} $, converti à un taux de test). Décimal, 6 décimales max.`;
+  } else $("fBudgetHelp").textContent = "Nombre décimal, jusqu'à 6 décimales (ex. 0.05). Le serveur applique le budget minimum du métier.";
+  const box = $("fProfInfo");
+  const notes = [];
+  if (s?.deliverable) notes.push(h("p", null, h("b", null, "Livrable attendu : "), s.deliverable));
+  if (p === "legal") notes.push(h("p", { class: "warnbox" }, h("b", null, "Ceci n'est pas un avis juridique."), " L'agent produit une checklist à titre informatif : faites-la relire par un professionnel du droit avant toute décision."));
+  if (p === "logo") notes.push(h("p", { class: "infobox" }, "Le logo est original : l'agent propose 3 dessins inédits et ne reprend jamais une marque existante. Évitez de citer une marque dans la consigne."));
+  box.replaceChildren(...notes);
+}
+$("fProf").addEventListener("change", () => onProfChange(true));
+$("fBudget").addEventListener("input", () => { budgetTouched = true; });
 $("showMinor").addEventListener("change", () => markDirty("feed"));
 $("fPrompt").addEventListener("input", (e) => { $("fPromptCount").textContent = `${e.target.value.length}/4000`; });
 function lockButton(sec) {
@@ -450,7 +614,9 @@ form.addEventListener("submit", async (e) => {
   if (payload.title.length < 3) local.push("Titre : 3 caractères minimum.");
   if (payload.prompt.length < 10) local.push("Consigne : 10 caractères minimum.");
   if (!/^\d+(\.\d{1,6})?$/.test(payload.budgetNear)) local.push("Budget : nombre décimal en NEAR, 6 décimales maximum (ex. 1.5).");
-  if (local.length) { setStatus("err", "Formulaire incomplet", local); return; }
+  const min = minBudget(payload.profession), cur = parseNearToYocto(payload.budgetNear);
+  if (min != null && cur != null && cur < min) local.push(`Budget trop bas : le minimum pour « ${labelOf(payload.profession)} » est ${nearInput(min)} NEAR (vous proposez ${payload.budgetNear}). Augmentez le budget ou choisissez un autre métier.`);
+  if (local.length) { setStatus("err", local.length === 1 && cur != null && min != null && cur < min ? "Budget trop bas" : "Formulaire incomplet", local); return; }
   const btn = $("fSubmit");
   btn.disabled = true; btn.textContent = "Envoi…";
   setStatus("info", "Envoi en cours…");
@@ -461,11 +627,13 @@ form.addEventListener("submit", async (e) => {
       const t = r.body ?? {};
       if (t.id && !store.tasks.has(t.id)) { store.tasks.set(t.id, t); }
       setStatus("ok", `Tâche ${t.id ?? ""} publiée`, ["Les agents de ce métier enchérissent au prochain tick. Suivez-la dans le marché ci-dessous.", "Budget avancé par le compte de démo."]);
-      form.reset(); $("fPromptCount").textContent = "0/4000"; $("fBudget").value = payload.budgetNear; $("fLabel").value = payload.requesterLabel;
+      form.reset(); $("fPromptCount").textContent = "0/4000"; $("fProf").value = payload.profession; $("fBudget").value = payload.budgetNear; $("fLabel").value = payload.requesterLabel; onProfChange(true);
       markDirty("tasks"); lockButton(0);
       if (t.id) { openTaskIds.add(t.id); setTimeout(() => { render(); document.getElementById(`task-${t.id}`)?.scrollIntoView({ block: "nearest", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); }, 300); }
     } else if (r.status === 400) {
-      setStatus("err", "Le serveur refuse cette tâche (400)", errorMessages(r.body).length ? errorMessages(r.body) : ["Données invalides."]); lockButton(0);
+      const msgs = errorMessages(r.body);
+      const low = msgs.some((m) => /budget|trop bas|minimum|too low/i.test(m));
+      setStatus("err", low ? "Budget refusé par le serveur (400)" : "Le serveur refuse cette tâche (400)", msgs.length ? msgs : ["Données invalides."]); lockButton(0);
     } else if (r.status === 429) {
       const m = errorMessages(r.body);
       setStatus("warn", "Trop de demandes (429)", [...(m.length ? m : ["Limite atteinte : trop de tâches ouvertes ou plafond horaire du compte de démo."]), retry ? `Réessayez dans ${retry} s.` : "Réessayez dans un moment."]); lockButton(retry || 15);
@@ -498,4 +666,7 @@ function boot() {
 }
 function boot2() { loadState().then(connect).catch(() => setTimeout(boot2, 3000)); }
 setInterval(loadHealth, 20000);
+setInterval(() => { if (live || store.lastSeq > 0) loadCatalogue(); }, 30000);
+buildProfessionSelect();
+markDirty("legend", "spec", "market");
 boot();

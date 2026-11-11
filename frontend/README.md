@@ -16,7 +16,17 @@ Options du faux serveur : `--tick=400`, `--testnet` (hashes réels-like et liens
 
 ## Fichiers
 
-`index.html` (structure), `style.css` (thèmes clair/sombre, variables), `app.js` (chargement, SSE avec reprise, panneaux, formulaire), `store.js` (état reconstruit depuis le journal), `tree.js` (arbre SVG animé), `format.js` (montants, liens, constructeur DOM sûr), `theme-init.js` (thème avant le premier rendu), `screens/` (captures de référence), `dev/` (outils de développement, non servis par le faux serveur).
+`index.html` (structure), `style.css` (thèmes clair/sombre, variables), `freelance.css` (L16 : spécialisation, marché, cycle de vie, livrables), `deliverable.js` (rendu sûr des livrables : Markdown minimal, SVG en `<img>`), `app.js` (chargement, SSE avec reprise, panneaux, formulaire), `store.js` (état reconstruit depuis le journal), `tree.js` (arbre SVG animé), `format.js` (montants, liens, constructeur DOM sûr), `theme-init.js` (thème avant le premier rendu), `screens/` (captures de référence), `dev/` (outils de développement, non servis par le faux serveur).
+
+## Freelance réel (lot L16)
+
+- **Formulaire** : 6 métiers (logo, analyse financière, architecture, marketing, traduction, checklist juridique). Libellés et prix plancher viennent de `GET /api/catalogue` ; le budget est pré-rempli au minimum du métier ; le message « Budget trop bas » est local (comparaison exacte en yocto) et lisible ; avertissement « Ceci n'est pas un avis juridique » (legal) et rappel « le logo est original » (logo). Repli si `/api/catalogue` répond 404 : libellés locaux, sans prix ni grille, le serveur applique ses bornes.
+- **Tâche** (panneau « Marché de tâches », dérouler une tâche) : cycle de vie en 6 étapes (publiée, enchères, attribuée, livrée, validée, payée ou remboursée) avec transactions cliquables, puis le livrable chargé à l'ouverture via `GET /api/tasks/:id/deliverable` : badge verdict, score et seuil, coûts de production et du juge, grille de notation, fichiers avec bouton Télécharger (`?download=1`).
+- **Sécurité des livrables** : texte et Markdown = nœuds DOM (jamais `innerHTML`, aucun lien activé) ; **SVG uniquement via `<img src="data:image/svg+xml,...">`** (aucun script exécuté, jamais injecté) ; Mermaid : **source affichée en code, pas de rendu** (la CSP du backend, `script-src 'self'`, interdit cdnjs ; on n'affaiblit pas la CSP pour un confort d'affichage).
+- **Panneau Marché** : événements de demande actifs (×3 ou ×0,3, ticks restants, couleur hausse/baisse) et historique (événements `market.event` rejoués), prix plancher par métier.
+- **Panneau Spécialisation** : à partir de `population.snapshot` (dernier instantané via `/api/state`, champ `populationSnapshot`, ou événement), une barre empilée par génération, une couleur et un libellé par métier, texte alternatif par ligne ; HTML/CSS, sans dépendance.
+- **Arbre** : couleur et lettre du nœud = métier ; légende des 6 métiers.
+- **Vérification** : `NODE_PATH=<node_modules avec playwright> node frontend/dev/l16.cjs <dossier>` (32 vérifications contre le faux serveur, qui sert catalogue, livrables piégés et instantanés ; option `--no-catalogue` pour tester le repli 404). Le faux serveur place volontairement un `<script>` et un `onerror` dans un SVG et un Markdown pour prouver qu'ils restent inertes. Aussi contre le vrai backend : `REAL_URL=http://127.0.0.1:3150 ... l16.cjs <dossier> --no-catalogue` (tant que `/api/catalogue` n'existe pas).
 
 ## Ce que la page montre
 
