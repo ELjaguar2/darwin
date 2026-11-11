@@ -9,6 +9,7 @@ export const EVENT_TYPES = [
   "task.validated", "escrow.released", "escrow.refunded", "subcontract.created", "reputation.updated",
   "brain.charged", "balance.changed", "funding.received",
   "chain.tx", "intents.quote", "system.warning", "system.error",
+  "deliverable.produced", "market.event", "population.snapshot", // L16
 ];
 
 const MAX_FEED = 120;
@@ -36,7 +37,29 @@ export class Store {
     this.totals = { alive: 0, dead: 0, born: 0, tasksSettled: 0, totalBalance: "0" };
     this.generations = 0;
     this.bidCount = new Map(); // taskId -> nombre d'offres
+    this.deliverables = new Map(); // taskId -> métadonnées (événement deliverable.produced)
+    this.marketEvents = []; // MarketEvent[] (dédoublonnés par id, plus récent en tête)
+    this.snapshot = null; // dernière population.snapshot : {tick, byProfession, byGeneration}
   }
+
+  /** Dernier instantané de population (état serveur ou événement), garde le plus récent. Forme tolérée : objet ou {data}. */
+  setSnapshot(s) {
+    const d = s?.data ?? s;
+    if (!d || typeof d !== "object" || typeof d.byGeneration !== "object" || !d.byGeneration) return;
+    if (this.snapshot && (d.tick ?? 0) < (this.snapshot.tick ?? 0)) return;
+    this.snapshot = { tick: d.tick ?? 0, byProfession: d.byProfession ?? {}, byGeneration: d.byGeneration };
+  }
+
+  addMarketEvent(e) {
+    if (!e || typeof e.id !== "string") return;
+    if (this.marketEvents.some((x) => x.id === e.id)) return;
+    this.marketEvents.unshift(e);
+    this.marketEvents.sort((a, b) => (b.startTick ?? 0) - (a.startTick ?? 0) || b.id.localeCompare(a.id));
+    if (this.marketEvents.length > 60) this.marketEvents.length = 60;
+  }
+
+  /** Événements de marché actifs au tick courant (calcul local, repli si /api/catalogue est absent). */
+  activeMarketEvents() { return this.marketEvents.filter((e) => e.startTick <= this.tick && this.tick < e.endTick); }
 
   subscribe(fn) { this.subs.add(fn); return () => this.subs.delete(fn); }
   notify(ev) { for (const fn of this.subs) fn(ev, this); }
@@ -56,6 +79,8 @@ export class Store {
     this.trimTasks();
     for (const l of state.letters ?? []) this.letters.set(l.id, l);
     this.lastSeq = state.lastSeq ?? 0;
+    this.setSnapshot(state.populationSnapshot ?? state.population ?? state.lastPopulationSnapshot ?? state.snapshot);
+    for (const e of state.marketEvents ?? state.activeEvents ?? []) this.addMarketEvent(e);
     this.notify({ type: "__loaded" });
   }
 
@@ -98,6 +123,12 @@ export class Store {
     const d = ev.data ?? {};
     const A = (id) => this.agents.get(id);
     switch (ev.type) {
+      case "deliverable.produced": if (d.taskId) this.deliverables.set(d.taskId, d); break;
+      case "market.event":
+        this.addMarketEvent(d.event);
+        if (live && d.event) this.chron(ev, "sys", `Marché : ${d.event.title} (${d.event.profession}, demande ×${d.event.demandMultiplier}).`);
+        break;
+      case "population.snapshot": this.setSnapshot({ tick: d.tick ?? ev.tick, byProfession: d.byProfession, byGeneration: d.byGeneration }); break;
       case "sim.started":
         this.mode = d.mode ?? this.mode; this.sim.running = true; this.sim.stopped = null;
         if (live) this.chron(ev, "sys", `Simulation lancée (${d.mode}, preset ${d.preset}).`);

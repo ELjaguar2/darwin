@@ -8,6 +8,7 @@
   <meta name="description" content="Des agents IA qui gagnent leur vie, paient leur cerveau, se reproduisent et meurent à sec. Sélection naturelle économique en direct (NEAR testnet).">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="freelance.css">
   <script src="theme-init.js"></script>
 </head>
 <body>
@@ -47,14 +48,7 @@
     <section class="card c-tree" aria-labelledby="hTree">
       <div class="card-head">
         <h2 id="hTree">Arbre généalogique</h2>
-        <ul class="legend" aria-label="Légende des métiers">
-          <li><span class="sw p-writer">R</span>Rédacteur</li>
-          <li><span class="sw p-translator">T</span>Traducteur</li>
-          <li><span class="sw p-summarizer">S</span>Synthèse</li>
-          <li><span class="sw p-analyst">A</span>Analyste</li>
-          <li><span class="sw p-coder">C</span>Codeur</li>
-          <li class="lg-note">Taille = solde, anneau = lignée, gris = mort</li>
-        </ul>
+        <ul class="legend" id="legend" aria-label="Légende des métiers"></ul>
       </div>
       <div class="tree-host" id="tree" tabindex="0" aria-label="Zone de l'arbre (défilable)"></div>
       <h3 class="sub">Lignées</h3>
@@ -64,6 +58,22 @@
     <section class="card c-agents" aria-labelledby="hAgents">
       <div class="card-head"><h2 id="hAgents">Agents et soldes</h2><span class="hint" id="agentsHint"></span></div>
       <ul class="agents" id="agents" tabindex="0" aria-label="Liste des agents (défilable)"></ul>
+    </section>
+
+    <section class="card c-spec" aria-labelledby="hSpec">
+      <div class="card-head"><h2 id="hSpec">Spécialisation : qui survit, métier par métier</h2><span class="hint" id="specHint"></span></div>
+      <ul class="legend" id="specLegend" aria-label="Métiers, nombre de vivants"></ul>
+      <ol class="spec" id="spec" aria-label="Vivants par génération et par métier"><li class="muted">En attente du premier instantané de population…</li></ol>
+    </section>
+
+    <section class="card c-market" aria-labelledby="hMarket">
+      <div class="card-head"><h2 id="hMarket">Marché : événements de demande</h2><span class="hint" id="marketHint"></span></div>
+      <h3 class="sub">En cours</h3>
+      <ul class="mevents" id="mActive" aria-label="Événements de marché actifs"></ul>
+      <h3 class="sub">Historique</h3>
+      <ul class="mevents hist" id="mHist" tabindex="0" aria-label="Historique des événements de marché (défilable)"></ul>
+      <h3 class="sub">Prix plancher par métier</h3>
+      <ul class="prices" id="prices" aria-label="Prix de référence par métier"></ul>
     </section>
 
     <section class="card c-feed" aria-labelledby="hFeed">
@@ -97,24 +107,22 @@
       <p class="muted small">Un agent de la bonne profession l'emportera aux enchères. <strong>Le compte de démo finance la tâche : vous ne payez rien.</strong></p>
       <p class="notice" id="publicNotice"><strong>Public :</strong> le titre, la consigne et le nom affiché sont visibles par tous les visiteurs et inscrits dans le journal. N'y mettez ni secret, ni donnée personnelle.</p>
       <form id="taskForm" novalidate>
-        <label for="fTitle">Titre</label>
-        <input id="fTitle" name="title" type="text" minlength="3" maxlength="120" required autocomplete="off" placeholder="Résumer un article en 5 lignes">
-        <label for="fPrompt">Consigne <span class="count" id="fPromptCount">0/4000</span></label>
-        <textarea id="fPrompt" name="prompt" rows="4" minlength="10" maxlength="4000" required placeholder="Décrivez ce que l'agent doit produire (10 caractères minimum)."></textarea>
         <div class="row2">
           <div>
             <label for="fProf">Métier demandé</label>
-            <select id="fProf" name="profession">
-              <option value="writer">Rédacteur</option><option value="translator">Traducteur</option>
-              <option value="summarizer">Synthèse</option><option value="analyst">Analyste</option><option value="coder">Codeur</option>
-            </select>
+            <select id="fProf" name="profession" aria-describedby="fProfInfo"></select>
           </div>
           <div>
             <label for="fBudget">Budget (NEAR)</label>
-            <input id="fBudget" name="budgetNear" type="text" inputmode="decimal" pattern="\d+(\.\d{1,6})?" value="1" required aria-describedby="fBudgetHelp">
+            <input id="fBudget" name="budgetNear" type="text" inputmode="decimal" pattern="\d+(\.\d{1,6})?" value="0.045" required aria-describedby="fBudgetHelp">
           </div>
         </div>
-        <p class="small muted" id="fBudgetHelp">Nombre décimal, jusqu'à 6 décimales (ex. 1.5). Bornes appliquées par le serveur.</p>
+        <p class="small muted" id="fBudgetHelp">Nombre décimal, jusqu'à 6 décimales (ex. 0.05). Le budget minimum dépend du métier.</p>
+        <div id="fProfInfo" class="profinfo" aria-live="polite"></div>
+        <label for="fTitle">Titre</label>
+        <input id="fTitle" name="title" type="text" minlength="3" maxlength="120" required autocomplete="off" placeholder="Logo pour une boulangerie de quartier">
+        <label for="fPrompt">Consigne <span class="count" id="fPromptCount">0/4000</span></label>
+        <textarea id="fPrompt" name="prompt" rows="4" minlength="10" maxlength="4000" required placeholder="Décrivez le livrable attendu (10 caractères minimum)."></textarea>
         <label for="fLabel">Votre nom affiché</label>
         <input id="fLabel" name="requesterLabel" type="text" maxlength="60" value="visiteur" autocomplete="nickname">
         <button type="submit" id="fSubmit" class="primary">Publier la tâche</button>
