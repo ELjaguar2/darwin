@@ -11,7 +11,7 @@
   "scripts": {
     "start": "tsx backend/main.ts",
     "start:mock": "cross-env DARWIN_MODE=mock DARWIN_CHAIN= DARWIN_BRAIN= tsx backend/main.ts",
-    "start:demo": "cross-env DARWIN_PRESET=demo tsx backend/main.ts",
+    "start:demo": "cross-env DARWIN_MODE=mock DARWIN_CHAIN= DARWIN_BRAIN= DARWIN_PRESET=demo tsx backend/main.ts",
     "replay": "cross-env DARWIN_MODE=replay tsx backend/main.ts",
     "start:testnet": "cross-env DARWIN_MODE=testnet tsx backend/main.ts",
     "test": "vitest run",
