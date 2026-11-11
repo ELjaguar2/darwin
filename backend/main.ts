@@ -8,6 +8,7 @@ import { safeErrorMessage } from "./redact.ts";
 import { createRuntime } from "./runtime.ts";
 import { checkNodeVersion, checkTestnetEnv } from "./startup.ts";
 import { createStore } from "./store.ts";
+import { runReplayMode } from "./replay-main.ts";
 
 const say = (msg: string) => console.log(`[darwin] ${msg}`);
 const fail = (msg: string, code = 1): never => {
@@ -29,6 +30,8 @@ async function main() {
   const tooOld = checkNodeVersion(nodeV, "mock").error;
   if (tooOld) return fail(tooOld, 2); // avant toute lecture de configuration
   loadDotEnv();
+  // L17 : `npm run replay` (DARWIN_MODE=replay) relit un journal enregistré : aucune clé, aucune chaîne, aucune IA.
+  if ((process.env.DARWIN_MODE ?? "").trim().toLowerCase() === "replay") return runReplayMode({ say, fail });
   let config;
   try {
     config = loadConfig();
