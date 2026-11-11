@@ -34,11 +34,47 @@ const pick = (a) => a[Math.floor(rnd() * a.length)];
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const hex = (n) => Array.from({ length: n }, () => Math.floor(rnd() * 16).toString(16)).join("");
 
-const PROFS = ["writer", "translator", "summarizer", "analyst", "coder"];
+const PROFS = ["logo", "finance", "architecture", "marketing", "translation", "legal"];
+// Catalogue de test (valeurs recopiées de shared/catalogue.ts : prix plancher en NEAR, seuil 0,6).
+const CAT = {
+  logo: ["Logo", 150, 0.045, "3 propositions de logo originales au format SVG."],
+  finance: ["Analyse financière", 120, 0.036, "Note d'analyse financière structurée en Markdown."],
+  architecture: ["Architecture logicielle", 200, 0.06, "Document d'architecture en Markdown avec un schéma Mermaid."],
+  marketing: ["Rédaction marketing", 80, 0.024, "Texte marketing prêt à publier."],
+  translation: ["Traduction", 40, 0.012, "Traduction fidèle du texte fourni."],
+  legal: ["Checklist juridique", 150, 0.045, "Checklist juridique informative (pas un avis juridique)."],
+};
+const RUBRIC = [{ id: "pertinence", description: "Répond à la consigne", weight: 0.4 }, { id: "qualite", description: "Qualité et clarté", weight: 0.35 }, { id: "format", description: "Respect du format demandé", weight: 0.25 }];
+const catalogue = () => ({ professions: PROFS.map((id) => ({ id, label: CAT[id][0], refUsd: CAT[id][1], nearPrice: near(CAT[id][2]).toString(), deliverable: CAT[id][3], rubric: RUBRIC, acceptScore: 0.6 })), activeEvents: marketEvents.filter((e) => e.startTick <= tick && tick < e.endTick) });
+const marketEvents = [];
+const deliverables = new Map();
+const EVENT_TITLES = [["logo", 3, "Salon des startups : tout le monde veut un logo"], ["legal", 3, "Nouvelle réglementation : ruée sur les checklists"], ["translation", 0.3, "Les traducteurs automatiques font chuter la demande"], ["finance", 3, "Clôture trimestrielle : analyses recherchées"], ["marketing", 0.3, "Budgets pub gelés"]];
+function logoSvg(i, name) {
+  const hue = [210, 150, 330][i % 3];
+  const evil = i === 1 ? '<script>window.__pwned = 1; document.title = "PWNED";</script><rect width="1" height="1" onload="window.__pwned = 2"/>' : "";
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><rect width="200" height="200" fill="hsl(${hue} 60% 94%)"/><circle cx="100" cy="90" r="52" fill="hsl(${hue} 70% 45%)"/><path d="M60 140 Q100 170 140 140" stroke="hsl(${hue} 70% 25%)" stroke-width="8" fill="none"/><text x="100" y="188" text-anchor="middle" font-size="16" font-family="sans-serif">${name}</text>${evil}</svg>`;
+}
+function makeDeliverable(t, w, ok, resultHash) {
+  const files = [];
+  if (t.profession === "logo") for (let i = 0; i < 3; i++) files.push({ name: `logo-${i + 1}.svg`, mime: "image/svg+xml", content: logoSvg(i, "<b>x</b>" && "Atelier " + (i + 1)) });
+  else if (t.profession === "architecture") {
+    files.push({ name: "architecture.md", mime: "text/markdown", content: `# Architecture : ${t.title}\n\n## Contexte\nService **web** avec une base \`postgres\` et une file de messages.\n\n## Composants\n- API REST (Node)\n- Worker asynchrone\n- Base de données\n\n| Composant | Rôle |\n|---|---|\n| API | Reçoit les requêtes |\n| Worker | Traite la file |\n\n<img src=x onerror="window.__pwned=3"> et <script>window.__pwned=4</script> doivent rester du texte.\n\n\`\`\`ts\nconst x = 1;\n\`\`\`\n` });
+    files.push({ name: "schema.mmd", mime: "text/vnd.mermaid", content: "graph TD\n  Client --> API\n  API --> DB[(Postgres)]\n  API --> Queue\n  Queue --> Worker" });
+  } else files.push({ name: "livrable.md", mime: "text/markdown", content: `## ${CAT[t.profession][0]}\n\nRéponse rédigée par ${w.name} pour « ${t.title} ».\n\n1. Point un\n2. Point deux\n\n> ${t.profession === "legal" ? "Ceci n'est pas un avis juridique." : "Fin du livrable."}` });
+  const d = { taskId: t.id, profession: t.profession, agentId: w.id, files, rawText: "", resultHash, productionCostUsd: 0.0012 + rnd() * 0.004, judgeCostUsd: 0.0004 + rnd() * 0.001, createdAt: new Date().toISOString() };
+  deliverables.set(t.id, d);
+  emit("deliverable.produced", { taskId: t.id, profession: t.profession, agentId: w.id, files: files.map((f) => ({ name: f.name, mime: f.mime, bytes: f.content.length })), productionCostUsd: d.productionCostUsd, judgeCostUsd: d.judgeCostUsd, resultHash });
+  return d;
+}
+function snapshot() {
+  const byProfession = Object.fromEntries(PROFS.map((p) => [p, 0])), byGeneration = {};
+  for (const a of alive()) { byProfession[a.genome.profession]++; (byGeneration[a.generation] ??= Object.fromEntries(PROFS.map((p) => [p, 0])))[a.genome.profession]++; }
+  return { tick, byProfession, byGeneration };
+}
 const NAMES = ["Ada", "Blaise", "Clara", "Darwin", "Emma", "Faraday", "Gaia", "Hugo", "Iris", "Jules", "Kepler", "Lina", "Mendel", "Nora", "Orion", "Pasteur", "Quark", "Rosalind", "Sagan", "Tesla", "Ulysse", "Vera", "Wallace", "Xena"];
 const MODELS = ["mock/small", "mock/large"];
 const PERSONALITIES = ["Je suis méticuleux : je préfère perdre une enchère que livrer du travail bâclé.", "Je casse les prix pour survivre, puis j'optimise.", "Je partage mes gains : la tribu avant l'individu.", "Prudent, je garde une réserve avant de risquer un enfant."];
-const TITLES = { writer: ["Rédiger une fiche produit", "Écrire un court billet de blog", "Texte d'accroche pour une newsletter"], translator: ["Traduire un paragraphe FR vers EN", "Traduire une notice en espagnol"], summarizer: ["Résumer un article de 800 mots", "Résumé exécutif d'un rapport"], analyst: ["Analyser un jeu de ventes trimestriel", "Comparer trois offres cloud"], coder: ["Écrire une fonction de tri stable", "Corriger une regex de validation d'e-mail"] };
+const TITLES = { logo: ["Logo pour une boulangerie", "Logo d'une app de randonnée"], finance: ["Analyser un jeu de ventes trimestriel", "Comparer trois offres de prêt"], architecture: ["Architecture d'une app de réservation", "Découper un monolithe en services"], marketing: ["Fiche produit pour une gourde", "Texte d'accroche newsletter"], translation: ["Traduire un paragraphe FR vers EN", "Traduire une notice en espagnol"], legal: ["Checklist de conformité RGPD", "Checklist pour une association"] };
 
 // ---- État ----
 const journal = [];
@@ -186,8 +222,10 @@ function stepTask(p) {
     t.result = { text, resultHash, submittedTick: tick }; t.status = "submitted";
     emit("task.submitted", { taskId: t.id, agentId: w.id, resultHash });
     const ok = rnd() < 0.86;
+    const dl = makeDeliverable(t, w, ok, resultHash);
     const validator = rnd() < 0.5 ? "brain:" + w.genome.model : "rule:non-vide-et-pertinent";
     t.validation = { verdict: ok ? "accepted" : "rejected", score: ok ? 0.7 + rnd() * 0.3 : 0.1 + rnd() * 0.3, validator, reason: ok ? "Réponse conforme à la demande." : "Hors sujet par rapport à la consigne.", resultHash, tick };
+    dl.verdict = t.validation.verdict; dl.score = t.validation.score;
     emit("task.validated", { taskId: t.id, validation: t.validation });
     const e = escrows.get(t.id);
     if (ok) {
@@ -237,6 +275,8 @@ function tickOnce() {
     if (BigInt(a.balance) >= thr && alive().length < 16 && tick - a.lastChild >= 10) reproduce(a);
   }
   for (const a of alive()) if (BigInt(a.balance) < near(1.5)) die(a);
+  if (tick % 9 === 3) { const [profession, demandMultiplier, title] = EVENT_TITLES[marketEvents.length % EVENT_TITLES.length]; const ev = { id: "e-" + String(marketEvents.length + 1).padStart(4, "0"), title, profession, demandMultiplier, startTick: tick, endTick: tick + 6 }; marketEvents.push(ev); emit("market.event", { event: ev }); }
+  emit("population.snapshot", snapshot());
   const av = alive();
   const total = av.reduce((x, a) => x + BigInt(a.balance), 0n);
   emit("sim.tick", { alive: av.length, tasksOpen: [...tasks.values()].filter((t) => t.status === "posted" || t.status === "awarded").length, totalBalance: total.toString() });
@@ -277,11 +317,11 @@ const state = () => ({
   brain: { kind: TESTNET ? "nearai" : "mock" },
   generations: Math.max(0, ...[...agents.values()].map((a) => a.generation)),
   agents: [...agents.values()].map(pub), tasks: [...tasks.values()].slice(-40).map(withBadge), letters: [...letters.values()],
-  lastSeq: journal.length,
+  lastSeq: journal.length, populationSnapshot: snapshot(),
   totals: { alive: alive().length, dead: agents.size - alive().length, born: agents.size, tasksSettled: [...tasks.values()].filter((t) => t.status === "settled").length, totalBalance: alive().reduce((x, a) => x + BigInt(a.balance), 0n).toString() },
 });
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".mjs": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".json": "application/json" };
-const CSP = "default-src 'self'; img-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'";
+const CSP = "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'";
 /** Forme d'erreur du vrai backend : {error:{code,message,retryable?}} (+ issues de validation pour 400). */
 function normErr(code, body) {
   if (code < 400 || (body && typeof body.error === "object")) return body;
@@ -303,14 +343,15 @@ function postTaskHandler(req, res, raw) {
   const issues = [];
   const str = (k, lo, hi) => { const v = body[k]; if (typeof v !== "string" || v.length < lo || v.length > hi) issues.push({ path: [k], message: `${k} : ${lo} à ${hi} caractères requis` }); };
   str("title", 3, 120); str("prompt", 10, 4000);
-  if (!PROFS.includes(body.profession ?? "writer")) issues.push({ path: ["profession"], message: "profession inconnue" });
-  if (typeof body.budgetNear !== "string" || !/^\d+(\.\d{1,6})?$/.test(body.budgetNear)) issues.push({ path: ["budgetNear"], message: "budgetNear : décimal en NEAR (ex. 1.5)" });
-  else if (Number(body.budgetNear) < 0.5 || Number(body.budgetNear) > 2.5) issues.push({ path: ["budgetNear"], message: "budgetNear hors bornes (0.5 à 2.5)" });
+  if (!PROFS.includes(body.profession ?? "logo")) issues.push({ path: ["profession"], message: "profession inconnue" });
+  if (typeof body.budgetNear !== "string" || !/^\d+(\.\d{1,6})?$/.test(body.budgetNear)) issues.push({ path: ["budgetNear"], message: "budgetNear : décimal en NEAR (ex. 0.05)" });
+  else if (CAT[body.profession] && Number(body.budgetNear) < CAT[body.profession][2]) issues.push({ path: ["budgetNear"], message: `budget trop bas : minimum ${CAT[body.profession][2]} NEAR pour ${CAT[body.profession][0]}` });
+  else if (Number(body.budgetNear) > 5) issues.push({ path: ["budgetNear"], message: "budgetNear hors bornes (maximum 5)" });
   if (FORCE_TASK_STATUS === 400 && !issues.length) issues.push({ path: ["title"], message: "erreur forcée pour test" });
   if (issues.length) return send(res, 400, { error: "invalid_input", issues });
   if ((visitorOpenByIp.get(ip) ?? 0) >= 10) return send(res, 429, { error: "too_many_open_tasks", message: "10 tâches ouvertes maximum par IP." }, { "Retry-After": "30" });
   visitorOpenByIp.set(ip, (visitorOpenByIp.get(ip) ?? 0) + 1);
-  const t = postTask({ kind: "visitor", label: String(body.requesterLabel ?? "visiteur").slice(0, 60) }, near(Number(body.budgetNear)), body.profession ?? "writer", body.title, body.prompt);
+  const t = postTask({ kind: "visitor", label: String(body.requesterLabel ?? "visiteur").slice(0, 60) }, near(Number(body.budgetNear)), body.profession ?? "logo", body.title, body.prompt);
   send(res, 201, t);
 }
 
@@ -332,6 +373,17 @@ const server = http.createServer(async (req, res) => {
     if (p === "/api/health") return send(res, 200, { ok: true, mode: TESTNET ? "testnet" : "mock", mock: !TESTNET, chain: { kind: TESTNET ? "near" : "mock" }, brain: { kind: TESTNET ? "nearai" : "mock" }, tick, escrow: DEGRADED || !TESTNET ? "operator-account" : "contract", visitors: { spentLastHour: "0", hourlyCap: near(30).toString() } });
     if (p === "/api/config") return send(res, 200, { mode: TESTNET ? "testnet" : "mock", preset: "demo", tickMs: TICK_MS, visitorHourlyCapNear: 30, taskBudgetMin: "0.5", taskBudgetMax: "2.5" });
     if (p === "/api/state") return send(res, 200, state());
+    if (p === "/api/catalogue" && !args["no-catalogue"]) return send(res, 200, catalogue());
+    let dm;
+    if ((dm = p.match(/^\/api\/tasks\/([\w-]+)\/deliverable(?:\/([\w.-]+))?$/)) && !args["no-catalogue"]) {
+      const d = deliverables.get(dm[1]);
+      if (!d) return send(res, 404, { error: { code: "UNKNOWN_DELIVERABLE", message: "pas de livrable" } });
+      if (!dm[2]) return send(res, 200, d);
+      const f = d.files.find((x) => x.name === dm[2]);
+      if (!f) return send(res, 404, { error: { code: "UNKNOWN_FILE", message: "fichier inconnu" } });
+      res.writeHead(200, { "Content-Type": f.mime + "; charset=utf-8", "Content-Disposition": url.searchParams.get("download") ? `attachment; filename="${f.name}"` : "inline", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox" });
+      return res.end(f.content);
+    }
     if (p === "/api/agents") return send(res, 200, { agents: [...agents.values()].map(pub) });
     let m;
     if ((m = p.match(/^\/api\/agents\/([\w-]+)\/letter$/))) { const a = agents.get(m[1]); const l = a && letters.get(a.letterId); return l ? send(res, 200, { letter: l }) : send(res, 404, { error: "not_found" }); }

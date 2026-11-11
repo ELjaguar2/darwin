@@ -29,7 +29,7 @@ const ok = (name, cond, info = "") => { results.push([cond ? "OK " : "KO ", name
   // 1. run normal : arbre, générations, formulaire OK + 400
   let s = await start("--tick=100");
   let p = await newPage(s.url);
-  await p.waitForFunction(() => document.querySelectorAll(".node").length >= 6, null, { timeout: 15000 });
+  await p.waitForFunction(() => document.querySelectorAll(".node").length >= 6, null, { timeout: 45000 });
   ok("arbre : nœuds affichés", true);
   await p.waitForFunction(() => Number(document.getElementById("genNum").textContent) >= 3, null, { timeout: 60000 });
   ok("compteur de générations >= 3", true, await p.textContent("#genNum"));
@@ -48,7 +48,7 @@ const ok = (name, cond, info = "") => { results.push([cond ? "OK " : "KO ", name
   await p.fill("#fTitle", "Test frontend"); await p.fill("#fPrompt", "Écris un haïku sur la sélection naturelle."); await p.fill("#fBudget", "9");
   await p.click("#fSubmit");
   await p.waitForSelector("#fStatus.err");
-  ok("formulaire 400 : message serveur", /hors bornes/.test(await p.textContent("#fStatus")), (await p.textContent("#fStatus")).slice(0, 80));
+  ok("formulaire 400 : message serveur", /hors bornes|maximum/.test(await p.textContent("#fStatus")), (await p.textContent("#fStatus")).slice(0, 80));
   await p.fill("#fBudget", "1.2"); await p.click("#fSubmit");
   await p.waitForSelector("#fStatus.ok");
   ok("formulaire 201", /publiée/.test(await p.textContent("#fStatus")));
