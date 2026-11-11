@@ -2,6 +2,8 @@
 // Permet de faire tourner toute la simulation sans clé ; toutes ses réponses portent mock:true.
 import { BrainError, type Brain, type BrainRequest, type BrainResponse, type ModelInfo } from "../brain.ts";
 import { sha256Hex } from "../hash.ts";
+import { PROFESSIONS, type Profession } from "../types.ts";
+import { mockDeliverable } from "./mock-deliverables.ts";
 
 export const MOCK_MODELS: ModelInfo[] = [
   { id: "mock/small", usdPerMTokIn: 0.1, usdPerMTokOut: 0.3, contextLength: 8192, verified: true },
@@ -33,15 +35,31 @@ export class MockBrain implements Brain {
       case "letter":
         text = `[mock] Cher enfant, je t'ai donné de quoi vivre. Travaille bien, ne dépense pas plus que tu ne gagnes, et méfie-toi des tâches mal payées. (${tag})`;
         break;
-      case "validate":
-        text = `[mock] ACCEPTED score=0.8 raison=réponse cohérente avec la demande (${tag})`;
+      case "validate": {
+        // Grille du métier présente (juge L16) : un score de 0,8 par critère ; sinon format ligne historique.
+        let ids: string[] = [];
+        try {
+          const o = JSON.parse(last) as { criteria?: { id?: unknown }[] };
+          ids = (o.criteria ?? []).map((c) => String(c.id)).filter(Boolean);
+        } catch { /* message non JSON */ }
+        text = ids.length
+          ? JSON.stringify({ scores: Object.fromEntries(ids.map((i) => [i, 0.8])), reason: `[mock] livrable cohérent avec la demande (${tag})` })
+          : `[mock] ACCEPTED score=0.8 raison=réponse cohérente avec la demande (${tag})`;
         break;
+      }
       case "bid":
         text = `[mock] Je peux le faire vite et proprement. (${tag})`;
         break;
       case "mutate":
         text = `[mock] Prudent mais curieux, variante ${tag}.`;
         break;
+      case "execute_task": {
+        // Le prompt de production (brain/prompts.ts) porte le marqueur [[PROFESSION:x]] : on renvoie un livrable valide du bon format.
+        const m = /\[\[PROFESSION:(\w+)\]\]/.exec(prompt);
+        const prof = m && (PROFESSIONS as readonly string[]).includes(m[1]!) ? (m[1] as Profession) : undefined;
+        text = prof ? mockDeliverable(prof, last) : `[mock] Résultat pour « ${last.slice(0, 60).replace(/\s+/g, " ")} » (${tag})`;
+        break;
+      }
       default:
         text = `[mock] Résultat pour « ${last.slice(0, 60).replace(/\s+/g, " ")} » (${tag})`;
     }

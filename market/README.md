@@ -40,3 +40,14 @@ Accepté +1, rejeté -2, délai manqué -2 (`opts.reputationDeltas`). Chaque aju
 
 ## Tests
 `market/market.test.ts` : cycle complet avec conservation des fonds, égalité de prix, sous-traitance (marge, auto-contrat), rejet, expiration sans offre, délai dépassé, validateur défaillant ou interdit, paiement repris, plafond horaire 429, comptes du marché, client simulé, isolation des messages, juge IA.
+
+## Freelance réel (L16)
+
+Catalogue : `shared/catalogue.ts` (6 métiers, `nearPrice` plancher, grille `rubric`, `acceptScore`, consignes, `maxOutputTokens`, `demandWeight`). Décisions D-037 à D-041.
+
+- **Prix minimum** : `postTask` refuse (visiteur ou client simulé) un budget < `CATALOGUE[métier].nearPrice` (`BUDGET_OUT_OF_RANGE`, message clair). La sous-traitance n'est pas concernée (budget < prix gagnant).
+- **Livrable** : `extractDeliverable(task, agentId, rawText, costs)` (`deliverable.ts`) : logo = exactement 3 blocs svg -> `logo-1..3.svg` ; architecture -> `architecture.md` + `schema.mmd` ; finance -> `analyse.md` ; marketing -> `texte.md` ; translation -> `traduction.md` ; legal -> `checklist.md`. SVG assainis par REJET (`sanitizeSvg`). `market.getDeliverable(taskId)` / `listDeliverables()` (en mémoire, perdus au redémarrage). Événement `deliverable.produced` `{taskId, profession, agentId, files:[{name,mime,bytes}], productionCostUsd, judgeCostUsd, resultHash}`, émis après le verdict.
+- **Juges** : `professionRule()` (`rule:<métier>`, contrôles déterministes de `checks.ts`) puis `brainJudge` avec la grille du métier (scores par critère, note pondérée >= `acceptScore`). Le défaut de `createMarket` les compose. Rejet = remboursement (test pour les 6 métiers). Le coût du juge est imputé à la trésorerie (`brain.charged` `agentId: "treasury"`) et reporté dans `judgeCostUsd`.
+- **Événements de marché** : `createMarketEvents` -> `market.event` `{event: MarketEvent}` ; `createSimulatedClient(deps, market).events` expose les événements actifs pour l'interface. Le client simulé est toujours étiqueté « simulé ».
+- **Mock** : `MockBrain` produit un livrable valide par métier (marqueur `[[PROFESSION:x]]` du prompt) et note 0,8 par critère ; un livrable volontairement mauvais est rejeté par les contrôles déterministes.
+- **Revue sécurité du séquestre (L16)** : aucun chemin de paiement modifié ; la libération exige toujours un verdict `accepted` enregistré avec `resultHash` identique ; l'extraction du livrable n'a aucun effet sur l'argent (une erreur inattendue émet `DELIVERABLE_FAILED`, le règlement continue comme avant) ; le contenu SVG d'un agent n'est conservé qu'assaini (rejet sinon) ; le backend doit le servir avec `Content-Type` strict, `X-Content-Type-Options: nosniff` et `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'`, et le frontend l'afficher dans `<img>` (jamais en ligne dans le DOM).

@@ -1,7 +1,7 @@
 // Prompts des agents. Règle anti-injection de base (D-025) : tout texte venant d'un visiteur (ou d'un autre agent)
 // est TOUJOURS dans un message `user`, délimité et déclaré comme donnée ; le message `system` ne contient que le
 // génome de l'agent (personnalité) et les règles fixes. Aucune concaténation de texte externe dans `system`.
-import type { ChatMessage, Genome } from "../shared/index.ts";
+import { CATALOGUE, PROFESSIONS, type ChatMessage, type Genome, type Profession } from "../shared/index.ts";
 
 const MAX_EXTERNAL_CHARS = 4000;
 
@@ -58,11 +58,25 @@ export function parseDecision(text: string): Decision {
   return { action: "skip", reason: "réponse non analysable" };
 }
 
-/** Exécution de tâche : le texte du visiteur est la tâche, en message user. */
-export function executeMessages(genome: Pick<Genome, "personality" | "profession">, task: { title: string; prompt: string }): ChatMessage[] {
+/** Marqueur lisible par MockBrain pour choisir le format du livrable (sans effet sur un vrai modèle). */
+export const PROFESSION_MARKER = (p: Profession) => `[[PROFESSION:${p}]]`;
+
+/**
+ * Exécution de tâche (L16) : les consignes de production du métier de la TÂCHE (catalogue) imposent un format de sortie extractible
+ * (voir market/deliverable.ts). Le texte du visiteur reste une donnée, en message user.
+ */
+export function executeMessages(
+  genome: Pick<Genome, "personality" | "profession">, task: { title: string; prompt: string; profession?: Profession },
+): ChatMessage[] {
+  const profession = task.profession && PROFESSIONS.includes(task.profession) ? task.profession : genome.profession;
+  const spec = CATALOGUE[profession];
+  const extra = `${PROFESSION_MARKER(profession)} Livrable attendu : ${spec.deliverable}
+${spec.instructions}
+Le format de sortie est strict : il sera extrait automatiquement puis contrôlé ; un format non respecté est rejeté et non payé.`;
   return [
-    { role: "system", content: systemPrompt(genome, "Exécute la tâche demandée de façon utile et concise, dans la limite de longueur imposée.") },
-    { role: "user", content: wrap("TACHE", `${task.title}\n${task.prompt}`) },
+    { role: "system", content: systemPrompt({ personality: genome.personality, profession }, extra) },
+    { role: "user", content: wrap("TACHE", `${task.title}
+${task.prompt}`) },
   ];
 }
 
