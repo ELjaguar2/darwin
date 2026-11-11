@@ -1,10 +1,10 @@
-# Besoins pour l'humain — mis à jour le 2026-11-12 (lot L17-docs2)
+# Besoins pour l'humain — mis à jour le 2026-11-12 (lot L17-docs3)
 
 **Échéance : samedi 14 novembre 2026, 23:59 UTC** (soit 00:59 le 15 novembre à Paris, heure d'hiver UTC+1). **Marge de sécurité conseillée : avoir tout soumis le 14 novembre avant 12:00 UTC (13:00 à Paris)**, pour absorber une panne de X, de GitHub ou du formulaire. Le formulaire est à soumettre **une seule fois** et corrigé ensuite via https://nearhackathon.com/request-changes : ne pas le garder pour la dernière heure.
 
 ## Résumé
 - **Prouvé en réel (voir `docs/PREUVES_TESTNET.md` §8)** : run 8 du 2026-11-10, preset `selection`, génération 3, 12 naissances, 8 reproductions, 7 morts par famine, 65 séquestres (63 libérés, 2 remboursés), contrat `darwin-contract-7k2.testnet`, clés function call vérifiées, appels réels NEAR AI Cloud (environ 0,034 USD en comptabilité locale), une attestation TEE.
-- **Run 9 (2026-11-11, journaux `docs/preuves/run9a-journal.jsonl` et `run9b-journal.jsonl`, résumés dans `docs/PREUVES_TESTNET.md` §11)** : commandes de logo. 9a : 7 logos rejetés puis remboursés (dont 1 commande « visiteur »), 2 commandes « visiteur » expirées sans offre, aucun livrable accepté. 9b : un logo « visiteur » verrouillé puis **rejeté** (sortie tronquée, 0 bloc SVG sur 3) et **remboursé** par le contrat ; deux livrables texte acceptés et payés (payeur : client simulé). Les deux runs se sont éteints (génération 1). **Aucun logo livré, accepté et payé sur testnet n'est prouvé** (run 9c à faire, par le chef de projet).
+- **Run 9 (2026-11-11, journaux `docs/preuves/run9a-journal.jsonl` et `run9b-journal.jsonl`, résumés dans `docs/PREUVES_TESTNET.md` §11)** : commandes de logo. 9a : 7 logos rejetés puis remboursés (dont 1 commande « visiteur »), 2 commandes « visiteur » expirées sans offre, aucun livrable accepté. 9b : un logo « visiteur » verrouillé puis **rejeté** (sortie tronquée, 0 bloc SVG sur 3) et **remboursé** par le contrat ; deux livrables texte acceptés et payés (payeur : client simulé). Les deux runs se sont éteints en génération 1 (aucune naissance au-delà des fondateurs ; 4 fondateurs et 4 morts en 9a, 6 fondateurs et 6 morts en 9b, d'après les journaux). Dans ces journaux chaque appel de production s'arrête à exactement 300 tokens de sortie (plafond du preset `selection` de l'époque), ce qui explique des sorties tronquées ; le plafond a été relevé depuis (`docs/PREUVES_TESTNET.md` §10, §11) et n'a pas été rejoué en run complet. **Aucun logo livré, accepté et payé sur testnet n'est prouvé** (run 9c à faire, par le chef de projet).
 - **Jamais prouvé** : NEAR Intents (jamais exécuté, aucune dépense), facture réelle NEAR AI relue, second run confirmant la génération 3, tâche de visiteur acceptée et payée sur testnet.
 - **Rien n'est publié** : dépôt, post X et formulaire sont à vous (règle 5). Aucune dépense mainnet.
 - Les clés (NEAR AI, compte maître) sont uniquement dans `.env`, ignoré par git. La clé NEAR AI a transité par la conversation : **à régénérer avant publication** (étape 3).
@@ -15,7 +15,41 @@ Tout se fait depuis le dossier du dépôt. Remplacer `<REPO_URL>` par l'adresse 
 
 **Repli si le run 9c n'est pas prouvé (aucun logo accepté et payé, avec hash) avant le 13 novembre 12:00 UTC** : ne pas attendre. Retirer **toute mention du run 9c** de la vidéo (`docs/VIDEO_SCRIPT.md` : ligne « logo accepté et payé, run 9c » des plans fixes, plan 5) et du post X (`docs/POST_X.md`), garder le run 8 et le cas refusé du run 9b tels que décrits, et enregistrer avec ce qui est prouvé. Une mention non prouvée est pire qu'une absence.
 
-### Vendredi 13 novembre
+### Plan horaire du jeudi soir au vendredi 13 novembre (organisé autour de la VIDÉO)
+
+**La vidéo est obligatoire** : HACKATHON.md (relu le 2026-11-12) exige de la joindre au post X ; des captures seules ne suffisent pas. Tout le vendredi sert à produire une vidéo vraie. Heures en UTC (Paris = UTC+1).
+
+| Heure (UTC) | Quoi | Référence | Fait quand |
+|---|---|---|---|
+| Matin, dès 07:00 | Étapes 1 et 3 ci-dessous (version finale vérifiée, clé NEAR AI régénérée), puis **lancer le run 9c** : recharger le compte maître, sauvegarder `data/`, lancer dans un terminal séparé, surveiller, arrêter, copier le journal | `docs/RUN_9C.md` §1 à §5 (ne pas le recopier ici) ; durée maximale du run : 90 minutes | `docs/preuves/run9c-journal.jsonl` existe, sans secret (`npm run scan-secrets -- --no-history`), ou le run a échoué et vous le savez |
+| **12:00 UTC (13:00 Paris) : POINT DE DÉCISION** | Un logo (ou une commande de visiteur) accepté et payé, avec hash, est-il prouvé par 9c ? **Oui** : le journal 9c sert de rejeu vitrine, les mentions du run 9c sont gardées dans la mesure exacte de ce qu'il prouve. **Non** : repli, retirer toute mention du run 9c de la vidéo et du post, rejeu du run 8 | encadré « Repli » plus haut ; `docs/RUN_9C.md` §6 et §7 | Décision prise et notée, aucune mention non prouvée |
+| 12:00 à 14:00 | Mettre à jour les documents sur ce qui a réellement tourné (chef de projet, rédacteur) et vérifier le rejeu choisi (étape 1, dernière puce) | `docs/RUN_9C.md` §6 | Le bandeau « Rejeu d'un run réel testnet… » s'affiche avec le journal choisi |
+| 14:00 à 17:00 | **Enregistrer la vidéo** : checklist ci-dessous, puis `docs/VIDEO_SCRIPT.md` plan par plan ; au moins 2 prises ; revoir la vidéo en entier | `docs/VIDEO_SCRIPT.md` | Fichier mp4 de 2:00 à 3:00, relu en entier, sans secret |
+| 17:00 à 19:00 | Étapes 4 et 5 (historique git, dernier contrôle) ; **préparer** (sans publier) le post X : `docs/POST_X.md` avec `<REPO_URL>` remplacé et la vidéo prête à joindre ; relire `docs/FORMULAIRE.md` | étapes 4, 5 | Tout est prêt à être publié le lendemain matin |
+| Soir | Dormir. Rien n'est publié le 13. Si la vidéo est ratée, il reste le 14 matin pour la refaire | | |
+
+**Marge** : si le run 9c n'est pas lancé avant 09:00 UTC, ne pas l'attendre au-delà de 12:00 : le repli est prévu et honnête.
+
+### CHECKLIST AVANT ENREGISTREMENT (à cocher, plan par plan : un plan = un mode)
+
+1. **Mode affiché dans l'en-tête = celui du plan filmé, jamais un autre** : `MODE MOCK` pour les plans en mock en direct (plans 1 à 6 du script), `REJEU` pour les plans en rejeu (7 et 8), `TESTNET NEAR` seulement si vous filmez un run testnet réel en direct (déconseillé : un tick dure environ une minute). Vérifier aussi `curl http://127.0.0.1:3000/api/health` : `"mode":"mock"`, `"mode":"replay"` ou `"mode":"testnet"`.
+2. **`.env`** : pour filmer en mock, le renommer d'abord (PowerShell `Rename-Item .env .env.testnet`), puis vérifier `/api/health` → `"mode":"mock"` ; le remettre après (`Rename-Item .env.testnet .env`). Pour un run testnet, le laisser en place. Dans les deux cas : ne jamais l'ouvrir ni l'afficher.
+3. **Journal chargé (rejeu)** : `DARWIN_REPLAY_FILE` = `docs/preuves/run8-journal.jsonl` (défaut) ou `docs/preuves/run9c-journal.jsonl` (si le point de 12:00 l'a validé) ; commande PowerShell `$env:DARWIN_REPLAY_FILE="docs/preuves/run9c-journal.jsonl"; npm run replay`. Vérifier le bandeau « Rejeu d'un run réel testnet du … » et la pastille « REJEU » ; choisir la vitesse (x1, x5, x20) et la garder pendant la prise.
+4. **Port 3000 libre** avant de lancer (`netstat -ano | findstr :3000` ne doit rien afficher), un seul serveur Darwin à la fois.
+5. **Notifications système coupées** (Windows : Ne pas déranger), messageries et mails fermés.
+6. **Navigateur** : fenêtre en 1920x1080 (ou 1280x720), zoom 100 % (ou 110 % si le texte est petit), thème sombre ou clair, **le même pour toute la vidéo**, barre des signets masquée (Ctrl+Maj+B), aucun autre onglet visible, profil sans extensions affichées.
+7. **Aucun secret visible** : pas de `.env`, pas de terminal avec une clé, pas de jeton (`DARWIN_ADMIN_TOKEN`) ni de clé dans la barre d'adresse, pas la page API Keys de cloud.near.ai.
+8. **Onglet Preuves** ouvert à l'avance sur un lien nearblocks **réel** (hashes de `docs/PREUVES_TESTNET.md` §8 ou §11) : vérifier qu'il s'affiche.
+9. **Chaque plan en rejeu dit « not live »** (voix et texte incrusté : « Replay of our recorded testnet run 8, not live. »). Le mock est dit mock. Le client payeur est dit simulé. NEAR Intents n'a pas été exécuté.
+10. **Durée cible 2 à 3 minutes** (2:50 visé, `docs/VIDEO_SCRIPT.md`) ; le « wow » dans les 10 premières secondes.
+11. **Export** en mp4 (H.264, 1080p ou 720p). **Limites de X non vérifiées par moi** (la page d'aide de X est inaccessible à mes outils) : à ma connaissance la durée et la taille maximales dépendent du type de compte (un compte gratuit est limité à environ 2 min 20 ; plus long avec un abonnement), et la taille maximale est de l'ordre de 512 Mo. **Vérifier dans l'éditeur de X avant le 14** en téléversant la vidéo sans publier ; si la durée dépasse la limite de votre compte, raccourcir (couper le plan 9, raccourcir le plan 7) ou publier la vidéo ailleurs et mettre le lien dans le post.
+12. Revoir la vidéo exportée en entier une fois : aucun secret, mode correct à chaque plan, durée lue dans le lecteur.
+
+### Samedi 14 novembre : publication (repère : tout soumis avant 12:00 UTC, limite 23:59 UTC)
+
+Voir les étapes 6 à 9 plus bas : 1) rendre le dépôt public (étape 6, vérifier le clone neuf, `npm run replay` inclus) ; 2) publier le post X avec la **vidéo** jointe, @NEARProtocol et #NEARHackathon (étape 7) ; 3) soumettre le formulaire une seule fois (étape 8) ; 4) vérification finale en navigation privée (étape 9). Marge : si une étape échoue à 12:00 UTC, il reste plus de 11 heures.
+
+### Vendredi 13 novembre : détail des étapes 1 à 5
 
 **1. Récupérer la version finale et vérifier qu'elle tourne.**
 - Action : `git checkout main`, `npm install`, `npm test`, `npm run typecheck`, `npm run scan:secrets -- --no-history`. Si possible, faites-le sur un **clone neuf** (`git clone <REPO_URL> /tmp/darwin-check`), c'est ce que fera le jury.
@@ -25,7 +59,7 @@ Tout se fait depuis le dossier du dépôt. Remplacer `<REPO_URL>` par l'adresse 
 - Puis, arrêter (Ctrl+C) et vérifier le rejeu : `npm run replay`, ouvrir la page : pastille « REJEU » et bandeau « Rejeu d'un run réel testnet du 10 novembre 2026 » avec barre de progression ; `curl http://127.0.0.1:3000/api/health` contient `"mode":"replay"`. Aucune clé n'est nécessaire.
 
 **2. Enregistrer la vidéo (2 à 3 minutes, voix off en anglais).**
-- Action : suivre `docs/VIDEO_SCRIPT.md`, plan par plan. Mettre le `.env` de côté (`Rename-Item .env .env.testnet`), lancer `npm run start:demo` 2 minutes avant et vérifier `/api/health` → `"mode":"mock"` (remettre le `.env` après la vidéo avec `Rename-Item .env.testnet .env`). Les plans de lignées et de preuves se tournent avec `npm run replay` (le composeur de missions y est désactivé) : voir `docs/VIDEO_SCRIPT.md`. Ouvrir à l'avance les liens nearblocks de la section « Préparation » du script. Enregistrer avec l'outil d'écran de votre choix (Windows : Win+G, ou OBS). Avant de filmer : fermer `.env`, le terminal avec des clés, les onglets privés.
+- Action : appliquer d'abord la **CHECKLIST AVANT ENREGISTREMENT** ci-dessus, puis suivre `docs/VIDEO_SCRIPT.md`, plan par plan. Mettre le `.env` de côté (`Rename-Item .env .env.testnet`), lancer `npm run start:demo` 2 minutes avant et vérifier `/api/health` → `"mode":"mock"` (remettre le `.env` après la vidéo avec `Rename-Item .env.testnet .env`). Les plans de lignées et de preuves se tournent avec `npm run replay` (le composeur de missions y est désactivé) : voir `docs/VIDEO_SCRIPT.md`. Ouvrir à l'avance les liens nearblocks de la section « Préparation » du script. Enregistrer avec l'outil d'écran de votre choix (Windows : Win+G, ou OBS). Avant de filmer : fermer `.env`, le terminal avec des clés, les onglets privés.
 - **La vidéo est obligatoire** : HACKATHON.md (relu le 2026-11-12) exige de la joindre au post X ; des captures seules ne suffisent pas.
 - Règles : dire que le mock est mock, que tout plan en rejeu est « not live », que le client payeur est simulé, que NEAR Intents n'a pas été exécuté, que le run testnet est une seule exécution. Ne pas dire « premier ». Retirer ou confirmer chaque mention « À CONFIRMER ».
 - Fait quand : un fichier vidéo de **2:00 à 3:00** (vérifier la durée dans le lecteur), lisible, sans clé ni `.env` visible (le revoir en entier une fois), « wow » dans les 10 premières secondes.
