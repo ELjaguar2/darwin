@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <circle cx="128" cy="128" r="100" fill="#FFF8DC"/>
+  <path d="M128 40 C128 80, 160 100, 200 120 C160 140, 128 160, 128 200" fill="#F5DEB3" stroke="#8B4513" stroke-width="10"/>
+  <path d="M40 128 C80 128, 100 100, 128 80 C156 100, 176 128, 216 128" fill="#DEB887" stroke="#8B4513" stroke-width="10"/>
+  <text x="128" y="230" font-family="Arial, sans-serif" font-size="18" fill="#8B4513" text-anchor="middle">Lumio</text>
+</svg>
