@@ -226,7 +226,8 @@ export function subRowsOf(a, near = (v) => formatNear(v, 3)) {
     if (r.byAgentId === a.id && r.status === "integrated") {
       const ch = store.agents.get(r.winnerId);
       out.push({ tick: r.tick, delta: -(r.price ?? 0n), text: `paid child${ch ? ` ${firstName(ch)}` : ""}`, sub: prof ? `${prof} sub-task` : "sub-task", amount: `-${near(r.price ?? 0n)}` });
-      out.push({ tick: r.tick, delta: r.commission ?? 0n, text: "subcontract commission", sub: "parent price - child price", amount: `+${near(r.commission ?? 0n)}` });
+      if (r.commissionKind === "void") out.push({ tick: r.tick, delta: 0n, text: "no commission: parent mission rejected", sub: "child was paid, parent refunded", amount: "–" });
+      else out.push({ tick: r.tick, delta: r.commission ?? 0n, text: r.commissionKind === "actual" ? "subcontract commission" : "subcontract commission (pending parent payment)", sub: "parent price - child price", amount: `+${near(r.commission ?? 0n)}` });
     }
     if (r.byAgentId === a.id && r.status === "fallback") out.push({ tick: r.tick, delta: 0n, text: "fallback: done in-house", sub: FALLBACK_REASON[r.fallbackReason] ?? r.fallbackReason ?? "failed", amount: "–" });
     if ((r.status === "paid" || r.status === "integrated") && r.payee && r.payee === a.accountId) {
