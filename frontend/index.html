@@ -48,9 +48,10 @@
               <button type="button" class="chip job-chip" id="jobBtn" aria-haspopup="menu" aria-expanded="false"></button>
               <ul class="menu" id="jobMenu" role="menu" aria-label="Choose the profession" hidden></ul>
             </div>
-            <label class="chip budget-chip" id="budgetChip"><span class="bc-l">Budget</span><input id="budgetInput" inputmode="decimal" autocomplete="off" aria-label="Budget in NEAR" value="0.024" size="6"><span class="bc-u">NEAR</span><small id="budgetMin"></small></label>
+            <label class="chip budget-chip" id="budgetChip"><span class="bc-l">Budget</span><input id="budgetInput" inputmode="decimal" autocomplete="off" aria-label="Budget in NEAR" value="" size="6"><span class="bc-u">NEAR</span></label>
             <button type="submit" class="send" id="mSend" aria-label="Send the mission"><span class="sr">Send the mission</span><svg class="ico" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
           </div>
+          <p class="c-help c-min" id="budgetMin"></p>
           <p class="c-help" id="jobHelp"></p>
           <p class="c-warn" id="jobWarn" hidden></p>
           <p class="m-status" id="mStatus" role="status" aria-live="polite" hidden></p>

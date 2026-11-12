@@ -69,8 +69,8 @@ async function loadCatalogue() {
   try {
     const r = await api("/api/catalogue");
     if (r.ok && Array.isArray(r.body?.professions)) {
-      catalogue = new Map(r.body.professions.filter((p) => p && typeof p.id === "string").map((p) => [p.id, p]));
-      catalogueEvents = Array.isArray(r.body.activeEvents) ? r.body.activeEvents : null;
+      catalogue = new Map(r.body.professions.map((p) => (p && typeof p === "object" ? { ...p, id: p.id ?? p.profession } : p)).filter((p) => p && typeof p.id === "string").map((p) => [p.id, p]));
+      catalogueEvents = Array.isArray(r.body.activeEvents ?? r.body.events) ? (r.body.activeEvents ?? r.body.events) : null;
       for (const e of catalogueEvents ?? []) store.addMarketEvent(e);
     } else { catalogue = null; catalogueEvents = null; }
   } catch { catalogue = null; catalogueEvents = null; }

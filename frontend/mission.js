@@ -345,7 +345,7 @@ function renderChips() {
   btn.className = `chip job-chip ${jb.cls}`;
   btn.setAttribute("aria-label", `Profession: ${labelOf(sel.job)}. Click to change.`);
   const min = minBudget(sel.job);
-  $("budgetMin").textContent = min != null ? `min. ${nearInput(min)}` : "";
+  $("budgetMin").textContent = min != null ? `Minimum for ${labelOf(sel.job)}: ${nearInput(min)} NEAR` : "";
   if (min != null) {
     const cur = parseNearToYocto($("budgetInput").value);
     if (!sel.budgetTouched || cur == null || cur < min) { $("budgetInput").value = nearInput(min); sel.budgetTouched = false; }
@@ -427,7 +427,10 @@ async function submit() {
       }
     } else if (r.status === 400) {
       const m = errorMessages(r.body);
-      setStatus("err", /budget|trop bas|minimum/i.test(m.join(" ")) ? "Budget rejected by the server" : "The server rejects this mission", m.length ? m : ["Invalid data."]); lockSend(0);
+      const budgetErr = /budget|trop bas|minimum/i.test(m.join(" "));
+      setStatus("err", budgetErr ? "Budget rejected by the server" : "The server rejects this mission", m.length ? m : ["Invalid data."]); lockSend(0);
+      const mn = minBudget(sel.job);
+      if (budgetErr && mn != null) $("mStatus").append(" ", h("button", { type: "button", class: "use-min", id: "useMin", onclick: () => { $("budgetInput").value = nearInput(mn); sel.budgetTouched = false; setStatus("", ""); $("mInput").focus(); } }, "Use the minimum"));
     } else if (r.status === 429) {
       setStatus("warn", "Too many missions right now.", [...errorMessages(r.body), retry ? `Try again in ${retry} s.` : "Try again in a moment."]); lockSend(retry || 15);
     } else if (r.status === 503) {

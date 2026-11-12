@@ -315,3 +315,5 @@ body[data-mode="replay"] .toasts { top: 170px; } /* fallback; exact value set by
 .esc-badge { font-size: 13px; font-weight: 800; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--warn); color: var(--warn); white-space: nowrap; }
 .esc-badge[hidden] { display: none; }
 @media (max-width: 640px) { .esc-badge { font-size: 11px; padding: 2px 8px; } }
+.c-min { color: var(--muted); font-weight: 600; }
+.use-min { margin-left: 6px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); font-weight: 700; cursor: pointer; }
