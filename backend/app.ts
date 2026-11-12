@@ -79,7 +79,7 @@ const defaultIp = (c: Context): string => {
 const digest = (s: string) => createHash("sha256").update(s).digest();
 
 export function taskView(t: Task) {
-  const badge = t.requester.kind === "visitor" ? VISITOR_FUNDING_LABEL : t.requester.kind === "simulated" ? SIMULATED_BADGE : "sous-traitance";
+  const badge = t.requester.kind === "visitor" ? VISITOR_FUNDING_LABEL : t.requester.kind === "simulated" ? SIMULATED_BADGE : "subcontracting";
   return { ...t, badge, validatedBy: t.validation?.validator };
 }
 

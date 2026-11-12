@@ -115,7 +115,7 @@ export function parseReplay(text: string, fileName: string): ParsedReplay {
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i]!.trim();
     if (!raw) continue;
-    const at = `${fileName}, ligne ${i + 1}`;
+    const at = `${fileName}, line ${i + 1}`;
     let o: any;
     try {
       o = JSON.parse(raw);

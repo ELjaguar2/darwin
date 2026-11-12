@@ -35,7 +35,7 @@ async function setup(ticks = 0) {
 const json = async (r: Response) => (await r.json()) as any;
 
 describe("livrables", () => {
-  it("200 : JSON complet sans rawText ; 404 si tâche sans livrable ou id invalide", async () => {
+  it("200: full JSON without rawText; 404 if task without deliverable or invalid id", async () => {
     const { rt, app } = await setup();
     rt.market.getDeliverable = (id) => (id === "t-7" ? structuredClone(FAKE) : undefined);
     const r = await app.request("/api/tasks/t-7/deliverable");
@@ -48,7 +48,7 @@ describe("livrables", () => {
     expect((await app.request("/api/tasks/..%2Fx/deliverable")).status).toBe(404);
   });
 
-  it("fichier : SVG avec en-têtes stricts, download=1, nom invalide 400, inconnu 404", async () => {
+  it("file: SVG with strict headers, download=1, invalid name 400, unknown 404", async () => {
     const { rt, app } = await setup();
     rt.market.getDeliverable = (id) => (id === "t-7" ? structuredClone(FAKE) : undefined);
     const r = await app.request("/api/tasks/t-7/deliverable/logo-1.svg");
@@ -68,11 +68,11 @@ describe("livrables", () => {
     expect((await app.request("/api/tasks/t-8/deliverable/logo-1.svg")).status).toBe(404);
   });
 
-  it("un vrai livrable produit par le marché est servi", async () => {
+  it("a real deliverable produced by the market is served", async () => {
     const { rt, app } = await setup();
     for (let i = 0; i < 60 && rt.market.listDeliverables().length === 0; i++) await rt.engine.tick();
     const d = rt.market.listDeliverables()[0];
-    if (!d) return; // aucun livrable en 60 ticks : couvert par les tests marché
+    if (!d) return; // no deliverable within 60 ticks: covered by the market tests
     const r = await app.request(`/api/tasks/${d.taskId}/deliverable`);
     expect(r.status).toBe(200);
     const f = d.files[0]!;
@@ -82,7 +82,7 @@ describe("livrables", () => {
 });
 
 describe("catalogue, population, budget", () => {
-  it("/api/catalogue : 6 métiers mis à l'échelle + événements actifs", async () => {
+  it("/api/catalogue: 6 scaled professions + active events", async () => {
     const { rt, app, config } = await setup(3);
     const r = await app.request("/api/catalogue");
     expect(r.status).toBe(200);
@@ -99,16 +99,16 @@ describe("catalogue, population, budget", () => {
     void rt;
   });
 
-  it("événements actifs déduits du journal", async () => {
+  it("active events derived from the journal", async () => {
     const { rt, app } = await setup();
     const tick = rt.engine.getState().tick;
     rt.journal.emit({ type: "market.event", data: { event: { id: "e-9999", title: "Test", profession: "logo", demandMultiplier: 3, startTick: tick, endTick: tick + 5 } } });
-    rt.journal.emit({ type: "market.event", data: { event: { id: "e-9998", title: "Passé", profession: "legal", demandMultiplier: 3, startTick: tick - 9, endTick: tick - 1 } } });
+    rt.journal.emit({ type: "market.event", data: { event: { id: "e-9998", title: "Past", profession: "legal", demandMultiplier: 3, startTick: tick - 9, endTick: tick - 1 } } });
     const c = await json(await app.request("/api/catalogue"));
     expect(c.events.map((e: any) => e.id)).toEqual(["e-9999"]);
   });
 
-  it("/api/state et /api/population exposent la dernière population.snapshot", async () => {
+  it("/api/state and /api/population expose the last population.snapshot", async () => {
     const { app } = await setup(2);
     const st = await json(await app.request("/api/state"));
     const pop = (await json(await app.request("/api/population"))).population;
@@ -120,21 +120,21 @@ describe("catalogue, population, budget", () => {
     }
   });
 
-  it("POST /api/tasks sous le prix du catalogue : 400 BUDGET_OUT_OF_RANGE explicite", async () => {
+  it("POST /api/tasks below the catalogue price: explicit 400 BUDGET_OUT_OF_RANGE", async () => {
     const { app } = await setup();
     const r = await app.request("/api/tasks", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ title: "Logo", prompt: "Un logo pour une boutique de thé.", profession: "logo", budgetNear: "0.001", requesterLabel: "Bob" }),
+      body: JSON.stringify({ title: "Logo", prompt: "A logo for a tea shop.", profession: "logo", budgetNear: "0.001", requesterLabel: "Bob" }),
     });
     expect(r.status).toBe(400);
     const b = await json(r);
     expect(b.error.code).toBe("BUDGET_OUT_OF_RANGE");
-    expect(b.error.message).toMatch(/budget minimum pour Logo/);
+    expect(b.error.message).toMatch(/minimum.*Logo|Logo.*minimum/i);
   });
 });
 
-describe("persistance des livrables", () => {
-  it("écrit data/deliverables/<tâche>/<fichier> + meta.json, rejette les noms dangereux", () => {
+describe("deliverable persistence", () => {
+  it("writes data/deliverables/<task>/<file> + meta.json, rejects dangerous names", () => {
     const dir = mkdtmp();
     const store = createStore(dir);
     store.saveDeliverable(FAKE);
@@ -152,7 +152,7 @@ describe("persistance des livrables", () => {
     expect(existsSync(join(dir2, "deliverables", "t-1", "x.txt"))).toBe(false);
   });
 
-  it("le lancement suivant range les anciens livrables en deliverables.prev", () => {
+  it("the next launch moves old deliverables to deliverables.prev", () => {
     const dir = mkdtmp();
     createStore(dir).saveDeliverable(FAKE);
     createStore(dir);

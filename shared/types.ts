@@ -71,12 +71,12 @@ export type TaskStatus =
 export type Requester =
   | { kind: "visitor"; label: string; accountId?: string }
   | { kind: "simulated"; label: string } // simulated client: ALWAYS labelled in the UI
-  | { kind: "agent"; agentId: string }; // sous-traitance
+  | { kind: "agent"; agentId: string }; // subcontracting
 
 export interface Task {
   id: string; // "t-0042"
   requester: Requester;
-  parentTaskId?: string; // sous-traitance
+  parentTaskId?: string; // subcontracting
   profession: Profession;
   title: string;
   prompt: string;
