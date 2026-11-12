@@ -1,46 +1,46 @@
-# brain/ : cerveau IA (lot L5)
+# brain/ : AI brain (lot L5)
 
-`createBrain(config, { fetch?, onWarning?, guardrails? })` renvoie un `Brain` (interface `shared/brain.ts`).
+`createBrain(config, { fetch?, onWarning?, guardrails? })` returns a `Brain` (interface `shared/brain.ts`).
 
-- `config.brain = "mock"` (défaut) : `MockBrain` inchangé.
-- `config.brain = "nearai"` sans `NEARAI_API_KEY` : `MockBrain` + warning `BRAIN_NO_KEY`.
-- `config.brain = "nearai"` avec clé : `NearAiBrain`.
+- `config.brain = "mock"` (default): `MockBrain`, unchanged.
+- `config.brain = "nearai"` without `NEARAI_API_KEY`: `MockBrain` plus the warning `BRAIN_NO_KEY`.
+- `config.brain = "nearai"` with a key: `NearAiBrain`.
 
-Le Brain ne débite rien : il renvoie `usage`. L'engine calcule `costYocto(usage, prix, nearUsdRate)` (taux fixe `DARWIN_NEAR_USD_RATE`, une représentation et non un paiement à NEAR AI Cloud, D-020), émet `brain.charged` et débite l'agent. Les prix viennent de `listModels()` (`ModelInfo.verified`).
+The Brain debits nothing: it returns `usage`. The engine computes `costYocto(usage, prices, nearUsdRate)` (fixed rate `DARWIN_NEAR_USD_RATE`, a representation and not a payment to NEAR AI Cloud, D-020), emits `brain.charged` and debits the agent. Prices come from `listModels()` (`ModelInfo.verified`).
 
-## API NEAR AI Cloud (vérifiée le 2026-11-09)
-- Base `https://cloud-api.near.ai/v1`, `Authorization: Bearer <clé>` (docs.near.ai/cloud/quickstart.md).
-- `POST /chat/completions` : `usage.prompt_tokens`, `completion_tokens`, `total_tokens`, `completion_tokens_details.reasoning_tokens` (alias déprécié `reasoning_tokens`). Dans l'exemple de la doc, `total = prompt + completion` : le raisonnement semble inclus dans `completion_tokens`. La règle `billableCompletionTokens` (D-021) couvre les deux cas.
-- `GET /models` (accessible sans clé le 2026-11-09). La doc ne donne pas les noms de champs ; format observé sur la réponse réelle : `pricing.input` / `pricing.output` en USD par million de tokens, `pricing.prompt` / `completion` en USD par token (chaînes), `context_length`, `is_ready`, `supported_features`, `output_modalities`.
+## NEAR AI Cloud API (verified on 2026-11-09)
+- Base `https://cloud-api.near.ai/v1`, `Authorization: Bearer <key>` (docs.near.ai/cloud/quickstart.md).
+- `POST /chat/completions`: `usage.prompt_tokens`, `completion_tokens`, `total_tokens`, `completion_tokens_details.reasoning_tokens` (deprecated alias `reasoning_tokens`). In the docs example, `total = prompt + completion`: reasoning seems to be included in `completion_tokens`. The `billableCompletionTokens` rule (D-021) covers both cases.
+- `GET /models` (reachable without a key on 2026-11-09). The docs do not give the field names; format observed on the real response: `pricing.input` / `pricing.output` in USD per million tokens, `pricing.prompt` / `completion` in USD per token (strings), `context_length`, `is_ready`, `supported_features`, `output_modalities`.
 
-## Prix et repli
-- Les modèles sans prix valide, à prix nul, non textuels ou `is_ready=false` sont ignorés (warning `BRAIN_MODEL_SKIPPED`).
-- Si `GET /models` échoue ou ne donne aucun modèle exploitable : repli sur l'instantané `FALLBACK_MODELS` (`pricing.ts`, daté du 2026-11-09), `verified:false`, warning `BRAIN_PRICES_FALLBACK` et `BRAIN_PRICE_UNVERIFIED`. Les derniers prix connus sont conservés s'il y en a. Il n'y a jamais de coût nul silencieux. Une réponse sans `usage` est une erreur `BAD_RESPONSE`.
-- Cache des modèles : 10 min.
+## Prices and fallback
+- Models without a valid price, with a zero price, non-text, or with `is_ready=false` are ignored (warning `BRAIN_MODEL_SKIPPED`).
+- If `GET /models` fails or returns no usable model: fall back to the `FALLBACK_MODELS` snapshot (`pricing.ts`, dated 2026-11-09), `verified:false`, warnings `BRAIN_PRICES_FALLBACK` and `BRAIN_PRICE_UNVERIFIED`. The last known prices are kept if there are any. There is never a silent zero cost. A response without `usage` is a `BAD_RESPONSE` error.
+- Model cache: 10 min.
 
-## Modèle = gène
-`genome.model` est vérifié via `/models`. S'il est absent, repli sur `defaultModel()` avec warning `BRAIN_MODEL_FALLBACK`, et la réponse porte le modèle réellement servi. En mode repli de prix, un modèle inconnu lève `UNKNOWN_MODEL`. `defaultModel()` renvoie `NEARAI_MODEL` s'il est valide, sinon le modèle le moins cher sans raisonnement (les tokens de raisonnement sont facturés et peuvent vider `max_tokens`).
+## Model = gene
+`genome.model` is checked through `/models`. If it is missing, fall back to `defaultModel()` with the warning `BRAIN_MODEL_FALLBACK`, and the response carries the model actually served. In price-fallback mode, an unknown model throws `UNKNOWN_MODEL`. `defaultModel()` returns `NEARAI_MODEL` if it is valid, otherwise the cheapest model without reasoning (reasoning tokens are billed and can exhaust `max_tokens`).
 
-## Garde-fous (`Guardrails`, tous testés)
-`max_tokens` plafonné (`sim.maxTokensPerCall`) ; budget maximum par appel en USD (`maxCostUsdPerCall`, défaut 0.05 : réduit `max_tokens`, sinon refuse) ; taille de prompt maximale ; quota d'appels par agent sur fenêtre glissante ; refus d'une même requête répétée ; une seule relance sur 429/5xx/réseau ; délai maximal (`NEARAI_TIMEOUT_MS`). Les refus lèvent `BrainError` (`RATE_LIMITED` ou `BAD_RESPONSE`) et émettent `BRAIN_LOOP_GUARD` via `onWarning`.
+## Guardrails (`Guardrails`, all tested)
+Capped `max_tokens` (`sim.maxTokensPerCall`); maximum budget per call in USD (`maxCostUsdPerCall`, default 0.05: reduces `max_tokens`, otherwise refuses); maximum prompt size; per-agent call quota over a sliding window; refusal of the same repeated request; a single retry on 429/5xx/network errors; maximum delay (`NEARAI_TIMEOUT_MS`). Refusals throw `BrainError` (`RATE_LIMITED` or `BAD_RESPONSE`) and emit `BRAIN_LOOP_GUARD` through `onWarning`.
 
-## Plafond global de dépense et URL
-- `maxUsdPerRun` (défaut 2 USD) et `maxUsdPerHour` (défaut 1 USD, fenêtre glissante) plafonnent la dépense cumulée sur la clé de plateforme. Chaque appel réserve son pire cas avant l'envoi (les appels concurrents comptent), puis le coût réel d'après `usage` est enregistré. À l'atteinte : `BrainError RATE_LIMITED` et warning `BRAIN_BUDGET_CAP`, sans appel réseau. `brain.spend()` expose les totaux. Valeurs configurables via `guardrails` (variables d'environnement proposées : `NEARAI_MAX_USD_PER_RUN`, `NEARAI_MAX_USD_PER_HOUR`, à câbler dans `shared/config.ts`).
-- `NEARAI_BASE_URL` doit être en https ; http n'est accepté que vers localhost/127.0.0.1/[::1] avec `allowInsecureLocalhost: true` (tests). Sinon le constructeur et `createBrain` lèvent une erreur.
-- `sanitizeExternal` retire les délimiteurs `<<<` et `>>>` en boucle jusqu'à stabilité.
+## Global spending cap and URL
+- `maxUsdPerRun` (default 2 USD) and `maxUsdPerHour` (default 1 USD, sliding window) cap the cumulative spending on the platform key. Each call reserves its worst case before sending (concurrent calls count), then the real cost from `usage` is recorded. When the cap is reached: `BrainError RATE_LIMITED` and warning `BRAIN_BUDGET_CAP`, with no network call. `brain.spend()` exposes the totals. Values are configurable through `guardrails` (environment variables: `NEARAI_MAX_USD_PER_RUN`, `NEARAI_MAX_USD_PER_HOUR`, wired in `shared/config.ts`).
+- `NEARAI_BASE_URL` must be https; http is only accepted towards localhost/127.0.0.1/[::1] with `allowInsecureLocalhost: true` (tests). Otherwise the constructor and `createBrain` throw an error.
+- `sanitizeExternal` removes the `<<<` and `>>>` delimiters in a loop until stable.
 
 ## Prompts (`prompts.ts`)
-Personnalité, enchère, décision JSON, exécution, validation, lettre à l'enfant, mutation. Tout texte externe (visiteur, autre agent) va dans un message `user`, entre `<<<...>>>`, délimiteurs neutralisés, taille bornée. Le `system` ne contient que les règles fixes et le génome. Les parseurs `parseDecision` et `parseVerdict` retombent sur `skip` ou `rejected`.
+Personality, bid, JSON decision, execution, validation, letter to the child, mutation. All generated content is in English. Any external text (visitor, other agent) goes in a `user` message, between `<<<...>>>`, with delimiters neutralised and a bounded size. The `system` message contains only fixed rules and the genome. The parsers `parseDecision` and `parseVerdict` fall back to `skip` or `rejected`.
 
-## Branchement backend
-`onWarning` doit émettre `system.warning` dans le journal. Aucun secret ni clé dans les messages d'erreur ou les warnings.
+## Backend wiring
+`onWarning` must emit `system.warning` into the journal. No secret or key in error messages or warnings.
 
-## L11 : cerveau réel, budget, liste blanche, secours, attestation
-- **Catalogue et liste blanche** (`model-list.ts`) : `GET /v1/model/list` (public) ; prix = `inputCostPerToken.amount / 10^scale` USD par token (x 1e6 = USD/M). Seuls les 7 modèles de `MODEL_WHITELIST` sont proposés comme gène, jamais un modèle > 1 USD/M en entrée. Si le catalogue échoue : prix de repli du 2026-11-10 (`verified:false`, warning `BRAIN_PRICES_FALLBACK`). `extraBody` limite le raisonnement par modèle (sinon tokens de raisonnement facturés et texte vide). Un modèle hors liste est remplacé par le défaut (`BRAIN_MODEL_FALLBACK`). Revérifier : `npm run ai:probe` (un vrai appel minuscule par modèle, ~0,0005 USD au total).
-- **Budget global** (`budget.ts`) : `DARWIN_AI_BUDGET_EUR_STOP` (8), `DARWIN_AI_BUDGET_EUR_TOTAL` (10), `DARWIN_EUR_USD_RATE` (1.10, prudent). Cumul USD persistant `data/ai-budget.json`. Au plafond : `BrainError BUDGET_EXHAUSTED`, aucun appel réseau, `onBudgetExhausted` -> le backend émet `BRAIN_BUDGET_STOP` et arrête le moteur (`sim.stopped`). Pour repartir à zéro : supprimer `data/ai-budget.json` (et archiver `data/ai-usage.jsonl`).
-- **Journal d'usage** `data/ai-usage.jsonl` (une ligne par appel : horodatage, fournisseur, modèle, tokens, coût USD/EUR, id de réponse, agent, usage). Rapport : `npm run ai:usage-report [-- --dir data --last 15]` (Markdown prêt pour `docs/PREUVES_TESTNET.md`).
-- **Secours** (`fallback-brain.ts`) : `AI_BASE_URL` / `AI_API_KEY` / `AI_MODEL`. Bascule après 3 échecs consécutifs (panne, timeout, 401/402/403, 429), jamais sur budget ou garde-fou local ; sans clé NEAR AI : secours seul. Pas de liste blanche NEAR pour lui, plafond de budget commun.
-- **Attestation TEE** : `npm run ai:verify-attestation` ; voir `docs/ATTESTATION_TEE.md` (ce qui est vérifié et ce qui ne l'est pas).
+## L11: real brain, budget, allow-list, fallback, attestation
+- **Catalogue and allow-list** (`model-list.ts`): `GET /v1/model/list` (public); price = `inputCostPerToken.amount / 10^scale` USD per token (x 1e6 = USD/M). Only the 7 models of `MODEL_WHITELIST` are offered as a gene, never a model above 1 USD/M on input. If the catalogue fails: fallback prices of 2026-11-10 (`verified:false`, warning `BRAIN_PRICES_FALLBACK`). `extraBody` limits reasoning per model (otherwise reasoning tokens are billed and the text is empty). A model outside the list is replaced by the default (`BRAIN_MODEL_FALLBACK`). To re-check: `npm run ai:probe` (one tiny real call per model, about 0.0005 USD in total).
+- **Global budget** (`budget.ts`): `DARWIN_AI_BUDGET_EUR_STOP` (8), `DARWIN_AI_BUDGET_EUR_TOTAL` (10), `DARWIN_EUR_USD_RATE` (1.10, conservative). Cumulative USD persisted in `data/ai-budget.json`. At the cap: `BrainError BUDGET_EXHAUSTED`, no network call, `onBudgetExhausted` makes the backend emit `BRAIN_BUDGET_STOP` and stop the engine (`sim.stopped`). To restart from zero: delete `data/ai-budget.json` (and archive `data/ai-usage.jsonl`).
+- **Usage journal** `data/ai-usage.jsonl` (one line per call: timestamp, provider, model, tokens, cost USD/EUR, response id, agent, usage). Report: `npm run ai:usage-report [-- --dir data --last 15]` (Markdown ready for `docs/PREUVES_TESTNET.md`).
+- **Fallback** (`fallback-brain.ts`): `AI_BASE_URL` / `AI_API_KEY` / `AI_MODEL`. Switches after 3 consecutive failures (outage, timeout, 401/402/403, 429), never on a budget or local guardrail refusal; without a NEAR AI key: fallback only. No NEAR allow-list for it, shared budget cap.
+- **TEE attestation**: `npm run ai:verify-attestation`; see `docs/ATTESTATION_TEE.md` (what is verified and what is not).
 
 ## Tests
-`npx vitest run brain` : fetch simulé uniquement, sans clé ni réseau (`brain.test.ts`, `l11.test.ts`). Les scripts `ai:probe` et `ai:verify-attestation` font de vrais appels et exigent `NEARAI_API_KEY` ; ils ne font pas partie de `npm test`.
+`npx vitest run brain`: mocked fetch only, no key or network (`brain.test.ts`, `l11.test.ts`). The `ai:probe` and `ai:verify-attestation` scripts make real calls and require `NEARAI_API_KEY`; they are not part of `npm test`.

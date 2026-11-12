@@ -1,48 +1,48 @@
-# engine/ : moteur d'évolution (lot L4)
+# engine/ : evolution engine (lot L4)
 
-`createEngine(deps, market, options?) : Engine` (interface `shared/modules.ts`). Il ne dépend que des interfaces `Chain`, `Brain`, `Market`, du journal et du `Rng` injectés (aucun import de `accounts/` ou `brain/`, aucun `process.env`).
+`createEngine(deps, market, options?) : Engine` (interface `shared/modules.ts`). It depends only on the injected `Chain`, `Brain` and `Market` interfaces, the journal and the `Rng` (no import from `accounts/` or `brain/`, no `process.env`).
 
-| Fichier | Rôle |
+| File | Role |
 |---|---|
-| `index.ts` | boucle de tick (ARCHITECTURE §13), start/pause/resume/stop, `getState` |
-| `genome.ts` | fondateurs, mutation (bornes de `GENOME_BOUNDS`, rapport gène -> [avant, après]) |
-| `lifecycle.ts` | naissance (sous-compte + registre), reproduction, lettre parent -> enfant, mort |
-| `economy.ts` | débits (métabolisme, coût IA via `costYocto`), règlement groupé, synchronisation des soldes |
-| `policy.ts` | décisions d'un agent : enchère (son métier seulement, jamais sous le prix plancher du métier), risque, sous-traitance |
-| `stub-market.ts` | `Market` minimal pour les tests (l'implémentation réelle est dans `market/`, L6) |
+| `index.ts` | tick loop (ARCHITECTURE section 13), start/pause/resume/stop, `getState` |
+| `genome.ts` | founders, mutation (bounds from `GENOME_BOUNDS`, gene -> [before, after] report) |
+| `lifecycle.ts` | birth (sub-account + registry), reproduction, parent -> child letter, death |
+| `economy.ts` | debits (metabolism, AI cost via `costYocto`), batched settlement, balance synchronisation |
+| `policy.ts` | an agent's decisions: bid (its own profession only, never below the profession's floor price), risk, subcontracting |
+| `stub-market.ts` | minimal `Market` for tests (the real implementation is in `market/`, L6) |
 
-## Règles de comportement
-- **Métabolisme** débité à chaque tick vers le compte maître. **Coût IA** débité au solde de l'agent (`brain.charged`, D-013/D-020) ; modèle non vérifié : repli sur le modèle par défaut avec `system.warning`, jamais de coût nul.
-- **Enchère** : un agent libre de la bonne profession demande `askRatio x budget`, plancher = coût IA estimé x 1,1 ; il s'abstient si son solde après coût passe sous `minVital x (1 + 2(1 - risque))` (le gène de risque règle cette réserve).
-- **Exécution** dans le tick de l'attribution : appel `Brain`, débit, `Market.submitResult`. Le moteur ne crédite jamais un solde : les gains sont lus dans `escrow.released` (journal) et dans le solde on-chain.
-- **Sous-traitance** : avec probabilité `cooperation/2`, tâche fille (25 % du prix, `requester: agent`). Simplification : le parent n'attend pas le résultat de la tâche fille.
-- **Reproduction** : solde >= `reproThreshold x birthCapital`, population < max, délai écoulé (aussi après la naissance), et le parent doit garder >= 2 x `minVital`. Capital de l'enfant = `birthCapital + generosity x surplus` (plafonné). Ordre des événements : `agent.born`, `agent.reproduced`, `letter.written` (lettre écrite par le cerveau du parent, coût débité au parent ; repli étiqueté si le cerveau échoue).
-- **Mort** : solde logique < `minVital` -> dettes réglées, `markAgentDead`, `closeAccount` vers le maître, `agent.died`. Plus de vivant : `sim.stopped(extinction)`. La lignée reste dans le registre et dans `getState().agents`.
-- **Solde logique et gaz (R4)** : solde logique = solde on-chain relu à chaque tick moins les dettes en attente (`settleEveryTicks > 1`). Le gaz payé par un sous-compte réduit donc le solde relu (`balance.changed`, raison `chain_fee`). `minVital` sert de réserve de gaz pour le balayage de mort : il doit rester nettement supérieur au gaz de quelques transactions (testnet : 0.05 NEAR, à confirmer par dev-comptes).
-- **Déterminisme** : tous les tirages passent par `Deps.rng` ; même graine = même journal (hors `ts`).
+## Behaviour rules
+- **Metabolism** is debited at every tick to the master account. **AI cost** is debited from the agent's balance (`brain.charged`, D-013/D-020); unverified model: fall back to the default model with a `system.warning`, never a zero cost.
+- **Bid**: a free agent of the right profession asks `askRatio x budget`, floor = estimated AI cost x 1.1; it abstains if its balance after cost would fall below `minVital x (1 + 2(1 - risk))` (the risk gene sets this reserve).
+- **Execution** in the tick of the award: `Brain` call, debit, `Market.submitResult`. The engine never credits a balance: earnings are read from `escrow.released` (journal) and from the on-chain balance.
+- **Subcontracting**: with probability `cooperation/2`, a child task (25% of the price, `requester: agent`). Simplification: the parent does not wait for the child task's result.
+- **Reproduction**: balance >= `reproThreshold x birthCapital`, population < max, delay elapsed (also after a birth), and the parent must keep >= 2 x `minVital`. Child capital = `birthCapital + generosity x surplus` (capped). Event order: `agent.born`, `agent.reproduced`, `letter.written` (letter written by the parent's brain, cost debited from the parent; labelled fallback if the brain fails).
+- **Death**: logical balance < `minVital` -> debts settled, `markAgentDead`, `closeAccount` to the master, `agent.died`. No one alive: `sim.stopped(extinction)`. The lineage stays in the registry and in `getState().agents`.
+- **Logical balance and gas (R4)**: logical balance = on-chain balance re-read at every tick minus pending debts (`settleEveryTicks > 1`). Gas paid by a sub-account therefore reduces the re-read balance (`balance.changed`, reason `chain_fee`). `minVital` serves as a gas reserve for the death sweep: it must stay well above the gas of a few transactions (testnet: 0.05 NEAR, to be confirmed by the accounts developer).
+- **Determinism**: all random draws go through `Deps.rng`; same seed = same journal (apart from `ts`).
 
 ## Options
-`autoRun` (défaut true : boucle temporisée `sim.tickMs` ; false : tests, `tick()` manuel) ; `emitChainTx` (défaut : vrai seulement avec une chaîne mock, `NearChain` journalise elle-même).
+`autoRun` (default true: timed loop `sim.tickMs`; false: tests, manual `tick()`); `emitChainTx` (default: true only with a mock chain, `NearChain` journals by itself).
 
 ## Tests
-`engine/simulation.test.ts` : 3+ générations en preset demo (naissances, travail, reproduction, morts, lettres), invariant de conservation de l'argent, catalogue d'événements, déterminisme par graine, règlement groupé, mutations. Durée : quelques secondes.
+`engine/simulation.test.ts`: 3+ generations in the demo preset (births, work, reproduction, deaths, letters), money conservation invariant, event catalogue, determinism by seed, batched settlement, mutations. Duration: a few seconds.
 
-## Calibrage (mock, preset demo, 900 ticks)
-Mesuré avec `nearUsdRate=0.01` (valeur du preset demo décidée par l'architecte ; reproduite ici par `DARWIN_NEAR_USD_RATE=0.01` car ces changements de `shared/` n'étaient pas encore commités sur `main`). Avec l'ancien taux de 3, le coût IA était négligeable ; à 0.01 il pèse 2 à 7 NEAR cumulés sur la population, donc le gène « modèle » devient sélectif.
+## Calibration (mock, demo preset, 900 ticks)
+Measured with `nearUsdRate=0.01` (demo preset value decided by the architect; reproduced here with `DARWIN_NEAR_USD_RATE=0.01` because these `shared/` changes were not yet committed on `main`). With the old rate of 3, the AI cost was negligible; at 0.01 it weighs 2 to 7 NEAR cumulated over the population, so the "model" gene becomes selective.
 
-| Graine | 1re reproduction | 1re naissance de génération 3 | 1re mort | Morts | Générations |
+| Seed | 1st reproduction | 1st generation-3 birth | 1st death | Deaths | Generations |
 |---|---|---|---|---|---|
 | 1 | tick 22 | tick 135 | tick 131 | 23 | 6 |
 | 42 | tick 30 | tick 84 | tick 137 | 54 | 12 |
 | 99 | tick 41 | tick 96 | tick 150 | 44 | 6 |
 
-Cibles ARCHITECTURE §12 tenues (reproduction avant tick 60, génération 3 avant tick 300). Avec 0.02 : génération 3 aux ticks 199, 84, 96, également conforme.
+ARCHITECTURE section 12 targets met (reproduction before tick 60, generation 3 before tick 300). With 0.02: generation 3 at ticks 199, 84, 96, also compliant.
 
-## Robustesse
-- Règlement groupé : la dette n'est effacée qu'après un transfert réussi (sinon elle reste due et l'erreur remonte). Test dans `failures.test.ts`.
-- `registerAgent` en échec : la naissance est annulée, le compte orphelin est clos et ses fonds retournent à celui qui les a donnés (parent ou maître), avec `system.warning BIRTH_ABORTED` (ou `system.error BIRTH_ORPHAN_ACCOUNT` si le rapatriement échoue aussi). Le parent n'est pas débité et la lettre n'est pas écrite.
+## Robustness
+- Batched settlement: the debt is cleared only after a successful transfer (otherwise it stays due and the error propagates). Test in `failures.test.ts`.
+- `registerAgent` failure: the birth is cancelled, the orphan account is closed and its funds return to whoever provided them (parent or master), with `system.warning BIRTH_ABORTED` (or `system.error BIRTH_ORPHAN_ACCOUNT` if the repatriation also fails). The parent is not debited and the letter is not written.
 
-## L16 : freelance réel, 6 métiers
-- Métiers : `logo, finance, architecture, marketing, translation, legal`. Fondateurs répartis à tour de rôle (index % 6) ; chaque métier a une personnalité de freelance courte (`personalityWith(profession, trait?)`). Un changement de métier par mutation réécrit la personnalité (trait conservé).
-- Enchère : prix = max(askRatio x budget, coût IA x 1,1, `CATALOGUE[métier].nearPrice`) ; au-dessus du budget, l'agent s'abstient.
-- Spécialisation : événement `population.snapshot { tick, byProfession, byGeneration }` toutes les 5 ticks (`POPULATION_SNAPSHOT_EVERY`), émis juste avant `sim.tick`, vivants uniquement.
+## L16: real freelance, 6 professions
+- Professions: `logo, finance, architecture, marketing, translation, legal`. Founders are assigned in turn (index % 6); each profession has a short freelance personality (`personalityWith(profession, trait?)`). A profession change by mutation rewrites the personality (trait kept).
+- Bid: price = max(askRatio x budget, AI cost x 1.1, `CATALOGUE[profession].nearPrice`); above the budget, the agent abstains.
+- Specialisation: event `population.snapshot { tick, byProfession, byGeneration }` every 5 ticks (`POPULATION_SNAPSHOT_EVERY`), emitted just before `sim.tick`, living agents only.
