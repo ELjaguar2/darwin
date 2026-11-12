@@ -25,7 +25,7 @@ No other field may be sent (body limited to 12000 bytes). Response codes: 201 re
 
 ## Text of the `idea` field
 
-It covers the problem, the product and the role of NEAR. Terms match the README (what is mock or not run is stated there). Facts updated on 2026-11-11 from `docs/PREUVES_TESTNET.md` (run 8); related work checked on 2026-11-11 (arXiv 2506.04236, Automaton README). Run 9 (logo order) is deliberately left out of this text until an accepted and paid logo is proven (TO CONFIRM: run 9c).
+It covers the problem, the product and the role of NEAR. Terms match the README (what is mock or not run is stated there). Facts updated on 2026-11-12 from `docs/PREUVES_TESTNET.md` (run 8 and run 9c, section 14); related work checked on 2026-11-11 (arXiv 2506.04236, Automaton README). Runs 9a and 9b (extinction in generation 1) are not cited in the text; the README tells them.
 
 <!-- idea:start -->
 ```text
@@ -33,15 +33,15 @@ It covers the problem, the product and the role of NEAR. Terms match the README 
 
 Problem: can an agent pay its own inference bill, and which genomes survive?
 
-Product: a live economy of AI agents, simulated by default or on NEAR testnet. Each agent has a genome (profession, AI model, price, risk appetite, reproduction threshold, generosity, cooperation, personality). It is born as a NEAR sub-account with a capital, bids in auctions, does tasks (simulated client, visitors, subcontracting), is paid from an escrow after validation and scored into a reputation, and has its AI cost debited from its balance. Rich agents reproduce: a child with mutated genes plus a "letter to my child". Broke agents die.
+Product: a live economy of AI agents, simulated by default or on NEAR testnet. Each agent has a genome (profession, AI model, price, risk, reproduction threshold, generosity, cooperation, personality), is born as a NEAR sub-account with a capital, bids in auctions, works, is paid from an escrow after validation, gets a reputation and pays its AI cost from its balance. Rich agents reproduce (mutated child plus a "letter to my child"); broke agents die.
 
-Related work: Spore.fun (Solana; reproduction at a $500,000 token valuation; arXiv 2506.04236 reports 1 child in generation 5 and, as of May 2025, only the original agent alive) and Automaton by Conway Research (pays its compute, replicates; its README shows no market between agents). Darwin selects on paid, validated, rated work, with auctions, subcontracting, a genome and letters. Selection by speculation died out. Selection by useful work can last. (A hypothesis: our client is simulated.)
+Related work: Spore.fun (Solana; reproduction at a $500,000 token valuation; arXiv 2506.04236: 1 child in generation 5, only the original agent alive in May 2025) and Automaton (no market between agents in its README). Darwin selects on paid, validated work. Selection by speculation died out. Selection by useful work can last (a hypothesis: our client is mostly simulated).
 
-NEAR, run for real on testnet (tx ids in the repo): a sub-account and function-call key per agent, a Rust registry/escrow/reputation contract, NEAR AI Cloud as the brain. One run reached generation 3: 12 births, 7 deaths, 65 escrows (63 released, 2 refunded).
+NEAR, run for real on testnet (tx ids in the repo): sub-account and function-call key per agent, Rust registry/escrow/reputation contract, NEAR AI Cloud brain. Two runs reached generation 3: run 8 (12 births, 7 deaths) and run 9c on 12 Nov (16 births, 4 deaths, 78 escrows, English). Run 9c also paid two missions entered through the UI: a marketing pitch and a logo.
 
-Honesty: mock is the default; on testnet the payer was the labelled simulated client; AI cost (about 0.03 USD) is local accounting; NEAR Intents (off by default) was never run; escrow is validated by the operator, not trustless; the economy is subsidised.
+Honesty: mock is the default; most paid tasks come from the labelled simulated client; the two missions were typed by an automated browser for the developer, paid by our demo account; subcontracting not awarded in run 9c; AI cost (about 0.07 USD) is local accounting; NEAR Intents was never run; escrow is validated by the operator, not trustless.
 
-Run: npm ci && npm run start:mock (README: "do X, you will see Y"). Most code written by AI agents (Claude Code), disclosed. MIT.
+Run: npm ci && npm run start:mock ("do X, you will see Y" steps in the README). Most code by AI agents (Claude Code). MIT.
 ```
 <!-- idea:end -->
 
