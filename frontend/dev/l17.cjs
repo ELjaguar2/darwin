@@ -222,11 +222,11 @@ const ok = (c, m) => { c ? pass++ : fail++; console.log((c ? "OK   " : "FAIL ") 
   if (REPLAY || /TESTNET/.test(mode)) ok((await p.$$eval("#txs a.hash[href^='https://testnet.nearblocks.io/txns/']", (n) => n.length)) >= 1, "proof: nearblocks links");
   { // L21: Proof tab, "Agent-to-agent subcontracting" block
     const vis = await p.isVisible("#subBlock");
-    const sm = await p.evaluate(async () => { const { subs } = await import("/subcontract.js"); const s = subs.summary(); return { count: s.count, paid: s.paid, expired: s.expired, awarded: s.awarded }; });
+    const sm = await p.evaluate(async () => { const { subs } = await import("/subcontract.js"); const s = subs.summary(); return { count: s.count, paid: s.paid, expired: s.expired, awarded: s.awarded, integrated: s.integrated, fallback: s.fallback }; });
     ok(vis === (sm.count > 0), `L21: subcontracting block ${vis ? "visible" : "hidden"} (${sm.count} subcontracts)`);
     if (vis) {
       const k = await p.$$eval("#subBlock .sub-kpis li", (n) => n.map((x) => x.textContent));
-      ok(k.length === 7 && k[0].startsWith(String(sm.count)) && k[2].startsWith(String(sm.paid)) && k[3].startsWith(String(sm.expired)), "L21: counts shown = tracker: " + k.join(" | "));
+      ok(k.length === 7 && k[0].startsWith(String(sm.count)) && k[1].startsWith(String(sm.integrated)) && k[2].startsWith(String(sm.fallback)) && k[3].startsWith(String(sm.expired)), "L21: counts shown = tracker: " + k.join(" | "));
       ok((await p.$$eval("#subBlock .sub-table tbody tr", (n) => n.length)) === Math.min(40, sm.count), "L21: one table row per subcontract");
       if (sm.paid && REPLAY) ok((await p.$$eval("#subBlock .sub-table a[href^='https://testnet.nearblocks.io/txns/']", (n) => n.length)) >= 2 * sm.paid, "L21: nearblocks links for escrow and release");
     }
