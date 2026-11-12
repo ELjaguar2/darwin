@@ -1,14 +1,14 @@
-// Contexte interne partagé par les modules du moteur (état en mémoire + dépendances injectées).
+// Internal context shared by the engine modules (in-memory state + injected dependencies).
 import type { Agent, Deps, Letter, Market, ModelInfo } from "../shared/index.ts";
 
 export interface EngineOptions {
-  /** Lance la boucle temporisée (config.sim.tickMs) au start(). Défaut true ; false pour les tests (tick() manuel). */
+  /** Starts the timed loop (config.sim.tickMs) on start(). Default true; false for tests (manual tick()). */
   autoRun?: boolean;
-  /** Émet `chain.tx` pour les transferts du moteur. Défaut : true seulement avec une chaîne mock (NearChain journalise elle-même). */
+  /** Emits `chain.tx` for engine transfers. Default: true only with a mock chain (NearChain journals by itself). */
   emitChainTx?: boolean;
-  /** Numéro de départ des identifiants d'agents (a-XXXX). Défaut 0. Utile en testnet : les comptes et le registre du contrat persistent entre deux lancements. */
+  /** Starting number of agent identifiers (a-XXXX). Default 0. Useful on testnet: accounts and the contract registry persist between two runs. */
   agentSeqStart?: number;
-  /** Client simulé du marché (gabarits, événements de marché, budgets au prix du métier). Absent : client simple local (tests). */
+  /** Simulated market client (templates, market events, budgets at the profession price). Absent: simple local client (tests). */
   simulatedClient?: { tick(tick: number): Promise<unknown> };
 }
 
@@ -23,11 +23,11 @@ export interface Ctx {
   tick: number;
   nextAgent: number;
   nextLetter: number;
-  /** Dernier tick de reproduction par parent (délai minimal entre deux enfants). */
+  /** Last reproduction tick per parent (minimum delay between two children). */
   lastRepro: Map<string, number>;
-  /** Dettes (métabolisme, coût IA) non encore réglées on-chain quand settleEveryTicks > 1. */
+  /** Debts (metabolism, AI cost) not yet settled on-chain when settleEveryTicks > 1. */
   pending: Map<string, bigint>;
-  /** Tâches dont l'exécution a déjà été tentée (pas de nouvel essai : l'échéance du marché tranche). */
+  /** Tasks whose execution has already been attempted (no retry: the market deadline decides). */
   attempted: Set<string>;
   warned: Set<string>;
 }

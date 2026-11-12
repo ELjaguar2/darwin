@@ -1,6 +1,6 @@
-// NearAiBrain : client NEAR AI Cloud (API compatible OpenAI). Ne débite RIEN : renvoie `usage` ; l'engine calcule
-// le coût (costYocto) et émet brain.charged. Aucune clé n'est journalisée ni incluse dans un message d'erreur.
-// Endpoints (docs.near.ai/cloud/quickstart.md) : POST {baseUrl}/chat/completions (Authorization: Bearer <clé>), GET {baseUrl}/models.
+// NearAiBrain: NEAR AI Cloud client (OpenAI-compatible API). Debits NOTHING: returns `usage`; the engine computes
+// the cost (costYocto) and emits brain.charged. No key is ever logged or included in an error message.
+// Endpoints (docs.near.ai/cloud/quickstart.md): POST {baseUrl}/chat/completions (Authorization: Bearer <key>), GET {baseUrl}/models.
 import {
   BrainError, assertValidPrice, costUsd,
   type Brain, type BrainRequest, type BrainResponse, type ModelInfo, type Usage,
@@ -13,26 +13,26 @@ export interface Guardrails {
   /** Plafond de max_tokens par appel (config.sim.maxTokensPerCall). */
   maxTokensPerCall: number;
   maxTokensHardCap: number;
-  /** Budget maximum par appel, en USD (prompt estimé + max_tokens au prix de sortie). Au-delà : max_tokens réduit, sinon refus. */
+  /** Maximum budget per call, in USD (estimated prompt + max_tokens at the output price). Beyond it: max_tokens is reduced, otherwise refusal. */
   maxCostUsdPerCall: number;
-  /** Taille maximale du prompt en caractères (refus au-delà). */
+  /** Maximum prompt size in characters (refusal beyond it). */
   maxPromptChars: number;
-  /** Anti-boucle : au plus `maxCallsPerAgentWindow` appels par agent sur `windowMs`. */
+  /** Anti-loop: at most `maxCallsPerAgentWindow` calls per agent over `windowMs`. */
   maxCallsPerAgentWindow: number;
   windowMs: number;
-  /** Anti-boucle : même requête identique répétée plus de `maxIdenticalCalls` fois dans la fenêtre = refus. */
+  /** Anti-loop: the same identical request repeated more than `maxIdenticalCalls` times within the window = refusal. */
   maxIdenticalCalls: number;
-  /** Nombre de relances sur 429/5xx/réseau (une seule par défaut, avec attente courte). */
+  /** Number of retries on 429/5xx/network errors (a single one by default, with a short wait). */
   retries: number;
-  /** Plafond GLOBAL de dépense sur la clé de plateforme (crédit réel), en USD : cumulé par run (vie de l'instance). */
+  /** GLOBAL spending cap on the platform key (real credit), in USD: cumulated per run (lifetime of the instance). */
   maxUsdPerRun: number;
-  /** Idem sur une fenêtre glissante d'une heure. */
+  /** Same over a sliding one-hour window. */
   maxUsdPerHour: number;
 }
 
 export const DEFAULT_GUARDRAILS: Guardrails = {
   maxTokensPerCall: 400,
-  /** Plafond dur d'une demande explicite (livrables du catalogue : logo = 3000). Le plafond de coût par appel s'applique toujours. */
+  /** Hard cap of an explicit request (catalogue deliverables: logo = 3000). The per-call cost cap always applies. */
   maxTokensHardCap: 4000,
   maxCostUsdPerCall: 0.05,
   maxPromptChars: 16000,
@@ -47,37 +47,37 @@ export const DEFAULT_GUARDRAILS: Guardrails = {
 export interface NearAiBrainOptions {
   baseUrl: string;
   apiKey: string | undefined;
-  /** Modèle par défaut souhaité (NEARAI_MODEL) ; vérifié via /models. */
+  /** Desired default model (NEARAI_MODEL); verified via /models. */
   model?: string;
   timeoutMs: number;
   fetch?: typeof fetch;
   now?: () => number;
-  /** Reçoit les system.warning (le backend les branche sur le journal). Jamais de secret dedans. */
+  /** Receives the system.warning events (the backend wires them to the journal). Never a secret inside. */
   onWarning?: (w: { code: string; message: string }) => void;
   guardrails?: Partial<Guardrails>;
-  /** Durée de vie du cache des modèles. */
+  /** Lifetime of the model cache. */
   modelsTtlMs?: number;
   sleep?: (ms: number) => Promise<void>;
-  /** Autorise http:// uniquement vers localhost/127.0.0.1/[::1] (tests). Sinon https exigé : la clé ne part jamais en clair. */
+  /** Allows http:// only towards localhost/127.0.0.1/[::1] (tests). Otherwise https is required: the key never travels in clear. */
   allowInsecureLocalhost?: boolean;
   /**
-   * Catalogue des modèles : "models" (GET /models, historique) ou "model-list" (GET /model/list : prix {amount,scale}, liste blanche
-   * `allowedModels`, repli sur MODEL_WHITELIST). createBrain utilise "model-list" pour NEAR AI Cloud.
+   * Model catalogue: "models" (GET /models, historical) or "model-list" (GET /model/list: price {amount,scale}, whitelist
+   * `allowedModels`, fallback to MODEL_WHITELIST). createBrain uses "model-list" for NEAR AI Cloud.
    */
   catalog?: "models" | "model-list";
-  /** Liste blanche d'ids (catalogue "model-list"). Défaut : MODEL_WHITELIST. */
+  /** Whitelist of ids ("model-list" catalogue). Default: MODEL_WHITELIST. */
   allowedModels?: readonly string[];
-  /** Modèles fixes (fournisseur OpenAI-compatible de secours sans catalogue de prix) : aucun appel de catalogue. */
+  /** Fixed models (OpenAI-compatible fallback provider without a price catalogue): no catalogue call. */
   staticModels?: ModelInfo[];
-  /** Budget IA global persistant (plafond d'arrêt, journal data/ai-usage.jsonl). */
+  /** Persistent global AI budget (stop cap, data/ai-usage.jsonl journal). */
   budget?: AiBudget;
-  /** Étiquette du fournisseur dans le journal d'usage. */
+  /** Provider label in the usage journal. */
   provider?: "nearai" | "fallback";
 }
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
-/** Valide NEARAI_BASE_URL : https obligatoire (http seulement vers localhost avec opt-in explicite). Message sans clé. */
+/** Validates NEARAI_BASE_URL: https mandatory (http only towards localhost with explicit opt-in). Message without key. */
 export function assertSafeBaseUrl(baseUrl: string, allowInsecureLocalhost = false): void {
   let u: URL;
   try {
@@ -88,12 +88,12 @@ export function assertSafeBaseUrl(baseUrl: string, allowInsecureLocalhost = fals
   if (u.username || u.password) throw new Error("NEARAI_BASE_URL ne doit pas contenir d'identifiants");
   if (u.protocol === "https:") return;
   if (u.protocol === "http:" && allowInsecureLocalhost && LOCAL_HOSTS.has(u.hostname)) return;
-  throw new Error("NEARAI_BASE_URL doit utiliser https:// (la clé API ne doit jamais circuler en clair)");
+  throw new Error("NEARAI_BASE_URL must use https:// (the API key must never travel in clear)");
 }
 
 const intOr0 = (x: unknown): number => (typeof x === "number" && Number.isFinite(x) && x > 0 ? Math.floor(x) : 0);
 
-/** Lecture de `usage` : completion_tokens_details.reasoning_tokens puis alias déprécié reasoning_tokens (D-021). */
+/** Reading of `usage`: completion_tokens_details.reasoning_tokens then the deprecated alias reasoning_tokens (D-021). */
 export function parseUsage(raw: unknown): Usage {
   const u = (raw ?? {}) as Record<string, any>;
   const promptTokens = intOr0(u.prompt_tokens);
@@ -103,7 +103,7 @@ export function parseUsage(raw: unknown): Usage {
   return { promptTokens, completionTokens, reasoningTokens, totalTokens };
 }
 
-/** Estimation grossière des tokens d'entrée (~3 caractères par token : volontairement pessimiste). */
+/** Rough estimate of input tokens (~3 characters per token: deliberately pessimistic). */
 const estimateTokens = (chars: number) => Math.ceil(chars / 3);
 
 export class NearAiBrain implements Brain {
@@ -115,15 +115,15 @@ export class NearAiBrain implements Brain {
   private cache: { at: number; models: ModelInfo[]; fromFallback: boolean; reasoning: Set<string>; attestation: Set<string> } | undefined;
   private loading: Promise<NonNullable<NearAiBrain["cache"]>> | undefined;
   private readonly calls = new Map<string, number[]>(); // agentId -> horodatages
-  private readonly identical = new Map<string, number[]>(); // hash de requête -> horodatages
+  private readonly identical = new Map<string, number[]>(); // request hash -> timestamps
   private readonly warned = new Set<string>();
 
-  // Dépense globale : réel cumulé + réservations des appels en vol (pire cas), pour tenir même en concurrence.
+  // Global spending: cumulated real cost + reservations of in-flight calls (worst case), to hold even under concurrency.
   private spentRun = 0;
   private pending = 0;
   private readonly hourLog: { t: number; usd: number }[] = [];
 
-  /** USD dépensés (estimés d'après usage) depuis le démarrage, et sur l'heure glissante. */
+  /** USD spent (estimated from usage) since startup, and over the sliding hour. */
   spend(): { run: number; hour: number } {
     return { run: this.spentRun, hour: this.hourSpent() };
   }
@@ -140,7 +140,7 @@ export class NearAiBrain implements Brain {
     this.opts.budget?.reserve(worstUsd); // BUDGET_EXHAUSTED : plafond persistant, avant tout autre garde-fou
     const over = this.spentRun + this.pending + worstUsd > g.maxUsdPerRun ? "run" : hour + this.pending + worstUsd > g.maxUsdPerHour ? "heure" : undefined;
     if (over) {
-      const msg = `plafond global de dépense IA atteint (${over === "run" ? `${g.maxUsdPerRun} USD par run` : `${g.maxUsdPerHour} USD par heure`}) : appel refusé`;
+      const msg = `global AI spending cap reached (${over === "run" ? `${g.maxUsdPerRun} USD per run` : `${g.maxUsdPerHour} USD per hour`}): call refused`;
       this.warn("BRAIN_BUDGET_CAP", msg);
       this.opts.budget?.settle(worstUsd);
       throw new BrainError("RATE_LIMITED", `Garde-fou budget : ${msg}`);
@@ -188,8 +188,8 @@ export class NearAiBrain implements Brain {
       }
       return { status: res.status, body };
     } catch (e) {
-      if ((e as Error)?.name === "AbortError") throw new BrainError("TIMEOUT", `NEAR AI Cloud : délai dépassé (${this.opts.timeoutMs} ms)`);
-      throw new BrainError("HTTP_ERROR", `NEAR AI Cloud : erreur réseau (${(e as Error)?.name ?? "inconnue"})`);
+      if ((e as Error)?.name === "AbortError") throw new BrainError("TIMEOUT", `NEAR AI Cloud: timeout (${this.opts.timeoutMs} ms)`);
+      throw new BrainError("HTTP_ERROR", `NEAR AI Cloud: network error (${(e as Error)?.name ?? "unknown"})`);
     } finally {
       clearTimeout(timer);
     }
@@ -212,16 +212,16 @@ export class NearAiBrain implements Brain {
         const { status, body } = await this.fetchJson(modelList ? "/model/list" : "/models", { method: "GET", headers });
         if (status < 200 || status >= 300) throw new Error(`HTTP ${status}`);
         const parsed = modelList ? parseModelList(body, allow) : { ...parseModelsResponse(body), attestation: new Set<string>() };
-        if (parsed.models.length === 0) throw new Error("aucun modèle exploitable (prix invalides ?)");
-        for (const s of parsed.skipped) this.warn("BRAIN_MODEL_SKIPPED", `modèle ${s.id} ignoré : ${s.reason}`, true);
+        if (parsed.models.length === 0) throw new Error("no usable model (invalid prices?)");
+        for (const s of parsed.skipped) this.warn("BRAIN_MODEL_SKIPPED", `model ${s.id} ignored: ${s.reason}`, true);
         this.cache = { at: this.now(), models: parsed.models, fromFallback: false, reasoning: parsed.reasoning, attestation: parsed.attestation };
       } catch (e) {
-        // Repli documenté : instantané de pricing.ts, marqué verified:false, avec avertissement. Jamais de prix nul.
+        // Documented fallback: pricing.ts snapshot, marked verified:false, with a warning. Never a zero price.
         const stale = this.cache && !this.cache.fromFallback ? this.cache : undefined;
         const fbDate = modelList ? WHITELIST_SNAPSHOT_DATE : FALLBACK_SNAPSHOT_DATE;
         this.warn("BRAIN_PRICES_FALLBACK", stale
-          ? `GET /models a échoué (${(e as Error).message}) : derniers prix connus conservés`
-          : `GET /models a échoué (${(e as Error).message}) : prix du repli du ${fbDate}, possiblement périmés`);
+          ? `GET /models failed (${(e as Error).message}): last known prices kept`
+          : `GET /models failed (${(e as Error).message}): fallback prices of ${fbDate}, possibly stale`);
         this.cache = stale
           ? { ...stale, at: this.now() }
           : {
@@ -241,7 +241,7 @@ export class NearAiBrain implements Brain {
     }
   }
 
-  /** Ids de la liste blanche dont le catalogue annonce attestationSupported (TEE). */
+  /** Whitelist ids for which the catalogue announces attestationSupported (TEE). */
   async attestationModels(): Promise<string[]> {
     return [...(await this.loadModels()).attestation];
   }
@@ -250,18 +250,18 @@ export class NearAiBrain implements Brain {
     return (await this.loadModels()).models.map((m) => ({ ...m }));
   }
 
-  /** NEARAI_MODEL si valide, sinon le moins cher des modèles SANS raisonnement (sinon le moins cher tout court). */
+  /** NEARAI_MODEL if valid, otherwise the cheapest of the models WITHOUT reasoning (otherwise simply the cheapest). */
   async defaultModel(): Promise<string> {
     const c = await this.loadModels();
     const want = this.opts.model;
     if (want) {
       if (c.models.some((m) => m.id === want)) return want;
-      this.warn("BRAIN_MODEL_UNKNOWN", `NEARAI_MODEL=${want} absent de /models : modèle par défaut choisi automatiquement`, true);
+      this.warn("BRAIN_MODEL_UNKNOWN", `NEARAI_MODEL=${want} absent from /models: default model chosen automatically`, true);
     }
     const cost = (m: ModelInfo) => m.usdPerMTokIn + m.usdPerMTokOut;
     const sorted = [...c.models].sort((a, b) => cost(a) - cost(b));
     const pick = sorted.find((m) => !c.reasoning.has(m.id)) ?? sorted[0];
-    if (!pick) throw new BrainError("UNKNOWN_MODEL", "Aucun modèle disponible");
+    if (!pick) throw new BrainError("UNKNOWN_MODEL", "No model available");
     return pick.id;
   }
 
@@ -272,15 +272,15 @@ export class NearAiBrain implements Brain {
     const mine = prune(this.calls.get(req.agentId) ?? []);
     if (mine.length >= g.maxCallsPerAgentWindow) {
       this.calls.set(req.agentId, mine);
-      this.warn("BRAIN_LOOP_GUARD", `agent ${req.agentId} : trop d'appels IA (${mine.length}/${g.windowMs} ms), appel refusé`);
+      this.warn("BRAIN_LOOP_GUARD", `agent ${req.agentId}: too many AI calls (${mine.length}/${g.windowMs} ms), call refused`);
       throw new BrainError("RATE_LIMITED", `Garde-fou anti-boucle : ${mine.length} appels en ${g.windowMs} ms pour ${req.agentId}`);
     }
     const key = `${req.agentId}|${req.purpose}|${req.model}|${promptKey}`;
     const same = prune(this.identical.get(key) ?? []);
     if (same.length >= g.maxIdenticalCalls) {
       this.identical.set(key, same);
-      this.warn("BRAIN_LOOP_GUARD", `agent ${req.agentId} : requête identique répétée ${same.length} fois, appel refusé`);
-      throw new BrainError("RATE_LIMITED", "Garde-fou anti-boucle : requête identique répétée");
+      this.warn("BRAIN_LOOP_GUARD", `agent ${req.agentId}: identical request repeated ${same.length} times, call refused`);
+      throw new BrainError("RATE_LIMITED", "Anti-loop guardrail: identical request repeated");
     }
     mine.push(t);
     same.push(t);
@@ -292,29 +292,29 @@ export class NearAiBrain implements Brain {
     if (!this.opts.apiKey) throw new BrainError("NO_API_KEY", "NEARAI_API_KEY absente : utiliser le mode mock");
     const g = this.guardrails;
     const promptChars = req.messages.reduce((n, m) => n + m.content.length, 0);
-    if (promptChars > g.maxPromptChars) throw new BrainError("BAD_RESPONSE", `Prompt trop long (${promptChars} > ${g.maxPromptChars} caractères) : appel refusé`);
+    if (promptChars > g.maxPromptChars) throw new BrainError("BAD_RESPONSE", `Prompt too long (${promptChars} > ${g.maxPromptChars} characters): call refused`);
 
     const cat = await this.loadModels();
     let info = cat.models.find((m) => m.id === req.model);
     let model = req.model;
     if (!info) {
-      if (cat.fromFallback) throw new BrainError("UNKNOWN_MODEL", `Modèle ${req.model} inconnu (prix indisponibles, repli limité)`);
+      if (cat.fromFallback) throw new BrainError("UNKNOWN_MODEL", `Model ${req.model} unknown (prices unavailable, limited fallback)`);
       model = await this.defaultModel();
       info = cat.models.find((m) => m.id === model);
-      this.warn("BRAIN_MODEL_FALLBACK", `modèle ${req.model} absent de /models : repli sur ${model}`, true);
+      this.warn("BRAIN_MODEL_FALLBACK", `model ${req.model} absent from /models: falling back to ${model}`, true);
     }
-    if (!info) throw new BrainError("UNKNOWN_MODEL", `Modèle ${req.model} inconnu`);
+    if (!info) throw new BrainError("UNKNOWN_MODEL", `Model ${req.model} unknown`);
     assertValidPrice(info);
-    if (!info.verified) this.warn("BRAIN_PRICE_UNVERIFIED", `prix de ${info.id} issus du repli du ${FALLBACK_SNAPSHOT_DATE} (non vérifiés)`, true);
+    if (!info.verified) this.warn("BRAIN_PRICE_UNVERIFIED", `prices of ${info.id} come from the fallback of ${FALLBACK_SNAPSHOT_DATE} (unverified)`, true);
 
-    // Budget maximum par appel : on réduit max_tokens pour tenir dans maxCostUsdPerCall, sinon on refuse.
+    // Maximum budget per call: we reduce max_tokens to fit within maxCostUsdPerCall, otherwise we refuse.
     let maxTokens = Math.max(1, Math.min(req.maxTokens ?? g.maxTokensPerCall, Math.max(g.maxTokensPerCall, g.maxTokensHardCap)));
     const promptEst = estimateTokens(promptChars);
     const worst = (mt: number) => costUsd({ promptTokens: promptEst, completionTokens: mt, reasoningTokens: 0, totalTokens: promptEst + mt }, info!);
     if (worst(maxTokens) > g.maxCostUsdPerCall) {
       const room = g.maxCostUsdPerCall - (promptEst * info.usdPerMTokIn) / 1e6;
       const fit = info.usdPerMTokOut > 0 ? Math.floor((room * 1e6) / info.usdPerMTokOut) : 0;
-      if (fit < 16) throw new BrainError("BAD_RESPONSE", `Budget par appel dépassé (> ${g.maxCostUsdPerCall} USD) : appel refusé`);
+      if (fit < 16) throw new BrainError("BAD_RESPONSE", `Per-call budget exceeded (> ${g.maxCostUsdPerCall} USD): call refused`);
       maxTokens = Math.min(maxTokens, fit);
     }
 
@@ -345,7 +345,7 @@ export class NearAiBrain implements Brain {
         last = e as BrainError;
         continue;
       }
-      if (r.status === 429) { last = new BrainError("RATE_LIMITED", "NEAR AI Cloud : limite de débit (429)", 429); continue; }
+      if (r.status === 429) { last = new BrainError("RATE_LIMITED", "NEAR AI Cloud: rate limit (429)", 429); continue; }
       if (r.status >= 500) { last = new BrainError("HTTP_ERROR", `NEAR AI Cloud : erreur serveur ${r.status}`, r.status); continue; }
       if (r.status < 200 || r.status >= 300) {
         const msg = typeof r.body?.error?.message === "string" ? r.body.error.message.slice(0, 200) : "";
@@ -353,10 +353,10 @@ export class NearAiBrain implements Brain {
       }
       const choice = r.body?.choices?.[0];
       const content = choice?.message?.content;
-      if (!choice || (content !== null && content !== undefined && typeof content !== "string")) throw new BrainError("BAD_RESPONSE", "Réponse chat/completions inattendue");
+      if (!choice || (content !== null && content !== undefined && typeof content !== "string")) throw new BrainError("BAD_RESPONSE", "Unexpected chat/completions response");
       if (!r.body?.usage) {
-        // Sans usage on ne peut pas débiter : on ne fabrique pas un coût nul.
-        throw new BrainError("BAD_RESPONSE", "Réponse sans champ usage : débit impossible");
+        // Without usage we cannot debit: we do not fabricate a zero cost.
+        throw new BrainError("BAD_RESPONSE", "Response without usage field: debit impossible");
       }
       const usage = parseUsage(r.body.usage);
       actualUsd = costUsd(usage, info);
@@ -366,7 +366,7 @@ export class NearAiBrain implements Brain {
         costUsd: actualUsd, responseId: typeof r.body.id === "string" ? r.body.id : null, agentId: req.agentId, purpose: req.purpose,
       };
       const text = typeof content === "string" ? content : "";
-      if (text === "" ) this.warn("BRAIN_EMPTY_TEXT", `réponse vide de ${model} (finish_reason=${String(choice.finish_reason)}) : tokens de raisonnement épuisés ?`);
+      if (text === "" ) this.warn("BRAIN_EMPTY_TEXT", `empty response from ${model} (finish_reason=${String(choice.finish_reason)}): reasoning tokens exhausted?`);
       return {
         text,
         usage,
@@ -375,7 +375,7 @@ export class NearAiBrain implements Brain {
         responseId: typeof r.body.id === "string" ? r.body.id : undefined,
       };
     }
-    throw last ?? new BrainError("HTTP_ERROR", "NEAR AI Cloud : échec");
+    throw last ?? new BrainError("HTTP_ERROR", "NEAR AI Cloud: failure");
     } finally {
       this.settle(worstUsd, actualUsd, rec);
     }
