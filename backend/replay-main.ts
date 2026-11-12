@@ -1,4 +1,4 @@
-// Replay mode startup: `npm run replay`. Variables: DARWIN_REPLAY_FILE (default docs/preuves/run8-journal.jsonl),
+// Replay mode startup: `npm run replay`. Variables: DARWIN_REPLAY_FILE (default docs/preuves/run9c-journal.jsonl),
 // DARWIN_REPLAY_SPEED (default 5), DARWIN_REPLAY_LOOP (1 = restart after a pause), DARWIN_REPLAY_MAX_GAP_MS, DARWIN_REPLAY_LABEL.
 // No key is read: secret variables are removed from the environment passed to loadConfig.
 import { serve } from "@hono/node-server";
@@ -11,7 +11,7 @@ import { safeErrorMessage } from "./redact.ts";
 import { ReplayError, createReplay, loadReplayFile, parseSpeed, DEFAULT_MAX_GAP_MS } from "./replay.ts";
 import { createReplayRuntime } from "./replay-runtime.ts";
 
-export const DEFAULT_REPLAY_FILE = fileURLToPath(new URL("../docs/preuves/run8-journal.jsonl", import.meta.url));
+export const DEFAULT_REPLAY_FILE = fileURLToPath(new URL("../docs/preuves/run9c-journal.jsonl", import.meta.url));
 
 /** Replay environment: mock forced, no secret. */
 export function replayEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {

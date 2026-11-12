@@ -6,7 +6,26 @@ import { loadConfig } from "../shared/index.ts";
 import { createApp } from "./app.ts";
 import { ReplayError, createReplay, loadReplayFile, parseReplay, parseSpeed } from "./replay.ts";
 import { createReplayRuntime } from "./replay-runtime.ts";
-import { DEFAULT_REPLAY_FILE, replayEnv } from "./replay-main.ts";
+import { fileURLToPath } from "node:url";
+import { replayEnv } from "./replay-main.ts";
+// The historical run 8 journal (the default replay file is now run 9c): these tests pin the run 8 numbers.
+const RUN8_FILE = fileURLToPath(new URL("../docs/preuves/run8-journal.jsonl", import.meta.url));
+const RUN9C_FILE = fileURLToPath(new URL("../docs/preuves/run9c-journal.jsonl", import.meta.url));
+
+describe("run 9c journal (default replay file)", () => {
+  it("loads: 2525 events, recorded on 2026-11-12, 16 births, 4 deaths, 2 visitor missions paid", () => {
+    const { events, meta } = loadReplayFile(RUN9C_FILE);
+    expect(events.length).toBe(2525);
+    expect(JSON.stringify(meta)).toContain("2026-11-12");
+    expect(events.filter((e) => e.type === "agent.born").length).toBe(16);
+    expect(events.filter((e) => e.type === "agent.died").length).toBe(4);
+    const visitorTasks = events.filter((e) => e.type === "task.posted" && (e.data as { task: { requester: { kind: string } } }).task.requester.kind === "visitor").map((e) => (e.data as { task: { id: string } }).task.id);
+    const released = new Set(events.filter((e) => e.type === "escrow.released").map((e) => (e.data as { taskId: string }).taskId));
+    expect(visitorTasks.filter((t) => released.has(t)).length).toBe(2);
+    const withContent = events.filter((e) => e.type === "deliverable.produced" && (e.data as { files: { content?: string }[] }).files.every((f) => typeof f.content === "string")).length;
+    expect(withContent).toBeGreaterThan(50);
+  });
+});
 
 const tmp: string[] = [];
 afterEach(() => {
@@ -70,7 +89,7 @@ function manual(text = smallJournal(), opts: Parameters<typeof createReplay>[1] 
 
 describe("journal validation", () => {
   it("reads run8: 1819 events, date read from the journal, no renumbering", () => {
-    const { events, meta } = loadReplayFile(DEFAULT_REPLAY_FILE);
+    const { events, meta } = loadReplayFile(RUN8_FILE);
     expect(events).toHaveLength(1819);
     expect(meta.recordedOn).toBe("2026-11-10");
     expect(meta.renumbered).toBe(false);
@@ -301,7 +320,7 @@ describe("API in replay mode", () => {
   });
 
   it("full run8: final state consistent with the journal (12 agents, 7 deaths, 3 generations)", async () => {
-    const parsed = loadReplayFile(DEFAULT_REPLAY_FILE);
+    const parsed = loadReplayFile(RUN8_FILE);
     const waits: (() => void)[] = [];
     const replay = createReplay(parsed, { setTimer: (fn) => { waits.push(fn); return 0; }, clearTimer: () => {} });
     for (let i = 0; i < parsed.events.length; i++) waits.pop()?.();
