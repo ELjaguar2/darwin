@@ -146,6 +146,12 @@ Voir les étapes 6 à 9 plus bas : 1) rendre le dépôt public (étape 6, vérif
 - Les décalages d'ids sont automatiques (horloge) : ne pas remettre `DARWIN_AGENT_SEQ_START` ni `DARWIN_TASK_SEQ_START` dans `.env`.
 - Journaux locaux (ignorés par git) : `data/journal.jsonl`, `data/archive/*`, `data/ai-usage.jsonl`, `data/ai-budget.json`. Copies commitées : `docs/preuves/run5-journal.jsonl` à `run9c-journal.jsonl`.
 
+## Montage vidéo (brouillon HyperFrames, 13 novembre) : décisions et blocages
+
+- **Blocage : FFmpeg n'est pas installé** (`npx hyperframes doctor` : FFmpeg et FFprobe absents). Le rendu MP4 H.264 + AAC et l'extraction d'images en ont besoin. J'ai téléchargé une version portable (`<utilisateur>/Darwin-video/tools/ffmpeg-dl/ffmpeg.zip`, non extraite, sha256 `60f46726…47ba`) mais le système de permissions a refusé que je l'extraie et l'exécute. **À faire par vous** : dans le terminal de la session, taper `! winget install --id Gyan.FFmpeg -e`, puis ouvrir un nouveau terminal et vérifier `ffmpeg -version`. Dites-moi ensuite « ffmpeg installé » et je lance `check`, les instantanés, la relecture et le rendu. Vous pouvez supprimer le dossier `tools/ffmpeg-dl` après coup.
+- Rien d'autre ne bloque : voix générée (`Darwin-video/voice`), images d'écran des rejeux enregistrées (`Darwin-video/footage`), projet HyperFrames assemblé (`Darwin-video/project`).
+- Décisions prises sans vous : voix `af_heart` (Kokoro, synthétique) ; sous-titres au niveau de la phrase, répartis proportionnellement aux caractères (pas d'alignement mot à mot, Whisper n'est pas installé) ; plans 8 et 9 en cartons animés (pas d'écran réel) ; pas de musique ni d'effets sonores dans ce brouillon.
+
 ## Décisions encore ouvertes
 1. **Historique git** : réécrire ou documenter (étape 4).
 2. **Option `trust proxy`** pour les plafonds par IP derrière un proxy : non codée, seulement si la démo est exposée derrière un proxy.
