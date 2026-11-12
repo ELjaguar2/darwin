@@ -1,5 +1,8 @@
 # QA_RAPPORT — recette « juge IA » sur clone neuf
 
+> **English summary.** QA acceptance reports in the role of the AI judges: start from a fresh clone, follow the README to the letter, check each "do X, you will see Y" step. Sections: 2026-11-09 fresh-clone run (mock mode PASSED, 0 blocking bug), 2026-11-12 replay / new interface / testnet-with-rotated-key run, and the fresh-clone run of `lot/L17-integration` (2026-11-12).
+> **State:** latest recorded verdicts are in the last section of the file; testnet, real NEAR AI and Intents were only verified to the extent stated there. The rest of this file is kept in its original French (internal working document, translated on demand).
+
 - **Date** : 2026-11-09 (recette sur `main`, commit `c99eab0`, arbre de travail propre : tout est commité).
 - **Environnement** : Windows 11 Pro, Node v22.17.1, npm, Git Bash, Playwright (Chromium, viewport 1280x900, deviceScaleFactor 1). Clone dans un dossier neuf du scratchpad (`git clone <dépôt>`), sans `node_modules`, `.env` ni `data/` copiés. Aucun `.env` dans le clone.
 - **Périmètre** : lecture seule sur le code. Rien corrigé, rien commité.

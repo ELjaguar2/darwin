@@ -1,63 +1,63 @@
-# Attestation TEE des réponses du cerveau (NEAR AI Cloud)
+# TEE attestation of the brain's responses (NEAR AI Cloud)
 
-> Propriétaire : dev-cerveau-ia (lot L11). Protocole vérifié le 2026-11-10 sur docs.near.ai/cloud/verification (pages « Gateway attestation », « NEAR model attestations », « Response signatures », « Quote, nonce, and signer bindings »). Exécution réelle du 2026-11-10 décrite en section 3.
+> Owner: dev-cerveau-ia (work package L11). Protocol verified on 2026-11-10 on docs.near.ai/cloud/verification (pages "Gateway attestation", "NEAR model attestations", "Response signatures", "Quote, nonce, and signer bindings"). Real execution of 2026-11-10 described in section 3.
 
-## 1. Ce que l'on peut prouver, et ce que l'on ne prouve pas
+## 1. What can be proven, and what is not proven
 
-Les modèles marqués `attestationSupported: true` dans `GET /v1/model/list` (dans notre liste blanche : `Qwen/Qwen3.8-27B`, `z-ai/glm-5.3-flash`, `Qwen/Qwen3.6-35B-A3B-FP8`, `deepseek-ai/DeepSeek-V4.1-Flash-1017`) tournent dans un environnement d'exécution de confiance (Intel TDX + GPU NVIDIA). Les trois autres (`openai/gpt-5-nano`, `anthropic/claude-haiku-5-5`, `google/gemini-2.5-flash-lite`) sont des modèles externes : **aucune attestation, rien n'est prouvé pour eux**.
+Models marked `attestationSupported: true` in `GET /v1/model/list` (in our allowlist: `Qwen/Qwen3.8-27B`, `z-ai/glm-5.3-flash`, `Qwen/Qwen3.6-35B-A3B-FP8`, `deepseek-ai/DeepSeek-V4.1-Flash-1017`) run in a trusted execution environment (Intel TDX + NVIDIA GPU). The other three (`openai/gpt-5-nano`, `anthropic/claude-haiku-5-5`, `google/gemini-2.5-flash-lite`) are external models: **no attestation, nothing is proven for them**.
 
-Important : le cerveau de Darwin **n'atteste pas chaque appel**. L'attestation est un contrôle à la demande (`npm run ai:verify-attestation`) sur une requête dédiée, pas une propriété de toute la simulation. Une démo ne doit pas affirmer « chaque réponse d'agent est prouvée ».
+Important: Darwin's brain **does not attest every call**. Attestation is an on-demand check (`npm run ai:verify-attestation`) on a dedicated request, not a property of the whole simulation. A demo must not claim "every agent response is proven".
 
-## 2. Comment vérifier soi-même
+## 2. How to verify yourself
 
 ```bash
 npm install
-# la clé NEARAI_API_KEY est lue depuis .env ou l'environnement (jamais affichée) ; elle ne sert qu'à la requête et à la signature
+# the NEARAI_API_KEY key is read from .env or the environment (never displayed); it is only used for the request and the signature
 npm run ai:verify-attestation -- --model z-ai/glm-5.3-flash --save-evidence data/attestation-glm
-# re-vérifier plus tard la partie signature à partir des preuves enregistrées (sans clé)
+# re-verify the signature part later from the saved evidence (no key)
 npm run ai:verify-attestation -- --offline data/attestation-glm
 ```
 
-Options : `--accept UpToDate,SWHardeningNeeded` (statuts TCB acceptés, défaut `UpToDate` seul), `--skip-gpu`, `--max-tokens N` (<= 200), `--env-file chemin`. Code de sortie 1 s'il y a un FAIL. Chaque contrôle est affiché `PASS`, `FAIL` ou `SKIP` ; un `SKIP` n'est jamais une réussite.
+Options: `--accept UpToDate,SWHardeningNeeded` (accepted TCB statuses, default `UpToDate` only), `--skip-gpu`, `--max-tokens N` (<= 200), `--env-file path`. Exit code 1 if there is a FAIL. Each check is displayed `PASS`, `FAIL` or `SKIP`; a `SKIP` is never a success.
 
-Le script suit le protocole officiel :
+The script follows the official protocol:
 
-1. Génère un nonce de 32 octets aléatoires et appelle `GET /v1/attestation/report?model=<id>&provider=near&signing_algo=ecdsa&nonce=<nonce>` avec l'en-tête `x-no-aliasing: true`. La réponse contient `gateway_attestation` (passerelle) et `model_attestations[]` (modèle).
-2. Pour la passerelle et chaque rapport modèle : vérifie la quote Intel TDX avec `@phala/dcap-qvl` (collatéral récupéré chez le PCCS de Phala), le statut TCB, l'absence de mode debug, que `report_data` de la quote = adresse du signataire + nonce du client, que `MRCONFIGID` = `01` + SHA-256(`app_compose`), et que le rejeu de l'event log (RTMR3, SHA-384) égale le RTMR3 de la quote.
-3. Preuve GPU : vérifie que le nonce du `nvidia_payload` est le nôtre, puis envoie le payload à NVIDIA NRAS (`https://nras.attestation.nvidia.com/v3/attest/gpu`) et exige `x-nvidia-overall-att-result: true`.
-4. Fait une vraie requête de chat avec les octets exacts conservés (modèle canonique, `x-no-aliasing: true`, `Accept-Encoding: identity`), puis `GET /v1/signature/<id>?model=<id>&signing_algo=ecdsa`.
-5. Vérifie que le texte signé vaut `<modèle>:SHA-256(requête exacte):SHA-256(réponse exacte)`, que la signature ECDSA (EIP-191) se récupère en l'adresse `signing_address`, que `signature_kind` vaut `provider_tee`, et que cette adresse correspond à exactement un rapport modèle vérifié en amont.
+1. Generates a nonce of 32 random bytes and calls `GET /v1/attestation/report?model=<id>&provider=near&signing_algo=ecdsa&nonce=<nonce>` with the header `x-no-aliasing: true`. The response contains `gateway_attestation` (gateway) and `model_attestations[]` (model).
+2. For the gateway and each model report: verifies the Intel TDX quote with `@phala/dcap-qvl` (collateral fetched from Phala's PCCS), the TCB status, the absence of debug mode, that the quote's `report_data` = signer address + client nonce, that `MRCONFIGID` = `01` + SHA-256(`app_compose`), and that replaying the event log (RTMR3, SHA-384) equals the quote's RTMR3.
+3. GPU proof: verifies that the `nvidia_payload` nonce is ours, then sends the payload to NVIDIA NRAS (`https://nras.attestation.nvidia.com/v3/attest/gpu`) and requires `x-nvidia-overall-att-result: true`.
+4. Makes a real chat request with the exact bytes retained (canonical model, `x-no-aliasing: true`, `Accept-Encoding: identity`), then `GET /v1/signature/<id>?model=<id>&signing_algo=ecdsa`.
+5. Verifies that the signed text equals `<model>:SHA-256(exact request):SHA-256(exact response)`, that the ECDSA signature (EIP-191) recovers to the `signing_address` address, that `signature_kind` is `provider_tee`, and that this address matches exactly one previously verified model report.
 
-## 3. Ce qui a été réellement vérifié (exécution du 2026-11-10, modèle `z-ai/glm-5.3-flash`)
+## 3. What was actually verified (execution of 2026-11-10, model `z-ai/glm-5.3-flash`)
 
-Résultat : 20 PASS, 0 FAIL, 0 SKIP.
+Result: 20 PASS, 0 FAIL, 0 SKIP.
 
-| Contrôle | Résultat |
+| Check | Result |
 |---|---|
-| Rapport d'attestation récupéré (1 candidat modèle) | PASS |
-| Passerelle : quote TDX DCAP, statut TCB `UpToDate`, debug désactivé, report_data = signataire + nonce, nonce renvoyé, MRCONFIGID, rejeu RTMR3 | PASS (6 contrôles) |
-| Modèle : mêmes 6 contrôles sur la quote du modèle (statut TCB `UpToDate`) | PASS (6 contrôles) |
-| Preuve GPU NVIDIA : nonce du payload, verdict NRAS `x-nvidia-overall-att-result=true` | PASS |
-| Requête réelle (id de réponse `1c1ea6068280496f8ef8d050c98dbe6d`) | PASS |
-| Signature récupérée : `signature_kind=provider_tee`, ECDSA | PASS |
-| Texte signé = modèle:SHA-256(requête exacte):SHA-256(réponse exacte) | PASS |
-| Signature ECDSA valide pour `signing_address` `0x3b753b4406613c5e70ae640508632b600424fa0c` | PASS |
-| Signataire = exactement un rapport modèle vérifié en amont | PASS |
+| Attestation report retrieved (1 model candidate) | PASS |
+| Gateway: TDX DCAP quote, TCB status `UpToDate`, debug disabled, report_data = signer + nonce, nonce returned, MRCONFIGID, RTMR3 replay | PASS (6 checks) |
+| Model: same 6 checks on the model's quote (TCB status `UpToDate`) | PASS (6 checks) |
+| NVIDIA GPU proof: payload nonce, NRAS verdict `x-nvidia-overall-att-result=true` | PASS |
+| Real request (response id `1c1ea6068280496f8ef8d050c98dbe6d`) | PASS |
+| Signature retrieved: `signature_kind=provider_tee`, ECDSA | PASS |
+| Signed text = model:SHA-256(exact request):SHA-256(exact response) | PASS |
+| ECDSA signature valid for `signing_address` `0x3b753b4406613c5e70ae640508632b600424fa0c` | PASS |
+| Signer = exactly one previously verified model report | PASS |
 
-Test négatif réalisé : en ajoutant un seul octet à la réponse enregistrée, la vérification hors ligne échoue sur « texte signé différent ».
+Negative test performed: adding a single byte to the saved response makes the offline verification fail on "signed text differs".
 
-Cette exécution est un fait daté, pas une garantie permanente : relancer la commande pour obtenir une preuve fraîche. Le coût de l'exécution (de l'ordre de 0,00001 USD) est journalisé dans `data/ai-usage.jsonl` avec l'agent `attestation`.
+This execution is a dated fact, not a permanent guarantee: re-run the command to obtain fresh proof. The cost of the execution (around 0.00001 USD) is journalled in `data/ai-usage.jsonl` with the agent `attestation`.
 
-## 4. Ce qui n'est PAS vérifié (limites)
+## 4. What is NOT verified (limits)
 
-- **Autres modèles de la liste** : seul `z-ai/glm-5.3-flash` a été attesté de bout en bout. Les trois autres modèles TEE (`Qwen3.8-27B`, `Qwen3.6-35B-A3B-FP8`, `DeepSeek-V4.1-Flash-1017`) disposent du même mécanisme mais n'ont pas été passés au script. Les modèles externes n'ont pas d'attestation.
-- **Pas de contrôle par appel de simulation** : les réponses produites par les agents pendant la simulation ne sont pas signées-vérifiées une à une.
-- **Liaison TLS** : la connexion TLS à `cloud-api.near.ai` n'est pas liée à l'attestation de la passerelle (`include_tls_fingerprint` non utilisé).
-- **Provenance des images / politique de mesures** : les mesures (MRTD, RTMR, `app_compose`) sont vérifiées pour leur cohérence interne avec la quote, mais **pas comparées à une liste de valeurs de référence acceptées** (pas de politique d'allowlist ni de provenance d'image). Un vérificateur de production devrait en définir une.
-- **Jeton NVIDIA** : on s'appuie sur le verdict de NRAS reçu en TLS ; le jeton JWT n'est pas revalidé localement (signature des claims non vérifiée).
-- **Collatéral Intel** : récupéré chez le PCCS de Phala (service tiers) par défaut ; on peut passer `INTEL_PCS_URL` pour utiliser le PCS d'Intel, non fait ici.
-- **Instance de service** : tous les exemplaires d'un même modèle partagent la clé de signature ; une signature valide n'établit pas que le rapport et la réponse viennent de la même instance (avertissement de la documentation officielle).
-- **Chaîne complète** : la signature `provider_tee` ne lie pas les octets signés par le modèle à la passerelle ni au TLS (limite documentée par NEAR AI Cloud).
-- **Mode hors ligne** (`--offline`) : ne refait que le hachage et la signature ; la quote, l'event log et le GPU sont marqués `SKIP` et le rapprochement du signataire avec un rapport vérifié aussi.
-- **Vulnérabilités de dépendances** : `npm audit` signale 2 alertes faibles (paquet `elliptic`, via `@phala/dcap-qvl`) dans les dépendances de développement uniquement.
-- Confidentialité : l'attestation prouve l'environnement d'exécution annoncé, pas que le fournisseur ne conserve pas les données ; la page de vérification de NEAR AI Cloud (cloud.near.ai/verify) permet une vérification dans le navigateur.
+- **Other models in the list**: only `z-ai/glm-5.3-flash` was attested end to end. The other three TEE models (`Qwen3.8-27B`, `Qwen3.6-35B-A3B-FP8`, `DeepSeek-V4.1-Flash-1017`) have the same mechanism but were not run through the script. External models have no attestation.
+- **No per-call check during the simulation**: the responses produced by agents during the simulation are not signature-verified one by one.
+- **TLS binding**: the TLS connection to `cloud-api.near.ai` is not bound to the gateway attestation (`include_tls_fingerprint` not used).
+- **Image provenance / measurement policy**: the measurements (MRTD, RTMR, `app_compose`) are verified for internal consistency with the quote, but **not compared against a list of accepted reference values** (no allowlist policy or image provenance). A production verifier should define one.
+- **NVIDIA token**: we rely on the NRAS verdict received over TLS; the JWT token is not re-validated locally (claims signature not verified).
+- **Intel collateral**: fetched from Phala's PCCS (third-party service) by default; `INTEL_PCS_URL` can be passed to use Intel's PCS, not done here.
+- **Service instance**: all instances of the same model share the signing key; a valid signature does not establish that the report and the response come from the same instance (warning in the official documentation).
+- **Full chain**: the `provider_tee` signature does not bind the bytes signed by the model to the gateway or to TLS (limit documented by NEAR AI Cloud).
+- **Offline mode** (`--offline`): only redoes the hashing and the signature; the quote, event log and GPU are marked `SKIP`, as is the matching of the signer against a verified report.
+- **Dependency vulnerabilities**: `npm audit` reports 2 low alerts (package `elliptic`, via `@phala/dcap-qvl`) in development dependencies only.
+- Confidentiality: attestation proves the announced execution environment, not that the provider does not retain data; NEAR AI Cloud's verification page (cloud.near.ai/verify) allows verification in the browser.

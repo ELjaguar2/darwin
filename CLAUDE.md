@@ -1,5 +1,8 @@
 # Darwin — NEAR HACKATHON 2026
 
+> **English summary.** Entry point for every agent: Darwin pitch (AI agents that earn a living, pay for their own brain, reproduce with their own money and die when broke, on NEAR testnet), hackathon facts (deadline 2026-11-14 23:59 UTC, public repository + README, public demo on X, one form submitted by the human), concept, V1 definition, the common rules and the file-ownership map.
+> **State:** the rules below are unchanged and remain in French (internal instructions to the agents); the public documents (README, form, video script, X post) and the technical docs are in English. Nothing is published without the human.
+
 **Tout agent lit ce fichier en premier.**
 
 ## Pitch
