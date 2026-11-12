@@ -78,7 +78,7 @@ describe("spending locks", () => {
   });
 });
 
-describe("flux complet en mock + preuve", () => {
+describe("full flow in mock + proof", () => {
   async function setup() {
     const journal = createJournal();
     const c = new MockIntents(cfgOf(LIVE).intents, { journal });
@@ -263,9 +263,9 @@ describe("security fixes pass 2", () => {
     c.simulateDeposit(q.depositAddress);
     const final = await c.waitForTerminal(q, { sleep: noSleep });
     expect(verifyDeposit(q, final, { mock: true }).accepted).toBe(true);
-    const a = { ...final, correlationId: "autre" };
+    const a = { ...final, correlationId: "other" };
     expect(verifyDeposit(q, a, { mock: true }).accepted).toBe(false);
-    const b = { ...final, quoteResponse: { ...final.quoteResponse, correlationId: "autre" } };
+    const b = { ...final, quoteResponse: { ...final.quoteResponse, correlationId: "other" } };
     expect(verifyDeposit(q, b, { mock: true }).accepted).toBe(false);
     const d = { ...final, correlationId: "" };
     expect(verifyDeposit(q, d, { mock: true })).toMatchObject({ accepted: false, reason: "correlationId missing" });

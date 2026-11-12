@@ -1,39 +1,39 @@
-# Démo mainnet NEAR Intents (1Click) — procédure pour l'humain
+# NEAR Intents (1Click) mainnet demo: procedure for the human
 
-Un seul moment réel, petites sommes, **mainnet** (Intents n'a pas de testnet). Rien de ceci n'est exécuté par les agents. Le code ne signe jamais : c'est vous qui envoyez le dépôt depuis votre wallet.
+A single real moment, small amounts, **mainnet** (Intents has no testnet). None of this is run by the agents. The code never signs: you send the deposit yourself from your wallet.
 
-## 0. Feu vert
-Rien ne se passe sans que vous ayez écrit un feu vert dans `docs/BESOINS_HUMAIN.md` (section « Feux verts accordés »), par exemple : « Feu vert intents : 1 NEAR maximum, wNEAR(near) -> USDC(base), compte X, date ». Plafond du code : 5 USD par opération (`maxUsd`).
+## 0. Green light
+Nothing happens until you have written a green light in `docs/BESOINS_HUMAIN.md` (section "Feux verts accordés"), for example: "Intents green light: 1 NEAR maximum, wNEAR(near) -> USDC(base), account X, date". Code cap: 5 USD per operation (`maxUsd`).
 
-## 1. Préparer (gratuit)
-- Un compte NEAR **mainnet de dev**, séparé de vos comptes principaux, avec environ 2 NEAR (1 NEAR pour le swap + frais de gaz). Un wallet qui vous permet de **transférer des wNEAR** ou de faire un `ft_transfer` (voir note ci-dessous).
-- Une adresse de destination valide sur la chaîne cible (ex. adresse EVM sur Base, casse EIP-55 correcte, sinon l'API répond « recipient is not valid »).
-- Optionnel : clé partenaire sur https://partners.near-intents.org -> `INTENTS_JWT` (envoyée en en-tête `X-API-Key`, jamais journalisée). Sans clé, frais un peu plus élevés.
+## 1. Prepare (free)
+- A **mainnet dev** NEAR account, separate from your main accounts, with about 2 NEAR (1 NEAR for the swap + gas fees). A wallet that lets you **transfer wNEAR** or do an `ft_transfer` (see the note below).
+- A valid destination address on the target chain (e.g. an EVM address on Base, correct EIP-55 casing, otherwise the API answers "recipient is not valid").
+- Optional: partner key at https://partners.near-intents.org -> `INTENTS_JWT` (sent in the `X-API-Key` header, never logged). Without a key, fees are slightly higher.
 - `npm install`, Node >= 22.22.2.
 
-## 2. Vérifier sans rien dépenser (dry-run public)
+## 2. Verify without spending anything (public dry run)
 ```
 INTENTS_ENABLED=true npx tsx intents/demo.ts tokens
-INTENTS_ENABLED=true npx tsx intents/demo.ts dry wNEAR near USDC base 1000000000000000000000000 <votre_compte.near> <adresse_0x_destination>
+INTENTS_ENABLED=true npx tsx intents/demo.ts dry wNEAR near USDC base 1000000000000000000000000 <your_account.near> <destination_0x_address>
 ```
-Vous obtenez `amountOut`, `minAmountOut`, `appFeeBps`. Exemple réel observé le 2026-11-09 : 1 wNEAR (3,55 USD) -> 3 532 493 USDC (6 décimales), `appFeeBps: 20` sans clé (la doc fees.md annonce 25 ; on lit la valeur réelle). Si `dry` échoue, ne continuez pas.
+You get `amountOut`, `minAmountOut`, `appFeeBps`. Real example observed on 2026-11-09: 1 wNEAR (3.55 USD) -> 3,532,493 USDC (6 decimals), `appFeeBps: 20` without a key (the fees.md doc announces 25; we read the real value). If `dry` fails, do not continue.
 
-## 3. Swap réel (après feu vert)
+## 3. Real swap (after the green light)
 ```
-INTENTS_ENABLED=true INTENTS_DRY_ONLY=false npx tsx intents/demo.ts run wNEAR near USDC base 1000000000000000000000000 <votre_compte.near> <adresse_0x_destination>
+INTENTS_ENABLED=true INTENTS_DRY_ONLY=false npx tsx intents/demo.ts run wNEAR near USDC base 1000000000000000000000000 <your_account.near> <destination_0x_address>
 ```
-Le script fait : dry:true, puis dry:false (affiche une **adresse de dépôt** valable ~15 min), puis attend.
-1. Depuis votre compte de dev, envoyez **exactement** le montant indiqué d'actif d'origine à l'adresse de dépôt (pour wNEAR : `ft_transfer` sur `wrap.near` vers l'adresse, 1 yocto joint ; si l'adresse de dépôt n'a pas de compte NEAR enregistré, un `storage_deposit` préalable peut être exigé par le contrat wNEAR). Un dépôt envoyé après l'échéance ou d'un mauvais montant sera remboursé (`REFUNDED`) à `refundTo`.
-2. Collez le hash de transaction dans le terminal (si l'origine est NEAR, définissez `NEAR_SENDER_ACCOUNT=<votre_compte.near>` avant de lancer). Le script appelle `/v0/deposit/submit` puis suit `/v0/status` (PENDING_DEPOSIT -> KNOWN_DEPOSIT_TX -> PROCESSING -> SUCCESS).
-3. Vous verrez « Preuve acceptée » avec le hash de destination, ou « Preuve REFUSÉE : raison ». Seule une preuve acceptée peut créditer quoi que ce soit dans Darwin.
+The script does: dry:true, then dry:false (displays a **deposit address** valid ~15 min), then waits.
+1. From your dev account, send **exactly** the indicated amount of the origin asset to the deposit address (for wNEAR: `ft_transfer` on `wrap.near` to the address, with 1 yocto attached; if the deposit address has no registered NEAR account, a prior `storage_deposit` may be required by the wNEAR contract). A deposit sent after the deadline or of the wrong amount will be refunded (`REFUNDED`) to `refundTo`.
+2. Paste the transaction hash into the terminal (if the origin is NEAR, set `NEAR_SENDER_ACCOUNT=<your_account.near>` before launching). The script calls `/v0/deposit/submit` then follows `/v0/status` (PENDING_DEPOSIT -> KNOWN_DEPOSIT_TX -> PROCESSING -> SUCCESS).
+3. You will see "Proof accepted" with the destination hash, or "Proof REFUSED: reason". Only an accepted proof can credit anything in Darwin.
 
-## 4. Suivre et conserver les preuves
-- Statut à tout moment : `INTENTS_ENABLED=true npx tsx intents/demo.ts status <adresse_de_dépôt>`.
-- Explorateurs : https://nearblocks.io (hash NEAR), explorateur de la chaîne de destination pour le hash cible. Capturez-les pour la vidéo/le post.
-- Statuts terminaux : SUCCESS, REFUNDED, FAILED, INCOMPLETE_DEPOSIT. Si FAILED ou INCOMPLETE_DEPOSIT, les fonds sont remboursables : gardez l'adresse de dépôt et le hash, contactez le support Intents.
+## 4. Track and keep the proofs
+- Status at any time: `INTENTS_ENABLED=true npx tsx intents/demo.ts status <deposit_address>`.
+- Explorers: https://nearblocks.io (NEAR hash), the destination chain's explorer for the target hash. Capture them for the video/post.
+- Terminal statuses: SUCCESS, REFUNDED, FAILED, INCOMPLETE_DEPOSIT. If FAILED or INCOMPLETE_DEPOSIT, the funds are refundable: keep the deposit address and the hash, contact Intents support.
 
-## 5. Ensuite
-Repassez `INTENTS_DRY_ONLY` à sa valeur par défaut (retirez la variable). Ne committez jamais de clé, d'adresse de dépôt de test ni de `.env`.
+## 5. Afterwards
+Set `INTENTS_DRY_ONLY` back to its default value (remove the variable). Never commit a key, a test deposit address or a `.env`.
 
-## Garde-fous du code
-INTENTS_ENABLED=false par défaut ; dry:false et submit refusés si `INTENTS_DRY_ONLY` != `false` ; dry:true identique obligatoire avant dry:false ; plafond 5 USD ; preuve = statut SUCCESS de `/v0/status` recoupé avec NOTRE devis (correlationId, adresse, destinataire, actif, `amountOut >= minAmountOut`, hash de destination, aucun remboursement) ; crédit unique par dépôt, refusé sans preuve émise par `verifyDeposit`.
+## Code safeguards
+INTENTS_ENABLED=false by default; dry:false and submit refused if `INTENTS_DRY_ONLY` != `false`; identical dry:true mandatory before dry:false; 5 USD cap; proof = SUCCESS status of `/v0/status` cross-checked against OUR quote (correlationId, address, recipient, asset, `amountOut >= minAmountOut`, destination hash, no refund); single credit per deposit, refused without a proof issued by `verifyDeposit`.

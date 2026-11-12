@@ -58,7 +58,7 @@ describe("enriched journal (L18): bid pitch and deliverable content", () => {
     expect((await json(app.request("/api/events?since=0&limit=100"))).events.find((e: any) => e.type === "bid.placed").data.bid.pitch).toBe(PITCH);
   });
 
-  it("GET /api/tasks/:id/deliverable sert files[].content en replay (texte, SVG, drapeau truncated)", async () => {
+  it("GET /api/tasks/:id/deliverable serves files[].content in replay (text, SVG, truncated flag)", async () => {
     const app = appOf(journal({ files: [texte, { name: "logo-1.svg", mime: "image/svg+xml", bytes: 90000, content: SVG, truncated: true }] }));
     const r = await app.request("/api/tasks/t-1/deliverable");
     expect(r.status).toBe(200);

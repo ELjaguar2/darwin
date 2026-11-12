@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { loadConfig } from "../shared/index.ts";
 import { checkNodeVersion, checkTestnetEnv, versionLt } from "./startup.ts";
 
-describe("version de Node", () => {
+describe("Node version", () => {
   it("comparaison semver", () => {
     expect(versionLt("22.11.9", "22.12.0")).toBe(true);
     expect(versionLt("22.12.0", "22.12.0")).toBe(false);

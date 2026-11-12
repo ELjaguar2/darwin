@@ -68,7 +68,7 @@ function manual(text = smallJournal(), opts: Parameters<typeof createReplay>[1] 
   return { replay, waits, step, hasPending: () => pending !== undefined };
 }
 
-describe("validation du journal", () => {
+describe("journal validation", () => {
   it("reads run8: 1819 events, date read from the journal, no renumbering", () => {
     const { events, meta } = loadReplayFile(DEFAULT_REPLAY_FILE);
     expect(events).toHaveLength(1819);
@@ -168,7 +168,7 @@ describe("reader: pacing and speeds", () => {
   });
 });
 
-describe("API en mode replay", () => {
+describe("API in replay mode", () => {
   function appFor(opts: { text?: string; steps?: number; env?: Record<string, string>; control?: "open" | "locked" } = {}) {
     const m = manual(opts.text, { speed: 5 });
     m.step(opts.steps ?? 0);
@@ -275,14 +275,14 @@ describe("API en mode replay", () => {
     expect(locked.replay.status().speed).toBe(20);
   });
 
-  it("/classique redirige vers /?classique", async () => {
+  it("/classique redirects to /?classique", async () => {
     const { app } = appFor();
     const r = await app.request("/classique");
     expect(r.status).toBe(302);
     expect(r.headers.get("location")).toBe("/?classique");
   });
 
-  it("fin de rejeu et redémarrage : reset envoyé aux clients connectés, état vidé", async () => {
+  it("end of replay and restart: reset sent to connected clients, state cleared", async () => {
     const { app, step, replay } = appFor({ steps: 0 });
     const ctl = new AbortController();
     const res = await app.request("/api/stream", { signal: ctl.signal });

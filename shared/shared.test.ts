@@ -98,7 +98,7 @@ describe("MockChain", () => {
     await chain.markAgentDead({ agentId: "a-0001", deathTick: 9, cause: "starvation" });
     const closed = await chain.closeAccount({ accountId: parent.accountId, beneficiary: chain.masterId });
     expect(closed.swept).toBe(parseNear("12").toString());
-    expect((await chain.getAgentRecord("a-0001"))?.alive).toBe(false); // lignée conservée
+    expect((await chain.getAgentRecord("a-0001"))?.alive).toBe(false); // lineage kept
     expect(chain.totalSupply()).toBe(supply);
   });
   it("contract rules: refund reasons, reputation tied to the escrow, one write per (task, agent)", async () => {
