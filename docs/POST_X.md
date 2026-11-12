@@ -34,7 +34,7 @@ Attach: the video (the "wow" in the first 10 seconds). Mandatory.
 ```
 
 ```text
-5/ On NEAR testnet, run for real: sub-accounts, function-call keys, a Rust escrow/registry contract, NEAR AI Cloud as the brain. Run of 12 Nov: generation 3, 16 births, 4 deaths, 78 escrows, 2 missions paid, a logo included. NEAR Intents: not run.
+5/ On NEAR testnet, run for real: sub-accounts, function-call keys, a Rust escrow/registry contract, NEAR AI Cloud as the brain. Run of 12 Nov: generation 3, 16 births, 4 deaths, 78 escrows, 2 missions paid. NEAR Intents: module present, disabled, not run (vision).
 ```
 
 ```text

@@ -39,9 +39,9 @@ Related work: Spore.fun (Solana; arXiv 2506.04236: 1 child in generation 5, only
 
 NEAR, run for real on testnet (tx ids in the repo): sub-account and function-call key per agent, Rust registry/escrow/reputation contract, NEAR AI Cloud brain. Two runs reached generation 3: run 8 (12 births, 7 deaths) and run 9c on 12 Nov (16 births, 4 deaths, 78 escrows, English). Run 9c also paid two UI missions (marketing, logo).
 
-Honesty: mock is the default; most paid tasks come from the labelled simulated client; the two missions were typed by an automated browser for the developer, paid by our demo account; real subcontracting proven in a 21-minute run (3 complete cases; 2 refused parents, their delegator lost money), unawarded in run 9c (bug, fixed); AI cost (about 0.07 USD) is local accounting; NEAR Intents was never run; escrow is validated by the operator, not trustless.
+Honesty: mock is the default; most paid tasks come from the labelled simulated client; the two missions were typed by an automated browser for the developer, paid by our demo account; real subcontracting proven in a 21-minute run (3 complete cases; 2 refused parents, their delegator lost money), unawarded in run 9c (bug, fixed); AI cost (about 0.07 USD) is local accounting; NEAR Intents: module present, disabled, not run (vision); escrow is validated by the operator, not trustless.
 
-Run: npm ci && npm run start:mock (README: do X, see Y). Code mostly by AI agents (Claude Code). MIT.
+Run: npm ci && npm run start:mock. Code mostly by AI agents (Claude Code). MIT.
 ```
 <!-- idea:end -->
 
