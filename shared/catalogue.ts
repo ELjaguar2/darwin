@@ -28,7 +28,7 @@ export interface ProfessionSpec {
   nearPrice: bigint;
   /** Description of the expected deliverable (shown in the form and in the judge prompt). */
   deliverable: string;
-  /** Produced file names (see market/deliverable.ts). Stable protocol identifiers: kept as they are. */
+  /** Produced file names (see market/deliverable.ts). English since L19 (old journals may still carry analyse.md, texte.md, traduction.md: any safe name is accepted when reading). */
   files: string[];
   rubric: RubricCriterion[];
   /** Minimum weighted score (0..1) for the judge to accept (the deterministic checks must also pass). */
@@ -82,7 +82,7 @@ export const CATALOGUE: Record<Profession, ProfessionSpec> = {
   finance: {
     profession: "finance", label: "Financial analysis", refUsd: 120, nearPrice: np("0.036"), baseDemand: 1, acceptScore: 0.6, maxOutputTokens: 1800,
     deliverable: "Financial analysis in Markdown based on the figures provided in the order, calculations shown, limits stated.",
-    files: ["analyse.md"],
+    files: ["analysis.md"],
     rubric: rub(
       ["fidelity", "Only the provided figures are used; no invented figure.", 0.35],
       ["calculations", "The calculations are shown and correct (totals, margins, variations).", 0.3],
@@ -111,7 +111,7 @@ export const CATALOGUE: Record<Profession, ProfessionSpec> = {
   marketing: {
     profession: "marketing", label: "Marketing copywriting", refUsd: 80, nearPrice: np("0.024"), baseDemand: 1.1, acceptScore: 0.6, maxOutputTokens: 900,
     deliverable: "Ready-to-publish marketing copy in Markdown (hook, body, call to action).",
-    files: ["texte.md"],
+    files: ["text.md"],
     rubric: rub(
       ["fit", "The text answers the order (requested product, target, tone, format).", 0.35],
       ["hook", "Punchy hook and clear call to action.", 0.25],
@@ -125,7 +125,7 @@ export const CATALOGUE: Record<Profession, ProfessionSpec> = {
   translation: {
     profession: "translation", label: "Translation", refUsd: 40, nearPrice: np("0.012"), baseDemand: 1.3, acceptScore: 0.6, maxOutputTokens: 900,
     deliverable: "Faithful translation of the source text into the requested language (English by default), followed by a short note.",
-    files: ["traduction.md"],
+    files: ["translation.md"],
     rubric: rub(
       ["fidelity", "The meaning of the source text is fully preserved, with no addition or omission.", 0.4],
       ["language", "The target language is correct and natural, with the right terminology.", 0.35],

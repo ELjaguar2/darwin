@@ -2,7 +2,7 @@
 import type { Profession } from "./types.ts";
 
 export interface DeliverableFile {
-  /** Safe file name: [a-z0-9._-]{1,64}, e.g. "logo-1.svg", "architecture.md", "schema.mmd". Stable protocol identifier (not translated). */
+  /** Safe file name: [a-z0-9._-]{1,64}, e.g. "logo-1.svg", "architecture.md", "schema.mmd". English since L19. */
   name: string;
   /** "image/svg+xml" | "text/markdown" | "text/plain" | "text/vnd.mermaid" */
   mime: string;
