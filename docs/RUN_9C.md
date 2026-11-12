@@ -33,7 +33,7 @@ Since 9b: hard `max_tokens` cap for deliverables (7cb869d), mock calibration D-0
    The `amount` field is in yoctoNEAR (1 NEAR = 10^24). Top up via the usual testnet faucet (the one from previous runs, which gave 10 NEAR).
 4. Backup: startup renames `data/journal.jsonl`, `state.json` and `lineage.json` to `*.prev` (and **overwrites** the old `journal.prev`). Copy first:
    ```powershell
-   Copy-Item -Recurse data "data-sauvegarde-$(Get-Date -Format yyyyMMdd-HHmm)"
+   Copy-Item -Recurse data "data-backup-$(Get-Date -Format yyyyMMdd-HHmm)"
    ```
 5. AI budget: `data/ai-budget.json` cumulative ≈ 0.05 USD, stop cap 8 EUR: ample.
 6. Close the other Darwin servers (port 3000 free).
@@ -47,7 +47,7 @@ $env:DARWIN_PRESET = "selection"
 $env:DARWIN_ADMIN_TOKEN = "<random-string-of-24-characters-or-more>"   # optional, used to pause cleanly
 npm run start:testnet
 ```
-No other tuning variable (as in run 8). Ids are shifted automatically. The page is at http://127.0.0.1:3000 (check that the header shows **TESTNET NEAR**, not MOCK or REPLAY). A tick lasts about 1 real minute.
+No other tuning variable (as in run 8). Ids are shifted automatically. The page is at http://127.0.0.1:3000 (check that the header shows **NEAR TESTNET**, not MOCK or REPLAY). A tick lasts about 1 real minute.
 
 Recommended course during the run:
 - **Ticks 1 to 8**: let the 6 founders be born. Check the Mission page (agent cards) and the Proof tab (nearblocks links).

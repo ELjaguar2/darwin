@@ -2,7 +2,7 @@
 
 > Runs before 2026-11-12 were generated in French (agent letters, pitches, deliverables); journals under docs/preuves are historical traces and are not modified.
 >
-> Updated 2026-11-12: §8 = run 8 of 2026-11-10 (generation 3 and deaths), §10 = logo validation of 2026-11-11, §11 = summary of runs 9a and 9b of 2026-11-11, §12 = sha256 fingerprints of the proof journals. Rule: only what appears here with a transaction identifier, a journal or a reproducible command is **proven**. Everything else is stated as not proven. Explorer: `https://testnet.nearblocks.io/txns/<hash>` (nearblocks, testnet). No mainnet spending, nothing is published. This file is generated from `docs/preuves/PREUVES_TEMPLATE.md` and the journals by `node scripts/assemble-preuves.mjs` (the generator scripts emit some table headers in French; the committed English file was translated by hand).
+> Updated 2026-11-12: §8 = run 8 of 2026-11-10 (generation 3 and deaths), §10 = logo validation of 2026-11-11, §11 = summary of runs 9a and 9b of 2026-11-11, §12 = sha256 fingerprints of the proof journals, §13 = English output validation of 2026-11-12. Rule: only what appears here with a transaction identifier, a journal or a reproducible command is **proven**. Everything else is stated as not proven. Explorer: `https://testnet.nearblocks.io/txns/<hash>` (nearblocks, testnet). No mainnet spending, nothing is published. This file is generated from `docs/preuves/PREUVES_TEMPLATE.md` and the journals by `node scripts/assemble-preuves.mjs` (the generator scripts emit some table headers in French; the committed English file was translated by hand).
 
 ## 1. Honest summary
 
@@ -16,7 +16,7 @@
 | Generation 2 on the real chain (5 reproductions and 5 letters in a single run) | **Proven** (§4) |
 | Generation 3 in a single real run | **Proven** (run 8, preset `selection`, 59 ticks: generation 3, 12 births, 8 reproductions; §8) |
 | Death of an agent on testnet | **Proven**: 7 deaths by starvation in run 8, `mark_dead` and account closing with transactions (§8) |
-| `refund_escrow` on testnet | **Proven once**: task `t-5003` rejected by the judge, `rejected` refund by the contract, reputation penalty −2 (§8) |
+| `refund_escrow` on testnet | **Proven** (§8, §11): task `t-5003` rejected by the judge, `rejected` refund by the contract, reputation penalty −2; visitor logo orders refunded the same way in run 9b (§11) |
 | Agents' function-call keys | **Proven in run 8**: key added in the creation transaction, 0 warnings, 2 keys verified on the chain (failed in runs 5 to 7, fixed) |
 | NEAR Intents, mainnet | **Never executed** (no spending) |
 

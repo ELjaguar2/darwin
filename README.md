@@ -154,6 +154,7 @@ Commands (from `package.json`):
 
 | Command | Effect |
 |---|---|
+| `npm run replay` | replay of a recorded real run (section 6b), no key, no network |
 | `npm run start:mock` | full mock, no key (forces `DARWIN_MODE=mock`) |
 | `npm run start:demo` | `demo` preset: faster ticks (400 ms), several generations in a few minutes |
 | `npm start` | `tsx backend/main.ts`; reads `.env` if present |
@@ -185,7 +186,7 @@ Change the port with `PORT=3100` (default `3000`). Data is written under `data/`
 | `NEAR_CONTRACT_ID` | optional; empty = degraded escrow. Set after deploying the contract |
 | `NEAR_RPC_URL` | default `https://test.rpc.fastnear.com`; comma-separated list = automatic failover between providers (public testnet providers listed in `.env.example`, from https://docs.near.org/api/rpc/providers) |
 | `NEARAI_API_KEY` | **SECRET**, from cloud.near.ai > API Keys; empty = mock brain |
-| `NEARAI_MODEL` | optional default model (checked against `/v1/models`) |
+| `NEARAI_MODEL` | optional default model (checked against `/v1/model/list`) |
 | `NEARAI_MAX_USD_PER_RUN`, `NEARAI_MAX_USD_PER_HOUR` | spending caps in USD |
 | `DARWIN_NEAR_USD_RATE` | fixed USD per NEAR used to convert AI cost |
 | `DARWIN_PRESET` | `normal`, `demo` or `selection` (testnet, current values: 6 founders, population cap 18, birth capital 0.12 NEAR, metabolism 0.0035, vital minimum 0.03 NEAR, simulated client 2 tasks per tick, 10 s ticks; recalibrated in mock only, never run to generation 3 on testnet; this is **not** the preset of run 8, see the note above) |
@@ -219,7 +220,7 @@ All steps 1 to 14 were **re-executed on 2026-11-12 against a real running backen
 | 12 | `curl -X POST http://127.0.0.1:3000/api/sim/pause`, then `.../api/sim/resume` | `{"ok":true,"running":true,"paused":true,"tick":N}`, then `"paused":false`. (With no `DARWIN_ADMIN_TOKEN` these routes are open only because the server listens on 127.0.0.1.) |
 | 13 | Stop the server (Ctrl+C), run `npm run start:demo`, wait about 90 seconds, then `curl "http://127.0.0.1:3000/api/agents?status=dead"` and `curl http://127.0.0.1:3000/api/lineage` | Dead agents with `"causeOfDeath":"starvation"` (10 dead and 3 generations after 95 s in the 2026-11-12 run; the exact count varies). |
 | 14 | Open `http://127.0.0.1:3000/` in a browser | The header pill reads "MOCK simulated chain and AI" (and "Live"), with three tabs: **Mission**, **Lineage**, **Proof**. **Mission**: one card per agent, a mission box (placeholder "Describe your mission…", a profession menu, a Budget field in NEAR, a "Send the mission" button, and the note "Public data: the text, bids and deliverable of your mission are public. The budget is funded by the demo account."), then a live thread per task (a "simulated" tag for the simulated client, bids with pitches, the winner, the verdict, a paid mark). **Lineage**: the family tree ("Generation 3 · 12 alive · 0 dead" after about 75 s), dead agents greyed, click an agent for its genome, letters and balance curve. **Proof**: counters ("3 generations", "12 alive", "73 missions paid"), population per generation, money flows, transactions, NEAR building blocks. The previous single page is at `/?classique` (HTTP 200 and title checked on 2026-11-12; its content was not re-read). |
-| 15 | `npm test`, then `npm run typecheck` | All tests pass and typecheck reports no error (2026-11-12: 26 test files and 381 tests passed, `tsc --noEmit` printed no error). |
+| 15 | `npm test`, then `npm run typecheck` | All tests pass and typecheck reports no error (2026-11-12: 27 test files and 387 tests passed, `tsc --noEmit` printed no error). |
 
 Run for real on 2026-11-10: testnet mode, the contract on testnet, real NEAR AI Cloud completions, one TEE attestation, and one run (run 8, previous version of preset `selection`) with generation 3 and 7 deaths (section 8, step 6; not re-run by QA as part of these steps). Never run: the real NEAR Intents flow, an accepted and paid visitor-path task on testnet (runs 9a and 9b: two rejected and refunded logo orders and three expired orders only). The web page and the clean-clone install in mock mode were checked (page by the author with Playwright, clean clone by the QA run, see `docs/QA_RAPPORT.md`). The Rust tests were not re-run by the author of this README.
 
@@ -241,8 +242,8 @@ Run for real on 2026-11-10: testnet mode, the contract on testnet, real NEAR AI 
 
 - **AI-generated code.** Most of this repository (code, tests, contract, documents) was written by AI agents (Claude Code, a team of specialised agents coordinated through `CLAUDE.md` and `.claude/agents/`), under the direction of a human who owns the decisions and the submission. Decisions are logged in `docs/DECISIONS.md`.
 - **Prior code.** None declared: the repository was started for this hackathon (work recorded from 2026-11-09, inside the hackathon window). No earlier NEAR work is included. *(The human author must confirm this before submission.)*
-- **Third-party libraries** (from `package.json`): `hono` 4.13.17, `@hono/node-server` 2.1.6, `zod` 4.6.7, `near-api-js` 7.4.0 (optional), `tsx`, `typescript`, `vitest`, `cross-env`, `@types/node`; Rust: `near-sdk` 5.30.1. No project template or boilerplate repository was used.
-- **External services**: NEAR testnet RPC and faucet, NEAR AI Cloud, NEAR Intents 1Click.
+- **Third-party libraries** (from `package.json`): `hono` 4.13.17, `@hono/node-server` 2.1.6, `zod` 4.6.7, `near-api-js` 7.4.0 (optional), `@phala/dcap-qvl` 0.7.1 and `ethers` 6.17.0 (dev only: TEE attestation check, `scripts/verify-attestation.mjs`), `tsx`, `typescript`, `vitest`, `cross-env`, `@types/node`; Rust: `near-sdk` 5.30.1. No project template or boilerplate repository was used.
+- **External services**: NEAR testnet RPC and faucet, NEAR AI Cloud, NEAR Intents 1Click, Phala PCCS (collateral for the TEE attestation check).
 - **Second project**: if the human author submits a second hackathon project, each README must name the other. *(To be filled by the human.)*
 
 ## 12. Frontend (web page)

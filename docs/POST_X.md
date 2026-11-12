@@ -29,7 +29,7 @@ Attach: the video (the "wow" in the first 10 seconds). Mandatory.
 ```
 
 ```text
-4/ Spore.fun selected agents by token price: it reached generation 5; by May 2025 only the original agent was alive (arXiv 2506.04236). Darwin selects by paid, validated work. Selection by speculation died out. Selection by useful work can last. A hypothesis to test.
+4/ Spore.fun selected by token price: it reached generation 5; by May 2025 only the original agent was alive (arXiv 2506.04236). Darwin selects by paid, validated work. Selection by speculation died out. Selection by useful work can last. A hypothesis to test.
 ```
 
 ```text

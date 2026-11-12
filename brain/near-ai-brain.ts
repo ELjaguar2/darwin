@@ -273,7 +273,7 @@ export class NearAiBrain implements Brain {
     if (mine.length >= g.maxCallsPerAgentWindow) {
       this.calls.set(req.agentId, mine);
       this.warn("BRAIN_LOOP_GUARD", `agent ${req.agentId}: too many AI calls (${mine.length}/${g.windowMs} ms), call refused`);
-      throw new BrainError("RATE_LIMITED", `Garde-fou anti-boucle : ${mine.length} appels en ${g.windowMs} ms pour ${req.agentId}`);
+      throw new BrainError("RATE_LIMITED", `Anti-loop guard: ${mine.length} calls in ${g.windowMs} ms for ${req.agentId}`);
     }
     const key = `${req.agentId}|${req.purpose}|${req.model}|${promptKey}`;
     const same = prune(this.identical.get(key) ?? []);
@@ -289,7 +289,7 @@ export class NearAiBrain implements Brain {
   }
 
   async complete(req: BrainRequest): Promise<BrainResponse> {
-    if (!this.opts.apiKey) throw new BrainError("NO_API_KEY", "NEARAI_API_KEY absente : utiliser le mode mock");
+    if (!this.opts.apiKey) throw new BrainError("NO_API_KEY", "NEARAI_API_KEY missing: use mock mode");
     const g = this.guardrails;
     const promptChars = req.messages.reduce((n, m) => n + m.content.length, 0);
     if (promptChars > g.maxPromptChars) throw new BrainError("BAD_RESPONSE", `Prompt too long (${promptChars} > ${g.maxPromptChars} characters): call refused`);

@@ -38,7 +38,7 @@ async function main() {
     assertSafeBinding(config.server.host, config.server.adminToken); // R7: token mandatory outside 127.0.0.1
     const nv = checkNodeVersion(nodeV, config.mode);
     if (nv.error) return fail(nv.error, 2);
-    if (nv.warning) console.warn(`[darwin] AVERTISSEMENT : ${nv.warning}`);
+    if (nv.warning) console.warn(`[darwin] WARNING: ${nv.warning}`);
     const envErr = checkTestnetEnv(config);
     if (envErr) return fail(envErr, 2);
   } catch (e) {

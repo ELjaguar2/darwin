@@ -427,7 +427,7 @@ function renderSpec() {
         ...r.parts.filter(([, n]) => n > 0).map(([p, n]) => h("span", { class: `seg ${profOf(p).cls}`, title: `${labelOf(p)}: ${n}`, css: { flexGrow: String(n) } }, h("b", null, n)))),
       h("span", { class: "spec-n", "aria-hidden": "true" }, r.sum ? `${r.sum} alive` : "extinct"));
   });
-  if (dom) out.push(h("li", { class: "spec-note muted small" }, `Dominant profession: ${labelOf(dom)} (${totals[dom]} of ${alive}). Lineages that specialize where demand is strong thrive, the others die out.`));
+  if (dom) out.push(h("li", { class: "spec-note muted small" }, `Dominant profession: ${labelOf(dom)} (${totals[dom]} of ${alive}). Hypothesis: lineages that specialize where demand is strong should survive better.`));
   $("spec").replaceChildren(...out);
 }
 

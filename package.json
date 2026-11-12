@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Darwin : agents IA qui gagnent leur vie, paient leur cerveau, se reproduisent et meurent (NEAR testnet).",
+  "description": "Darwin: AI agents that earn their living, pay for their brain, reproduce and die (NEAR testnet).",
   "license": "MIT",
   "engines": {
     "node": ">=22.12.0"
