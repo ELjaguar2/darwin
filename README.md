@@ -282,6 +282,17 @@ Run for real on 2026-11-10 and 2026-11-12: testnet mode, the contract on testnet
 
 The web page is in `frontend/` (plain HTML, CSS and ES modules, no build step, no external resource) and is served by the backend at `/`. The default page has three tabs (Mission, Lineage, Proof; labels read from the page on 2026-11-12). **Mission**: agent cards, a box to order a task ("Describe your mission…"), and a live thread per task (bids, the winner, the judge verdict, the paid mark). **Lineage**: the family tree, dead agents greyed, genome, letters and balance curve per agent. **Proof**: counters, population per generation, money flows, transactions and the NEAR building blocks. The previous single page is still served at `/?classique`. The page reads only `/api/*` and `/api/stream`. It also displays the honesty labels: a header pill ("MOCK", "NEAR TESTNET" or "REPLAY"), a "simulated" tag on the simulated client, a visitor badge on visitor tasks; the classic page also shows a degraded-escrow label. The server sends a strict Content-Security-Policy, so the page loads no external resource and no inline script. In replay, the mission box is disabled ("Missions disabled during replay") and a banner reads "Replay of a real testnet run from November 12, 2026" (the date of the journal replayed; November 10 for run 8). More: [`frontend/README.md`](frontend/README.md).
 
+## What we observed
+
+Computed from the journals of the three real runs (8, 9c, 10); details, tables and caveats in [`docs/FINDINGS.md`](docs/FINDINGS.md). **These are anecdotes from tiny samples (9 to 16 agents, one run each), not statistics.**
+
+- **Work is concentrated.** The top 3 agents earned 90% (run 8), 67% (run 9c) and 53% (run 10) of all earnings; 8 of 12, 9 of 16 and 2 of 9 agents earned nothing. Agents that died had won about 2 tasks on average, those that reproduced 11 to 16.
+- **No gene stands out.** Correlations between each gene (price strategy, risk, cooperation, reproduction threshold, generosity) and earnings change sign between runs; only cooperation stayed weakly positive (+0.07 to +0.27). A pattern visible in run 8 did not replicate in run 9c.
+- **Subcontracting was roughly neutral.** In run 10, delegators earned a similar amount per won task as others; the 3 accepted parents kept 0.0576 NEAR of commission and the 2 refused logo parents lost 0.048 NEAR (net about +0.0096 NEAR).
+- **Children are near-copies and rarely earn within a run** (1 of 8, 1 of 10 and 1 of 3 children earned anything), but they also had far less time than founders.
+- **Parent-to-child letters are a record, not a channel:** they are not fed into the child's prompts, and 8 of 13 letters of the English runs came out shorter than 100 characters (6 empty).
+
+
 ## Known limitations
 
 - The **testnet mode was run for real**: generation 3 in run 8 (previous preset, 7 deaths) and in run 9c (current preset, 4 deaths), **one execution each**, one seed: speed of selection is not guaranteed. The payer of most tasks was the simulated client (run 9c: 76 of 78 escrows). The two missions of run 9c that were paid through the interface were typed by an automated browser on the developer's behalf, and paid from the operator's demo account. The public RPC rate limit is a known weak point (multi-provider failover available, not exercised for real).
