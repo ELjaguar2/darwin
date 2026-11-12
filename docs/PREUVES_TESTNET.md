@@ -356,3 +356,25 @@ Date : 2026-11-11 (UTC), testnet NEAR, `mode=testnet`, `preset=selection` (versi
 - Cause du rejet : la sortie du modèle était tronquée et ne contenait pas les 3 blocs SVG attendus. Le §10 l'attribue à un plafond de tokens de sortie trop bas, corrigé ensuite (commit `7cb869d`) puis validé par un appel réel isolé (§10). **Nuance** : le §10 cite un plafond de 400 ; dans ces journaux chaque appel de production s'arrête à exactement 300 tokens de sortie (valeur du preset `selection` de l'époque). Le plafond a été relevé depuis ; il n'a pas été rejoué dans un run complet.
 - Enchères : 7 (`bid.placed`) en 9a et 9 en 9b, très peu face aux 92 du run 8 ; les deux runs se sont éteints en génération 1 (extinction), schéma que `docs/RUN_9C.md` §0 et §4 demande de surveiller. Écart de comptage avec `docs/RUN_9C.md` §0 : ce tableau indique 6 fondateurs pour 9a, alors que `run9a-journal.jsonl` n'en contient que 4 (`agent.born` : 4, `agent.died` : 4) ; les journaux font foi.
 - Vérifiable : `https://testnet.nearblocks.io/txns/<hash>` avec les hashes ci-dessus ; les hashes complets des autres événements sont dans les journaux.
+
+## 12. Empreintes sha256 des journaux de preuve
+
+Le bandeau « run réel testnet » de l'interface se déduit du champ `chain` du journal lui-même : un journal modifié à la main serait étiqueté « réel ». Ces empreintes permettent de vérifier qu'un fichier est identique à celui publié (la seule preuve des transactions reste leur hash sur `testnet.nearblocks.io`). Calculées sur les fichiers du dépôt à la date du 2026-11-12.
+
+| Fichier | sha256 |
+|---|---|
+| `docs/preuves/run5-journal.jsonl` | `7b2218013c9a59eaf6c4a137438023f3edf1263f5fe4c1011fde7e78df367cef` |
+| `docs/preuves/run6-journal.jsonl` | `4acc398b036ab7da18680533dfe58e5ec6aeafb9e6d4232daae8a486100be84f` |
+| `docs/preuves/run7-journal.jsonl` | `af255a9f0a037baba87b24cbb5be04f318144f0ec459ffcd50d9989d3214c486` |
+| `docs/preuves/run8-journal.jsonl` | `9647d982663bc2493a2ecf562d17837ef7ad1d32b9169bbf704afcedf3ba2110` |
+| `docs/preuves/run9a-journal.jsonl` | `b82aa257e853b076a01501c92b40319b6a4503a3f5977cb6998a94ff0a6628fb` |
+| `docs/preuves/run9b-journal.jsonl` | `fdb06603b6571207bcf11fc2b175826c798d85a61906829c83efdaffaf7dbf69` |
+
+Vérification (depuis la racine du dépôt) :
+
+```bash
+sha256sum docs/preuves/*.jsonl          # Linux, macOS, Git Bash
+# PowerShell : Get-FileHash -Algorithm SHA256 docs/preuves/*.jsonl
+```
+
+Les valeurs doivent être identiques à celles du tableau. Une conversion de fins de ligne au checkout (`core.autocrlf`) change l'empreinte : cloner avec `git -c core.autocrlf=false clone ...` en cas de doute.

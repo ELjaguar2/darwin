@@ -5,7 +5,7 @@
 | ID | Date | Décision | Raison |
 |---|---|---|---|
 | D-001 | 2026-11-09 | Équipe de 14 agents conforme au prompt, sans ajustement. | Composition du prompt jugée suffisante (max 16). |
-| D-002 | 2026-11-09 | Dépôt git initialisé dans C:\Users\aymer\Darwin, branche main. | Prérequis des branches par lot. |
+| D-002 | 2026-11-09 | Dépôt git initialisé dans <dépôt>, branche main. | Prérequis des branches par lot. |
 | D-003 | 2026-11-09 | Stack : TypeScript (strict) sur Node.js 22 pour tout sauf les contrats. Un seul `package.json` à la racine, pas de monorepo à workspaces. | Une seule langue, un seul `npm install`, démarrage sans clé sur clone neuf. Les modules sont des dossiers, pas des paquets. |
 | D-004 | 2026-11-09 | Contrats NEAR en Rust avec `near-sdk` 5.30.1 (crates.io, 2026-11-09), compilés par `cargo-near` 0.23.0. Un seul contrat `contracts/darwin` (registre + séquestre + réputation). | docs.near.org/smart-contracts/quickstart : near-sdk-rs est « l'only official smart-contract SDK » ; `near-sdk-js` n'a plus de publication depuis 2024-06. Un seul déploiement simplifie le testnet. La doc cite rustc 1.86.0 / cargo-near 0.16.1 comme versions testées : le dev-contrats vérifie la chaîne d'outils. |
 | D-005 | 2026-11-09 | Client NEAR côté TypeScript : `near-api-js` 7.4.0 (npm `latest`, 2026-11-09), en `optionalDependencies`, importé dynamiquement par `accounts/` seulement. Exige Node >= 22.22.2 (champ `engines` du paquet). | docs.near.org/tools/near-api cite near-api-js et near-kit ; near-api-js est la bibliothèque de référence. Optionnel pour que le mode mock s'installe sur n'importe quel Node 22. Constat : sur Node 22.17.1 npm saute ce paquet, donc le mode testnet exige Node >= 22.22.2 (documenté dans le README). |

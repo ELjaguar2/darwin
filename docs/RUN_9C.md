@@ -19,7 +19,7 @@ Depuis 9b : plafond dur de `max_tokens` pour les livrables (7cb869d), calibrage 
 
 1. Code final fusionné dans `main` (revues sécurité et gardien faites), puis :
    ```powershell
-   cd C:\Users\aymer\Darwin
+   cd <dépôt>
    git checkout main
    npm ci
    npm test        # doit être vert
@@ -41,7 +41,7 @@ Depuis 9b : plafond dur de `max_tokens` pour les livrables (7cb869d), calibrage 
 
 Dans un terminal PowerShell séparé :
 ```powershell
-cd C:\Users\aymer\Darwin
+cd <dépôt>
 $env:DARWIN_PRESET = "selection"
 $env:DARWIN_ADMIN_TOKEN = "<chaine-aleatoire-de-24-caracteres-ou-plus>"   # facultatif, sert à mettre en pause proprement
 npm run start:testnet

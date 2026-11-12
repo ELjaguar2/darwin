@@ -1,7 +1,7 @@
 # QA_RAPPORT — recette « juge IA » sur clone neuf
 
 - **Date** : 2026-11-09 (recette sur `main`, commit `c99eab0`, arbre de travail propre : tout est commité).
-- **Environnement** : Windows 11 Pro, Node v22.17.1, npm, Git Bash, Playwright (Chromium, viewport 1280x900, deviceScaleFactor 1). Clone dans un dossier neuf du scratchpad (`git clone C:\Users\aymer\Darwin`), sans `node_modules`, `.env` ni `data/` copiés. Aucun `.env` dans le clone.
+- **Environnement** : Windows 11 Pro, Node v22.17.1, npm, Git Bash, Playwright (Chromium, viewport 1280x900, deviceScaleFactor 1). Clone dans un dossier neuf du scratchpad (`git clone <dépôt>`), sans `node_modules`, `.env` ni `data/` copiés. Aucun `.env` dans le clone.
 - **Périmètre** : lecture seule sur le code. Rien corrigé, rien commité.
 
 ## Verdict : clone neuf PASSE (mode mock). Zéro bug bloquant.
