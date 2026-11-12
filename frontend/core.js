@@ -3,6 +3,7 @@
 import { Store, EVENT_TYPES } from "./store.js";
 import { big, explorerUrl } from "./format.js";
 import { subs } from "./subcontract.js";
+import { letterReceipts } from "./letters.js";
 
 export const store = new Store();
 store.explorerBase = undefined;
@@ -50,6 +51,7 @@ class Ledger {
   reset() {
     this.maxSeq = 0;
     subs.reset();
+    letterReceipts.reset();
     this.hist = new Map(); // agentId -> [{tick, delta (bigint), reason, balance (bigint)}]
     this.totals = { earned: 0n, brain: 0n, passed: 0n, fees: 0n, brainCalls: 0, teeCalls: 0, models: new Map() };
     this.byGen = new Map(); // generation -> {earned, brain, passed}
@@ -59,6 +61,7 @@ class Ledger {
   ingest(ev) {
     if (ev.seq <= this.maxSeq) return;
     this.maxSeq = ev.seq;
+    letterReceipts.ingest(ev); // L25
     subs.ingest(ev); // L21: agent-to-agent subcontracting (display aggregates)
     const d = ev.data ?? {};
     switch (ev.type) {
