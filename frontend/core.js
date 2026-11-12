@@ -1,5 +1,5 @@
-// Coeur de l'interface L17 : chargement de l'état, historique, flux SSE avec reprise, catalogue, santé, mode (mock / testnet / rejeu).
-// Aucune logique métier : tout est reflet du journal d'événements du backend. Aucun innerHTML.
+// Core of the L17 interface: state loading, history, SSE stream with resume, catalogue, health, mode (mock / testnet / replay).
+// No business logic: everything reflects the backend event log. No innerHTML.
 import { Store, EVENT_TYPES } from "./store.js";
 import { big, explorerUrl } from "./format.js";
 
@@ -9,18 +9,18 @@ store.explorerBase = undefined;
 const KNOWN = new Set(EVENT_TYPES);
 const listeners = { event: new Set(), loaded: new Set(), conn: new Set(), meta: new Set(), reset: new Set() };
 export const on = (kind, fn) => { listeners[kind].add(fn); return () => listeners[kind].delete(fn); };
-const fire = (kind, ...a) => { for (const fn of listeners[kind]) { try { fn(...a); } catch (e) { console.warn("écouteur", kind, e?.message); } } };
+const fire = (kind, ...a) => { for (const fn of listeners[kind]) { try { fn(...a); } catch (e) { console.warn("listener", kind, e?.message); } } };
 
 export const core = {
   mode: "mock", // "mock" | "testnet" | "replay"
   replayInfo: null,
   health: null,
   catalogue: null, // Map id -> {id,label,refUsd,nearPrice,deliverable,rubric,acceptScore}
-  conn: { state: "connecting", text: "Connexion…" },
-  live: false, // faux pendant le rattrapage initial : pas de notification ni d'animation
+  conn: { state: "connecting", text: "Connecting…" },
+  live: false, // false during the initial catch-up: no notification or animation
 };
 
-/** Mode toujours affiché : replay si le backend l'annonce (health.mode, state.mode, sim.started, champ replay), sinon testnet/mock. */
+/** Mode is always displayed: replay if the backend announces it (health.mode, state.mode, sim.started, replay field), otherwise testnet/mock. */
 function computeMode() {
   const h = core.health, s = core.stateRaw;
   const replay = core.mode === "replay" && !core.resetting || store.mode === "replay" || h?.mode === "replay" || !!h?.replay || !!s?.replay || core.sawReplayStart;
@@ -28,10 +28,10 @@ function computeMode() {
   core.mode = replay ? "replay" : (store.mode === "testnet" || h?.mode === "testnet" || !mock) ? "testnet" : "mock";
   core.replayInfo = replay ? (h?.replay && typeof h.replay === "object" ? h.replay : s?.replay && typeof s.replay === "object" ? s.replay : {}) : null;
   fire("meta");
-  if (replay && !core.replayPoll) core.replayPoll = setInterval(loadHealth, 3000); // progression du lecteur
+  if (replay && !core.replayPoll) core.replayPoll = setInterval(loadHealth, 3000); // player progress
 }
 
-// ------------------------------------------------------------------ réseau
+// ------------------------------------------------------------------ network
 async function api(path, opts) {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), 10000);
@@ -43,14 +43,14 @@ async function api(path, opts) {
 }
 export { api };
 
-// ------------------------------------------------------------------ registre financier (agrégats, jamais de règle métier)
+// ------------------------------------------------------------------ financial ledger (aggregates, never business rules)
 class Ledger {
   constructor() { this.reset(); }
   reset() {
     this.maxSeq = 0;
     this.hist = new Map(); // agentId -> [{tick, delta (bigint), reason, balance (bigint)}]
     this.totals = { earned: 0n, brain: 0n, passed: 0n, fees: 0n, brainCalls: 0, teeCalls: 0, models: new Map() };
-    this.byGen = new Map(); // génération -> {earned, brain, passed}
+    this.byGen = new Map(); // generation -> {earned, brain, passed}
     this.births = []; // {tick, agentId}
   }
   gen(g) { let r = this.byGen.get(g); if (!r) { r = { earned: 0n, brain: 0n, passed: 0n }; this.byGen.set(g, r); } return r; }
@@ -97,7 +97,7 @@ class Ledger {
 }
 export const ledger = new Ledger();
 
-// ------------------------------------------------------------------ chargement
+// ------------------------------------------------------------------ loading
 async function loadHistory() {
   let since = 0;
   for (let page = 0; page < 40; page++) {
@@ -126,12 +126,12 @@ export async function loadCatalogue() {
   fire("meta");
 }
 export async function loadHealth() {
-  try { const r = await api("/api/health"); if (r.ok) { core.health = r.body; store.health = r.body; computeMode(); } } catch { /* ignoré */ }
+  try { const r = await api("/api/health"); if (r.ok) { core.health = r.body; store.health = r.body; computeMode(); } } catch { /* ignored */ }
 }
 
 export async function loadState() {
   const r = await api("/api/state");
-  if (!r.ok) throw new Error("GET /api/state : " + r.status);
+  if (!r.ok) throw new Error("GET /api/state: " + r.status);
   core.live = false;
   core.sawReplayStart = false; core.resetting = true;
   store.load(r.body);
@@ -139,7 +139,7 @@ export async function loadState() {
   ledger.reset();
   fire("reset");
   computeMode(); core.resetting = false;
-  try { await loadHistory(); } catch { /* historique facultatif */ }
+  try { await loadHistory(); } catch { /* history is optional */ }
   await loadHealth();
   await loadCatalogue();
   computeMode();
@@ -147,7 +147,7 @@ export async function loadState() {
   setTimeout(() => { core.live = true; fire("meta"); }, 700);
 }
 
-// ------------------------------------------------------------------ SSE avec reprise
+// ------------------------------------------------------------------ SSE with resume
 let es = null, retries = 0, reconnectTimer = 0, wasDown = false, gapStreak = 0, okStreak = 0;
 const isValidEvent = (ev) => !!ev && typeof ev === "object" && !Array.isArray(ev) && Number.isSafeInteger(ev.seq) && ev.seq > 0
   && typeof ev.type === "string" && KNOWN.has(ev.type) && (ev.data == null || (typeof ev.data === "object" && !Array.isArray(ev.data)));
@@ -159,7 +159,7 @@ function handleEvent(ev) {
     store.apply(ev);
     ledger.ingest(ev);
     fire("event", ev, { silent: !core.live });
-  } catch (e) { console.warn("événement ignoré", ev?.type, e?.message); }
+  } catch (e) { console.warn("event ignored", ev?.type, e?.message); }
 }
 
 export function connect() {
@@ -168,8 +168,8 @@ export function connect() {
   es = new EventSource(`/api/stream?since=${store.lastSeq}`);
   es.onopen = async () => {
     retries = 0;
-    setConn("live", core.mode === "replay" ? "Rejeu en cours" : "En direct");
-    if (wasDown) { wasDown = false; try { const r = await api("/api/state"); if (r.ok && r.body.lastSeq < store.lastSeq) { await loadState(); connect(); } } catch { /* ignoré */ } }
+    setConn("live", core.mode === "replay" ? "Replay running" : "Live");
+    if (wasDown) { wasDown = false; try { const r = await api("/api/state"); if (r.ok && r.body.lastSeq < store.lastSeq) { await loadState(); connect(); } } catch { /* ignored */ } }
   };
   const onMsg = (m) => {
     let ev;
@@ -180,7 +180,7 @@ export function connect() {
       clearTimeout(reconnectTimer);
       if (es) es.close();
       reconnectTimer = setTimeout(connect, Math.min(10000, 500 * 2 ** Math.min(gapStreak, 5)));
-      setConn("retry", "Resynchronisation…");
+      setConn("retry", "Resynchronizing…");
       return;
     }
     if (ev.seq > store.lastSeq && ++okStreak >= 20) { gapStreak = 0; okStreak = 0; }
@@ -188,7 +188,7 @@ export function connect() {
   };
   for (const t of EVENT_TYPES) es.addEventListener(t, onMsg);
   es.onmessage = onMsg;
-  es.addEventListener("reset", () => { // le serveur a redémarré (ou le rejeu recommence) : on vide, le flux rejoue depuis le début
+  es.addEventListener("reset", () => { // the server restarted (or the replay restarts): clear, the stream replays from the start
     const keep = { mode: store.mode, chain: store.chain, brain: store.brain, health: store.health, explorerBase: store.explorerBase };
     store.reset(); Object.assign(store, keep);
     ledger.reset();
@@ -198,15 +198,15 @@ export function connect() {
   });
   es.onerror = () => {
     wasDown = true; retries++;
-    setConn("retry", `Reconnexion… (essai ${retries})`);
+    setConn("retry", `Reconnecting… (attempt ${retries})`);
     if (es.readyState === EventSource.CLOSED) reconnectTimer = setTimeout(connect, Math.min(10000, 800 * 2 ** Math.min(retries, 4)));
-    if (retries > 6) setConn("down", "Hors ligne");
+    if (retries > 6) setConn("down", "Offline");
   };
 }
 
 export function start() {
   const go = () => loadState().then(() => connect()).catch((e) => {
-    setConn("down", "Backend injoignable");
+    setConn("down", "Backend unreachable");
     console.warn(String(e?.message ?? e));
     setTimeout(go, 3000);
   });
@@ -215,8 +215,8 @@ export function start() {
   setInterval(() => { if (store.lastSeq > 0) loadCatalogue(); }, 30000);
 }
 
-// ------------------------------------------------------------------ aides partagées
-/** Lien d'explorateur pour un hash : URL vue par le flux, sinon reconstruite. null en mock. */
+// ------------------------------------------------------------------ shared helpers
+/** Explorer link for a hash: URL seen in the stream, otherwise rebuilt. null in mock. */
 export function txUrl(hash) {
   if (!hash) return null;
   return store.feedByHash.get(hash)?.url ?? explorerUrl(hash, { chainKind: store.chain.kind, base: store.explorerBase });

@@ -1,13 +1,13 @@
-// Affichage d'un livrable (lot L16). Sécurité : tout contenu produit par une IA est du texte non fiable.
-//  - texte : nœuds Text uniquement (jamais innerHTML) ;
-//  - SVG : affiché seulement via <img src="data:image/svg+xml,..."> (le navigateur n'exécute aucun script dans une image) ;
-//  - Mermaid : source affichée en code (pas de rendu : la CSP du backend interdit tout script externe).
+// Deliverable display (lot L16). Security: any AI-produced content is untrusted text.
+//  - text: Text nodes only (never innerHTML);
+//  - SVG: displayed only via <img src="data:image/svg+xml,..."> (the browser runs no script inside an image);
+//  - Mermaid: source displayed as code (no rendering: the backend CSP forbids any external script).
 import { h, usd, shortHash } from "./format.js";
 
 const SAFE_NAME = /^[a-z0-9._-]{1,64}$/;
-const MAX_INLINE_CHARS = 60000; // au-delà, on n'affiche pas tout (le fichier reste téléchargeable)
+const MAX_INLINE_CHARS = 60000; // beyond this, not everything is displayed (the file stays downloadable)
 
-/** Markdown minimal et sûr : titres, listes, tableaux simples, citations, blocs de code, gras, italique, code en ligne. Sortie = nœuds DOM. */
+/** Minimal, safe Markdown: headings, lists, simple tables, quotes, code blocks, bold, italic, inline code. Output = DOM nodes. */
 export function renderMarkdown(src) {
   const root = h("div", { class: "md" });
   const lines = String(src ?? "").slice(0, MAX_INLINE_CHARS).replace(/\r\n?/g, "\n").split("\n");
@@ -31,7 +31,7 @@ export function renderMarkdown(src) {
       const head = cells(line); i += 2;
       const body = [];
       while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) body.push(cells(lines[i++]));
-      root.append(h("div", { class: "md-tablewrap", tabindex: "0", role: "region", "aria-label": "Tableau (défilable)" },
+      root.append(h("div", { class: "md-tablewrap", tabindex: "0", role: "region", "aria-label": "Table (scrollable)" },
         h("table", { class: "md-table" }, h("thead", null, h("tr", null, head.map((c) => h("th", null, inline(c))))),
           h("tbody", null, body.map((r) => h("tr", null, r.map((c) => h("td", null, inline(c)))))))));
       continue;
@@ -60,11 +60,11 @@ export function renderMarkdown(src) {
     if (!buf.length) { buf.push(lines[i++]); }
     root.append(h("p", null, inline(buf.join(" "))));
   }
-  if (src && String(src).length > MAX_INLINE_CHARS) root.append(h("p", { class: "muted small" }, "Texte tronqué à l'écran : téléchargez le fichier pour le lire en entier."));
+  if (src && String(src).length > MAX_INLINE_CHARS) root.append(h("p", { class: "muted small" }, "Text truncated on screen: download the file to read it in full."));
   return root;
 }
 
-/** `code`, **gras**, *italique* : retourne des nœuds (texte inerte). Aucun lien cliquable : l'URL d'une IA n'est jamais activée. */
+/** `code`, **bold**, *italic*: returns nodes (inert text). No clickable link: an AI-provided URL is never activated. */
 function inline(text) {
   const out = [];
   const re = /(`[^`\n]+`|\*\*[^*\n]+\*\*|__[^_\n]+__|\*[^*\n]+\*)/g;
@@ -82,7 +82,7 @@ function inline(text) {
   return out;
 }
 
-/** Contenu SVG -> URL de données pour <img>. Jamais injecté dans le DOM. */
+/** SVG content -> data URL for <img>. Never injected into the DOM. */
 export function svgDataUri(content) {
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(String(content));
 }
@@ -91,7 +91,7 @@ export const fileUrl = (taskId, name, download) =>
   `/api/tasks/${encodeURIComponent(taskId)}/deliverable/${encodeURIComponent(name)}${download ? "?download=1" : ""}`;
 
 function dlLink(taskId, f) {
-  return h("a", { class: "btn-dl", href: fileUrl(taskId, f.name, true), download: f.name, "aria-label": `Télécharger ${f.name}` }, "Télécharger");
+  return h("a", { class: "btn-dl", href: fileUrl(taskId, f.name, true), download: f.name, "aria-label": `Download ${f.name}` }, "Download");
 }
 
 export const isSvg = (f) => f.mime === "image/svg+xml" || /\.svg$/.test(f.name);
@@ -101,48 +101,48 @@ export { SAFE_NAME, MAX_INLINE_CHARS };
 
 function fileBlock(taskId, f) {
   const name = String(f.name ?? "");
-  if (!SAFE_NAME.test(name)) return h("p", { class: "muted small" }, "Fichier ignoré : nom non conforme.");
+  if (!SAFE_NAME.test(name)) return h("p", { class: "muted small" }, "File ignored: non-conforming name.");
   const content = String(f.content ?? "");
   if (isSvg(f)) {
     return h("figure", { class: "dl-svg" },
-      h("div", { class: "svg-frame" }, h("img", { src: svgDataUri(content), alt: `Proposition de logo ${name}`, loading: "lazy", decoding: "async", referrerpolicy: "no-referrer" })),
+      h("div", { class: "svg-frame" }, h("img", { src: svgDataUri(content), alt: `Logo proposal ${name}`, loading: "lazy", decoding: "async", referrerpolicy: "no-referrer" })),
       h("figcaption", null, h("code", null, name), dlLink(taskId, f)));
   }
   if (isMermaid(f)) {
     return h("div", { class: "dl-file" },
-      h("div", { class: "dl-head" }, h("strong", null, "Schéma Mermaid (source)"), h("code", null, name), dlLink(taskId, f)),
-      h("pre", { class: "md-code", tabindex: "0", "aria-label": "Source du schéma Mermaid" }, h("code", null, content.slice(0, MAX_INLINE_CHARS))),
-      h("p", { class: "muted small" }, "Source affichée telle quelle (rendu graphique désactivé : la page ne charge aucune ressource externe)."));
+      h("div", { class: "dl-head" }, h("strong", null, "Mermaid diagram (source)"), h("code", null, name), dlLink(taskId, f)),
+      h("pre", { class: "md-code", tabindex: "0", "aria-label": "Mermaid diagram source" }, h("code", null, content.slice(0, MAX_INLINE_CHARS))),
+      h("p", { class: "muted small" }, "Source displayed as-is (graphical rendering disabled: the page loads no external resource)."));
   }
   return h("div", { class: "dl-file" },
     h("div", { class: "dl-head" }, h("code", null, name), dlLink(taskId, f)),
     isMarkdown(f) ? renderMarkdown(content) : h("div", { class: "md" }, h("pre", { class: "plain" }, content.slice(0, MAX_INLINE_CHARS))));
 }
 
-/** Construit la vue complète du livrable. `spec` = entrée du catalogue (grille, seuil) ou null. */
+/** Builds the full deliverable view. `spec` = catalogue entry (rubric, threshold) or null. */
 export function buildDeliverable(d, spec, profLabelText) {
   const accepted = d.verdict === "accepted";
   const has = d.verdict === "accepted" || d.verdict === "rejected";
   const score = Number.isFinite(Number(d.score)) ? Number(d.score) : null;
   const files = Array.isArray(d.files) ? d.files : [];
-  const root = h("section", { class: "deliverable", "aria-label": `Livrable ${profLabelText ?? ""}` });
+  const root = h("section", { class: "deliverable", "aria-label": `Deliverable ${profLabelText ?? ""}` });
   root.append(h("div", { class: "dl-summary" },
-    has ? h("span", { class: `verdict ${accepted ? "v-ok" : "v-ko"}` }, accepted ? "Accepté" : "Rejeté") : h("span", { class: "verdict v-wait" }, "En attente de validation"),
-    score != null ? h("span", { class: "score", title: spec ? `Seuil d'acceptation : ${Math.round(spec.acceptScore * 100)} %` : "" }, `Score ${Math.round(score * 100)} %`, spec ? h("small", null, ` (seuil ${Math.round(spec.acceptScore * 100)} %)`) : null) : null,
-    h("span", { class: "cost", title: "Coût IA de production, payé par l'agent" }, "Production ", h("b", null, usd(d.productionCostUsd))),
-    h("span", { class: "cost", title: "Coût IA du juge qui note le livrable" }, "Juge ", h("b", null, usd(d.judgeCostUsd))),
-    d.resultHash ? h("span", { class: "muted small" }, "empreinte ", h("code", null, shortHash(d.resultHash))) : null));
+    has ? h("span", { class: `verdict ${accepted ? "v-ok" : "v-ko"}` }, accepted ? "Accepted" : "Rejected") : h("span", { class: "verdict v-wait" }, "Awaiting validation"),
+    score != null ? h("span", { class: "score", title: spec ? `Acceptance threshold: ${Math.round(spec.acceptScore * 100)}%` : "" }, `Score ${Math.round(score * 100)}%`, spec ? h("small", null, ` (threshold ${Math.round(spec.acceptScore * 100)}%)`) : null) : null,
+    h("span", { class: "cost", title: "AI production cost, paid by the agent" }, "Production ", h("b", null, usd(d.productionCostUsd))),
+    h("span", { class: "cost", title: "AI cost of the judge who scores the deliverable" }, "Judge ", h("b", null, usd(d.judgeCostUsd))),
+    d.resultHash ? h("span", { class: "muted small" }, "hash ", h("code", null, shortHash(d.resultHash))) : null));
   if (spec?.rubric?.length) {
     const sc = score ?? 0;
     root.append(h("details", { class: "rubric" },
-      h("summary", null, "Grille de notation"),
+      h("summary", null, "Scoring rubric"),
       h("ul", { class: "rubric-list" }, spec.rubric.map((c) => h("li", null,
         h("span", { class: "rb-d" }, c.description),
-        h("span", { class: "rb-bar", role: "img", "aria-label": `Poids ${Math.round(c.weight * 100)} %` }, h("span", { css: { width: `${Math.round(c.weight * 100)}%` } })),
-        h("b", null, `${Math.round(c.weight * 100)} %`)))),
-      h("p", { class: "muted small" }, `Note finale = somme pondérée des critères${score != null ? ` : ${sc.toFixed(2)}` : ""}. Accepté si la note atteint le seuil ET si les contrôles automatiques passent.`)));
+        h("span", { class: "rb-bar", role: "img", "aria-label": `Weight ${Math.round(c.weight * 100)}%` }, h("span", { css: { width: `${Math.round(c.weight * 100)}%` } })),
+        h("b", null, `${Math.round(c.weight * 100)}%`)))),
+      h("p", { class: "muted small" }, `Final score = weighted sum of the criteria${score != null ? `: ${sc.toFixed(2)}` : ""}. Accepted if the score reaches the threshold AND the automatic checks pass.`)));
   }
-  if (!files.length) root.append(h("p", { class: "muted" }, "Aucun fichier dans ce livrable."));
+  if (!files.length) root.append(h("p", { class: "muted" }, "No file in this deliverable."));
   const logos = files.filter(isSvg), rest = files.filter((f) => !isSvg(f));
   if (logos.length) root.append(h("div", { class: "logos" }, logos.map((f) => fileBlock(d.taskId, f))));
   for (const f of rest) root.append(fileBlock(d.taskId, f));

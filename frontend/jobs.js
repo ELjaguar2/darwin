@@ -1,11 +1,11 @@
-// Métiers, icônes et avatars (interface L17). Données d'affichage uniquement, aucune logique métier.
-// Les 6 métiers du catalogue (L16) + les 5 métiers « historiques » des runs réels antérieurs (writer, analyst, coder, summarizer, translator),
-// pour que le rejeu d'un ancien journal reste lisible. Un métier inconnu retombe sur un style neutre.
+// Professions, icons and avatars (L17 interface). Display data only, no business logic.
+// The 6 catalogue professions (L16) + the 5 "historical" professions of earlier real runs (writer, analyst, coder, summarizer, translator),
+// so that replaying an old log stays readable. An unknown profession falls back to a neutral style.
 import { h } from "./format.js";
 
 const NS = "http://www.w3.org/2000/svg";
 
-// Tracés d'icônes (viewBox 24, trait). Chaque valeur est un tableau de chemins.
+// Icon paths (viewBox 24, stroke). Each value is an array of paths.
 const ICON = {
   logo: ["M12 2l2.6 6.4L21 11l-6.4 2.6L12 20l-2.6-6.4L3 11l6.4-2.6z"],
   finance: ["M4 20V11", "M10 20V4", "M16 20v-6", "M2 20h20"],
@@ -21,28 +21,28 @@ const ICON = {
   unknown: ["M12 3a9 9 0 1 0 0 18a9 9 0 0 0 0-18z", "M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 1-1 1.7", "M12 17h.01"],
 };
 
-// Couleur (variable CSS --p-<clé>) et libellé court par métier. Les métiers historiques empruntent la teinte d'un métier proche.
+// Color (CSS variable --p-<key>) and short label per profession. Historical professions borrow the tone of a close profession.
 const JOB = {
   logo: { label: "Logo", tone: "logo" },
-  finance: { label: "Analyse financière", tone: "finance" },
+  finance: { label: "Financial analysis", tone: "finance" },
   architecture: { label: "Architecture", tone: "architecture" },
-  marketing: { label: "Rédaction marketing", tone: "marketing" },
-  translation: { label: "Traduction", tone: "translation" },
-  legal: { label: "Checklist juridique", tone: "legal" },
-  writer: { label: "Rédaction", tone: "marketing" },
-  analyst: { label: "Analyse", tone: "finance" },
+  marketing: { label: "Marketing copy", tone: "marketing" },
+  translation: { label: "Translation", tone: "translation" },
+  legal: { label: "Legal checklist", tone: "legal" },
+  writer: { label: "Writing", tone: "marketing" },
+  analyst: { label: "Analysis", tone: "finance" },
   coder: { label: "Code", tone: "architecture" },
-  summarizer: { label: "Résumé", tone: "legal" },
-  translator: { label: "Traduction", tone: "translation" },
+  summarizer: { label: "Summary", tone: "legal" },
+  translator: { label: "Translation", tone: "translation" },
 };
 
-/** Style d'un métier : {id, label, cls (classe de teinte j-xxx), icon (clé)}. */
+/** Style of a profession: {id, label, cls (tone class j-xxx), icon (key)}. */
 export function jobOf(p) {
   const j = JOB[p];
-  return j ? { id: p, label: j.label, cls: `j-${j.tone}`, icon: p } : { id: String(p ?? "?"), label: String(p ?? "métier inconnu"), cls: "j-unknown", icon: "unknown" };
+  return j ? { id: p, label: j.label, cls: `j-${j.tone}`, icon: p } : { id: String(p ?? "?"), label: String(p ?? "unknown profession"), cls: "j-unknown", icon: "unknown" };
 }
 
-/** Icône SVG (nœud DOM, jamais de chaîne HTML). */
+/** SVG icon (DOM node, never an HTML string). */
 export function icon(key, size = 16) {
   const svg = document.createElementNS(NS, "svg");
   svg.setAttribute("viewBox", "0 0 24 24");
@@ -58,17 +58,17 @@ export function icon(key, size = 16) {
   return svg;
 }
 
-/** Prénom affiché : « Iris-214953 » devient « Iris ». */
+/** Displayed first name: "Iris-214953" becomes "Iris". */
 export const firstName = (a) => String(a?.name ?? a?.id ?? "?").replace(/[-\s]\d+$/, "");
 
-/** Teinte déterminée par le génome : deux agents au génome proche se ressemblent, une mutation décale la couleur. */
+/** Hue determined by the genome: two agents with close genomes look alike, a mutation shifts the color. */
 export function genomeHue(g) {
   const x = (v, lo, hi) => (Number.isFinite(Number(v)) ? (Number(v) - lo) / (hi - lo) : 0.5);
   const raw = x(g?.risk, 0, 1) * 200 + x(g?.cooperation, 0, 1) * 110 + x(g?.generosity, 0, 0.6) * 80 + x(g?.askRatio, 0.3, 1) * 60 + 20;
   return Math.round(raw) % 360;
 }
 
-/** Avatar rond : dégradé selon le génome, initiale, badge du métier. `size` en px. */
+/** Round avatar: gradient from the genome, initial, profession badge. `size` in px. */
 export function avatar(a, size = 44) {
   const hue = genomeHue(a?.genome);
   const job = jobOf(a?.genome?.profession);

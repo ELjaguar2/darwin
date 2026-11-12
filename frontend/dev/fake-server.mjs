@@ -1,13 +1,15 @@
-// Faux backend de développement pour le frontend (lot L8). Node >= 18, aucune dépendance.
-// Rejoue un journal d'événements plausible, conforme au catalogue de shared/events.ts, sur les mêmes routes
-// que docs/ARCHITECTURE.md §9. NE CONTIENT AUCUNE LOGIQUE DU PRODUIT : c'est un générateur de données de test.
+// Fake development backend for the frontend (lot L8). Node >= 18, no dependency.
+// Replays a plausible event log, conforming to the shared/events.ts catalogue, on the same routes
+// as docs/ARCHITECTURE.md section 9. CONTAINS NO PRODUCT LOGIC: it is a test data generator.
+// Test data is in English (it simulates agents that speak English). Protocol values (badge "simulé", "sous-traitance",
+// status codes, validator "rule:...") are kept as the real backend sends them: the frontend maps them to English labels.
 //
 // Usage : node frontend/dev/fake-server.mjs [--port=3000] [--tick=400] [--seed=7] [--testnet] [--degraded]
 //                                           [--max-ticks=900] [--no-sim] [--task-status=503]
-//   --testnet      mode "testnet" : chain "near", hashes réels-like + explorerUrl testnet.nearblocks.io
-//   --degraded     /api/health.escrow = "operator-account" (séquestre dégradé)
-//   --no-sim       n'émet aucun événement (état vide)
-//   --task-status  force le statut de réponse de POST /api/tasks (503, 429, 400) pour tester l'UI
+//   --testnet      mode "testnet": chain "near", real-looking hashes + explorerUrl testnet.nearblocks.io
+//   --degraded     /api/health.escrow = "operator-account" (degraded escrow)
+//   --no-sim       emits no event (empty state)
+//   --task-status  forces the response status of POST /api/tasks (503, 429, 400) to test the UI
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -27,7 +29,7 @@ const YOCTO = 10n ** 24n;
 const near = (x) => BigInt(Math.round(x * 1e6)) * (YOCTO / 1000000n);
 const nearNum = (y) => Number(BigInt(y) / (YOCTO / 1000000n)) / 1e6;
 
-// ---- RNG déterministe ----
+// ---- deterministic RNG ----
 let s = Number(args.seed ?? 7) >>> 0;
 const rnd = () => { s = (s + 0x6d2b79f5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 const pick = (a) => a[Math.floor(rnd() * a.length)];
@@ -35,20 +37,20 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const hex = (n) => Array.from({ length: n }, () => Math.floor(rnd() * 16).toString(16)).join("");
 
 const PROFS = ["logo", "finance", "architecture", "marketing", "translation", "legal"];
-// Catalogue de test (valeurs recopiées de shared/catalogue.ts : prix plancher en NEAR, seuil 0,6).
+// Test catalogue (values copied from shared/catalogue.ts: floor price in NEAR, threshold 0.6).
 const CAT = {
-  logo: ["Logo", 150, 0.045, "3 propositions de logo originales au format SVG."],
-  finance: ["Analyse financière", 120, 0.036, "Note d'analyse financière structurée en Markdown."],
-  architecture: ["Architecture logicielle", 200, 0.06, "Document d'architecture en Markdown avec un schéma Mermaid."],
-  marketing: ["Rédaction marketing", 80, 0.024, "Texte marketing prêt à publier."],
-  translation: ["Traduction", 40, 0.012, "Traduction fidèle du texte fourni."],
-  legal: ["Checklist juridique", 150, 0.045, "Checklist juridique informative (pas un avis juridique)."],
+  logo: ["Logo", 150, 0.045, "3 original logo proposals in SVG format."],
+  finance: ["Financial analysis", 120, 0.036, "Structured financial analysis note in Markdown."],
+  architecture: ["Software architecture", 200, 0.06, "Architecture document in Markdown with a Mermaid diagram."],
+  marketing: ["Marketing copywriting", 80, 0.024, "Ready-to-publish marketing copy."],
+  translation: ["Translation", 40, 0.012, "Faithful translation of the supplied text."],
+  legal: ["Legal checklist", 150, 0.045, "Informational legal checklist (not legal advice)."],
 };
-const RUBRIC = [{ id: "pertinence", description: "Répond à la consigne", weight: 0.4 }, { id: "qualite", description: "Qualité et clarté", weight: 0.35 }, { id: "format", description: "Respect du format demandé", weight: 0.25 }];
+const RUBRIC = [{ id: "pertinence", description: "Answers the brief", weight: 0.4 }, { id: "qualite", description: "Quality and clarity", weight: 0.35 }, { id: "format", description: "Respects the requested format", weight: 0.25 }];
 const catalogue = () => ({ professions: PROFS.map((id) => ({ id, label: CAT[id][0], refUsd: CAT[id][1], nearPrice: near(CAT[id][2]).toString(), deliverable: CAT[id][3], rubric: RUBRIC, acceptScore: 0.6 })), activeEvents: marketEvents.filter((e) => e.startTick <= tick && tick < e.endTick) });
 const marketEvents = [];
 const deliverables = new Map();
-const EVENT_TITLES = [["logo", 3, "Salon des startups : tout le monde veut un logo"], ["legal", 3, "Nouvelle réglementation : ruée sur les checklists"], ["translation", 0.3, "Les traducteurs automatiques font chuter la demande"], ["finance", 3, "Clôture trimestrielle : analyses recherchées"], ["marketing", 0.3, "Budgets pub gelés"]];
+const EVENT_TITLES = [["logo", 3, "Startup fair: everyone wants a logo"], ["legal", 3, "New regulation: rush on checklists"], ["translation", 0.3, "Machine translators make demand drop"], ["finance", 3, "Quarter-end close: analyses in demand"], ["marketing", 0.3, "Ad budgets frozen"]];
 function logoSvg(i, name) {
   const hue = [210, 150, 330][i % 3];
   const evil = i === 1 ? '<script>window.__pwned = 1; document.title = "PWNED";</script><rect width="1" height="1" onload="window.__pwned = 2"/>' : "";
@@ -58,9 +60,9 @@ function makeDeliverable(t, w, ok, resultHash) {
   const files = [];
   if (t.profession === "logo") for (let i = 0; i < 3; i++) files.push({ name: `logo-${i + 1}.svg`, mime: "image/svg+xml", content: logoSvg(i, "<b>x</b>" && "Atelier " + (i + 1)) });
   else if (t.profession === "architecture") {
-    files.push({ name: "architecture.md", mime: "text/markdown", content: `# Architecture : ${t.title}\n\n## Contexte\nService **web** avec une base \`postgres\` et une file de messages.\n\n## Composants\n- API REST (Node)\n- Worker asynchrone\n- Base de données\n\n| Composant | Rôle |\n|---|---|\n| API | Reçoit les requêtes |\n| Worker | Traite la file |\n\n<img src=x onerror="window.__pwned=3"> et <script>window.__pwned=4</script> doivent rester du texte.\n\n\`\`\`ts\nconst x = 1;\n\`\`\`\n` });
+    files.push({ name: "architecture.md", mime: "text/markdown", content: `# Architecture: ${t.title}\n\n## Context\n**Web** service with a \`postgres\` database and a message queue.\n\n## Components\n- REST API (Node)\n- Asynchronous worker\n- Database\n\n| Component | Role |\n|---|---|\n| API | Receives requests |\n| Worker | Processes the queue |\n\n<img src=x onerror="window.__pwned=3"> and <script>window.__pwned=4</script> must remain plain text.\n\n\`\`\`ts\nconst x = 1;\n\`\`\`\n` });
     files.push({ name: "schema.mmd", mime: "text/vnd.mermaid", content: "graph TD\n  Client --> API\n  API --> DB[(Postgres)]\n  API --> Queue\n  Queue --> Worker" });
-  } else files.push({ name: "livrable.md", mime: "text/markdown", content: `## ${CAT[t.profession][0]}\n\nRéponse rédigée par ${w.name} pour « ${t.title} ».\n\n1. Point un\n2. Point deux\n\n> ${t.profession === "legal" ? "Ceci n'est pas un avis juridique." : "Fin du livrable."}` });
+  } else files.push({ name: "deliverable.md", mime: "text/markdown", content: `## ${CAT[t.profession][0]}\n\nAnswer written by ${w.name} for "${t.title}".\n\n1. Point one\n2. Point two\n\n> ${t.profession === "legal" ? "This is not legal advice." : "End of the deliverable."}` });
   const d = { taskId: t.id, profession: t.profession, agentId: w.id, files, rawText: "", resultHash, productionCostUsd: 0.0012 + rnd() * 0.004, judgeCostUsd: 0.0004 + rnd() * 0.001, createdAt: new Date().toISOString() };
   deliverables.set(t.id, d);
   emit("deliverable.produced", { taskId: t.id, profession: t.profession, agentId: w.id, files: files.map((f) => ({ name: f.name, mime: f.mime, bytes: f.content.length })), productionCostUsd: d.productionCostUsd, judgeCostUsd: d.judgeCostUsd, resultHash });
@@ -73,10 +75,10 @@ function snapshot() {
 }
 const NAMES = ["Ada", "Blaise", "Clara", "Darwin", "Emma", "Faraday", "Gaia", "Hugo", "Iris", "Jules", "Kepler", "Lina", "Mendel", "Nora", "Orion", "Pasteur", "Quark", "Rosalind", "Sagan", "Tesla", "Ulysse", "Vera", "Wallace", "Xena"];
 const MODELS = ["mock/small", "mock/large"];
-const PERSONALITIES = ["Je suis méticuleux : je préfère perdre une enchère que livrer du travail bâclé.", "Je casse les prix pour survivre, puis j'optimise.", "Je partage mes gains : la tribu avant l'individu.", "Prudent, je garde une réserve avant de risquer un enfant."];
-const TITLES = { logo: ["Logo pour une boulangerie", "Logo d'une app de randonnée"], finance: ["Analyser un jeu de ventes trimestriel", "Comparer trois offres de prêt"], architecture: ["Architecture d'une app de réservation", "Découper un monolithe en services"], marketing: ["Fiche produit pour une gourde", "Texte d'accroche newsletter"], translation: ["Traduire un paragraphe FR vers EN", "Traduire une notice en espagnol"], legal: ["Checklist de conformité RGPD", "Checklist pour une association"] };
+const PERSONALITIES = ["I am meticulous: I would rather lose a bid than deliver sloppy work.", "I undercut prices to survive, then I optimize.", "I share my earnings: the tribe before the individual.", "Cautious, I keep a reserve before risking a child."];
+const TITLES = { logo: ["Logo for a bakery", "Logo for a hiking app"], finance: ["Analyze a quarterly sales dataset", "Compare three loan offers"], architecture: ["Architecture of a booking app", "Split a monolith into services"], marketing: ["Product page for a water bottle", "Newsletter hook text"], translation: ["Translate a paragraph from FR to EN", "Translate a leaflet into Spanish"], legal: ["GDPR compliance checklist", "Checklist for a non-profit"] };
 
-// ---- État ----
+// ---- State ----
 const journal = [];
 const clients = new Set();
 const agents = new Map();
@@ -157,7 +159,7 @@ function reproduce(p) {
   p.lastChild = tick;
   emit("agent.reproduced", { parentId: p.id, childId: child.id, transferred: give.toString(), mutations: mut });
   const lid = "l-" + String(++counters.l).padStart(4, "0");
-  const text = `Mon cher ${child.name},\n\nJe te transmets ${nearNum(give).toFixed(2)} NEAR et mon métier de ${p.genome.profession}. ${p.genome.personality}\n\nVoici ce que j'ai appris : les enchères trop gourmandes restent sans réponse, et l'IA coûte cher quand on choisit ${p.genome.model}. Surveille ton solde à chaque tick, car le métabolisme ne dort jamais. ${Object.keys(mut).length ? "J'ai laissé quelques mutations en toi (" + Object.keys(mut).join(", ") + ") : à toi de voir si elles te servent." : "Je n'ai pas muté ton génome : fais mieux que moi."}\n\nSois utile, sois sobre. Si tu dois mourir, que ce soit en laissant une lignée.\n\n— ${p.name}`;
+  const text = `My dear ${child.name},\n\nI am passing on ${nearNum(give).toFixed(2)} NEAR and my trade as ${p.genome.profession}. ${p.genome.personality}\n\nHere is what I learned: greedy bids go unanswered, and AI is expensive when you choose ${p.genome.model}. Watch your balance every tick, because metabolism never sleeps. ${Object.keys(mut).length ? "I left a few mutations in you (" + Object.keys(mut).join(", ") + "): see whether they serve you." : "I did not mutate your genome: do better than me."}\n\nBe useful, be frugal. If you must die, do it leaving a lineage.\n\n— ${p.name}`;
   const letter = { id: lid, fromAgentId: p.id, toAgentId: child.id, generation: child.generation, text, model: p.genome.model, mock: !TESTNET, tick, createdAt: new Date().toISOString() };
   letters.set(lid, letter);
   child.letterId = lid;
@@ -172,17 +174,17 @@ function die(a, cause = "starvation") {
   setBalance(a, -swept, "death");
 }
 
-// ---- Marché ----
+// ---- Market ----
 function postTask(requester, budget, profession, title, prompt) {
   const id = "t-" + String(++counters.t).padStart(4, "0");
   const t = { id, requester, profession, title, prompt, budget: budget.toString(), status: "posted", createdTick: tick, biddingEndsTick: tick + 1, deadlineTick: tick + 5, bidIds: [] };
   tasks.set(id, t);
   emit("task.posted", { task: { ...t } });
   pipeline.push({ id, stage: "bidding", at: tick + 1 });
-  // enchères immédiates des agents vivants de la profession
+  // immediate bids from the living agents of the profession
   for (const a of alive().filter((x) => x.genome.profession === profession)) {
-    if (requester.kind === "visitor" || rnd() < 0.5 + a.genome.risk * 0.4) { // les missions de visiteurs reçoivent toujours une offre (test déterministe)
-      const bid = { id: "b-" + String(++counters.b).padStart(4, "0"), taskId: id, agentId: a.id, price: near(nearNum(budget) * a.genome.askRatio).toString(), etaTicks: 1 + Math.floor(rnd() * 3), pitch: pick(["Livraison soignée.", "Prix serré, résultat net.", "Je connais ce type de mission."]), tick };
+    if (requester.kind === "visitor" || rnd() < 0.5 + a.genome.risk * 0.4) { // visitor missions always receive a bid (deterministic test)
+      const bid = { id: "b-" + String(++counters.b).padStart(4, "0"), taskId: id, agentId: a.id, price: near(nearNum(budget) * a.genome.askRatio).toString(), etaTicks: 1 + Math.floor(rnd() * 3), pitch: pick(["Careful delivery.", "Tight price, clean result.", "I know this kind of mission."]), tick };
       t.bidIds.push(bid.id);
       (bidsByTask.get(id) ?? bidsByTask.set(id, []).get(id)).push(bid);
       emit("bid.placed", { bid });
@@ -209,7 +211,7 @@ function stepTask(p) {
   if (p.stage === "work") {
     const w = agents.get(t.winnerId);
     if (!w || w.status !== "alive") { t.status = "expired"; emit("task.expired", { taskId: t.id, reason: "winner_dead" }); const e = escrows.get(t.id); const tx = chainTx("refund_escrow", "escrow", e.payer, BigInt(e.amount)); e.status = "refunded"; emit("escrow.refunded", { taskId: t.id, payer: e.payer, amount: e.amount, tx }); return true; }
-    // coût IA
+    // AI cost
     const large = w.genome.model === "mock/large";
     const cost = near((large ? 0.07 : 0.012) * (0.8 + rnd() * 0.5));
     const pt = 180 + Math.floor(rnd() * 200), ct = 120 + Math.floor(rnd() * 250);
@@ -217,14 +219,14 @@ function stepTask(p) {
     emit("brain.charged", { agentId: w.id, purpose: "execute_task", model: w.genome.model, promptTokens: pt, completionTokens: ct, reasoningTokens: 0, cost: cost.toString(), costUsd: nearNum(cost) * 0.01, nearUsdRate: 0.01, priceSource: "mock", mock: !TESTNET, tx: btx });
     w.spentBrain = (BigInt(w.spentBrain) + cost).toString();
     setBalance(w, -cost, "brain");
-    const text = `Résultat de « ${t.title} » (simulation). ${w.name} a rédigé une réponse structurée en trois parties : contexte, proposition, prochaines étapes.`;
+    const text = `Result of "${t.title}" (simulation). ${w.name} wrote a structured answer in three parts: context, proposal, next steps.`;
     const resultHash = hex(64);
     t.result = { text, resultHash, submittedTick: tick }; t.status = "submitted";
     emit("task.submitted", { taskId: t.id, agentId: w.id, resultHash });
     const ok = rnd() < 0.86;
     const dl = makeDeliverable(t, w, ok, resultHash);
     const validator = rnd() < 0.5 ? "brain:" + w.genome.model : "rule:non-vide-et-pertinent";
-    t.validation = { verdict: ok ? "accepted" : "rejected", score: ok ? 0.7 + rnd() * 0.3 : 0.1 + rnd() * 0.3, validator, reason: ok ? "Réponse conforme à la demande." : "Hors sujet par rapport à la consigne.", resultHash, tick };
+    t.validation = { verdict: ok ? "accepted" : "rejected", score: ok ? 0.7 + rnd() * 0.3 : 0.1 + rnd() * 0.3, validator, reason: ok ? "Answer matches the request." : "Off-topic compared to the brief.", resultHash, tick };
     dl.verdict = t.validation.verdict; dl.score = t.validation.score;
     emit("task.validated", { taskId: t.id, validation: t.validation });
     const e = escrows.get(t.id);
@@ -244,9 +246,9 @@ function stepTask(p) {
       w.reputation -= 3; emit("reputation.updated", { agentId: w.id, delta: -3, total: w.reputation, taskId: t.id });
       visitorOpenByIp.forEach((v, k) => visitorOpenByIp.set(k, Math.max(0, v - 1)));
     }
-    // sous-traitance occasionnelle
+    // occasional subcontracting
     if (rnd() < w.genome.cooperation * 0.12 && t.requester.kind !== "agent") {
-      const child = postTask({ kind: "agent", agentId: w.id }, near(0.4), pick(PROFS), "Sous-traitance : " + pick(TITLES[pick(PROFS)]), "Sous-tâche confiée par " + w.name + ".");
+      const child = postTask({ kind: "agent", agentId: w.id }, near(0.4), pick(PROFS), "Subcontract: " + pick(TITLES[pick(PROFS)]), "Sub-task handed over by " + w.name + ".");
       emit("subcontract.created", { parentTaskId: t.id, childTaskId: child.id, byAgentId: w.id });
     }
     return true;
@@ -257,19 +259,19 @@ function stepTask(p) {
 function tickOnce() {
   tick++;
   const live = alive();
-  // métabolisme
+  // metabolism
   for (const a of live) { const m = near(0.08); a.balance = (BigInt(a.balance) - m).toString(); }
-  // balance.changed regroupé pour ne pas inonder (1 par agent et par tick, comme le vrai moteur)
+  // balance.changed grouped to avoid flooding (1 per agent per tick, like the real engine)
   for (const a of live) emit("balance.changed", { agentId: a.id, balance: a.balance, delta: (-near(0.08)).toString(), reason: "metabolism" });
-  // client simulé
+  // simulated client
   const n = rnd() < 0.5 ? 1 : rnd() < 0.5 ? 2 : 0;
   for (let i = 0; i < n; i++) {
     const prof = pick(PROFS);
-    postTask({ kind: "simulated", label: "Client simulé" }, near(0.5 + rnd() * 2), prof, pick(TITLES[prof]), "Tâche artificielle générée par le client simulé.");
+    postTask({ kind: "simulated", label: "Simulated client" }, near(0.5 + rnd() * 2), prof, pick(TITLES[prof]), "Artificial task generated by the simulated client.");
   }
   // pipeline
   for (const p of [...pipeline]) if (p.at <= tick) { if (stepTask(p)) pipeline.splice(pipeline.indexOf(p), 1); }
-  // reproduction puis mort
+  // reproduction then death
   for (const a of alive()) {
     const thr = near(a.genome.reproThreshold * 10 * 0.9);
     if (BigInt(a.balance) >= thr && alive().length < 16 && tick - a.lastChild >= 10) reproduce(a);
@@ -285,7 +287,7 @@ function tickOnce() {
 }
 function stop(reason) { stopped = true; running = false; stopReason = reason; emit("sim.stopped", { reason, generations: Math.max(0, ...[...agents.values()].map((a) => a.generation)) }); }
 
-// --garbage : injecte des messages SSE malformés (hors journal) pour tester la robustesse du client.
+// --garbage: injects malformed SSE messages (outside the log) to test client robustness.
 let garbageN = 0;
 function garbage() {
   const frames = [
@@ -301,11 +303,11 @@ function garbage() {
 
 function start() {
   emit("sim.started", { mode: TESTNET ? "testnet" : "mock", preset: "demo", seed: Number(args.seed ?? 7), chain: TESTNET ? "near" : "mock", brain: TESTNET ? "nearai" : "mock" });
-  if (!TESTNET) emit("system.warning", { code: "MOCK_MODE", message: "Chaîne et IA simulées en mémoire." });
-  if (DEGRADED) emit("system.warning", { code: "ESCROW_DEGRADED", message: "Séquestre dégradé : compte piloté par l'opérateur, sans contrat." });
+  if (!TESTNET) emit("system.warning", { code: "MOCK_MODE", message: "Chain and AI simulated in memory." });
+  if (DEGRADED) emit("system.warning", { code: "ESCROW_DEGRADED", message: "Degraded escrow: account driven by the operator, no contract." });
   emit("funding.received", { to: "visitors." + MASTER, amount: near(30).toString(), source: "demo", tx: chainTx("transfer", MASTER, "visitors." + MASTER, near(30)) });
   for (let i = 0; i < 4; i++) birth(null, near(10), newGenome(null));
-  // garantit la diversité des métiers parmi les fondateurs
+  // guarantees profession diversity among the founders
   [...agents.values()].forEach((a, i) => { a.genome.profession = PROFS[i % PROFS.length]; });
   setInterval(() => { if (running && !paused) tickOnce(); if (args.garbage) garbage(); }, TICK_MS);
 }
@@ -322,12 +324,12 @@ const state = () => ({
 });
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".mjs": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".json": "application/json" };
 const CSP = "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'";
-/** Forme d'erreur du vrai backend : {error:{code,message,retryable?}} (+ issues de validation pour 400). */
+/** Error shape of the real backend: {error:{code,message,retryable?}} (+ validation issues for 400). */
 function normErr(code, body) {
   if (code < 400 || (body && typeof body.error === "object")) return body;
   const c = String(body?.error ?? "error").toUpperCase();
   const retryable = code === 429 || code === 503;
-  return { error: { code: code === 503 && FORCE_TASK_STATUS === 503 ? "VALIDATION_PENDING" : c, message: body?.message ?? body?.issues?.map((i) => i.message).join(" ; ") ?? "Erreur", retryable: retryable || undefined, issues: body?.issues } };
+  return { error: { code: code === 503 && FORCE_TASK_STATUS === 503 ? "VALIDATION_PENDING" : c, message: body?.message ?? body?.issues?.map((i) => i.message).join(" ; ") ?? "Error", retryable: retryable || undefined, issues: body?.issues } };
 }
 const badgeOf = (r) => (r.kind === "simulated" ? "simulé" : r.kind === "visitor" ? "Visiteur (financé par le compte de démo)" : "sous-traitance");
 const withBadge = (t) => ({ ...t, badge: badgeOf(t.requester), validatedBy: t.validation?.validator });
@@ -337,21 +339,21 @@ function readBody(req) { return new Promise((ok) => { let b = ""; req.on("data",
 
 function postTaskHandler(req, res, raw) {
   const ip = req.socket.remoteAddress ?? "?";
-  if (FORCE_TASK_STATUS === 503 || stopped) return send(res, 503, { error: "unavailable", message: stopped ? "La simulation est arrêtée." : "Simulation indisponible." }, { "Retry-After": "5" });
-  if (FORCE_TASK_STATUS === 429) return send(res, 429, { error: "rate_limited", message: "Plafond horaire du compte de démonstration atteint." }, { "Retry-After": "120" });
-  let body; try { body = JSON.parse(raw); } catch { return send(res, 400, { error: "invalid_json", message: "Corps JSON invalide." }); }
+  if (FORCE_TASK_STATUS === 503 || stopped) return send(res, 503, { error: "unavailable", message: stopped ? "The simulation is stopped." : "Simulation unavailable." }, { "Retry-After": "5" });
+  if (FORCE_TASK_STATUS === 429) return send(res, 429, { error: "rate_limited", message: "Hourly cap of the demo account reached." }, { "Retry-After": "120" });
+  let body; try { body = JSON.parse(raw); } catch { return send(res, 400, { error: "invalid_json", message: "Invalid JSON body." }); }
   const issues = [];
-  const str = (k, lo, hi) => { const v = body[k]; if (typeof v !== "string" || v.length < lo || v.length > hi) issues.push({ path: [k], message: `${k} : ${lo} à ${hi} caractères requis` }); };
+  const str = (k, lo, hi) => { const v = body[k]; if (typeof v !== "string" || v.length < lo || v.length > hi) issues.push({ path: [k], message: `${k}: ${lo} to ${hi} characters required` }); };
   str("title", 3, 120); str("prompt", 10, 4000);
-  if (!PROFS.includes(body.profession ?? "logo")) issues.push({ path: ["profession"], message: "profession inconnue" });
-  if (typeof body.budgetNear !== "string" || !/^\d+(\.\d{1,6})?$/.test(body.budgetNear)) issues.push({ path: ["budgetNear"], message: "budgetNear : décimal en NEAR (ex. 0.05)" });
-  else if (CAT[body.profession] && Number(body.budgetNear) < CAT[body.profession][2]) issues.push({ path: ["budgetNear"], message: `budget trop bas : minimum ${CAT[body.profession][2]} NEAR pour ${CAT[body.profession][0]}` });
-  else if (Number(body.budgetNear) > 5) issues.push({ path: ["budgetNear"], message: "budgetNear hors bornes (maximum 5)" });
-  if (FORCE_TASK_STATUS === 400 && !issues.length) issues.push({ path: ["title"], message: "erreur forcée pour test" });
+  if (!PROFS.includes(body.profession ?? "logo")) issues.push({ path: ["profession"], message: "unknown profession" });
+  if (typeof body.budgetNear !== "string" || !/^\d+(\.\d{1,6})?$/.test(body.budgetNear)) issues.push({ path: ["budgetNear"], message: "budgetNear: decimal in NEAR (e.g. 0.05)" });
+  else if (CAT[body.profession] && Number(body.budgetNear) < CAT[body.profession][2]) issues.push({ path: ["budgetNear"], message: `budget too low: minimum ${CAT[body.profession][2]} NEAR for ${CAT[body.profession][0]}` });
+  else if (Number(body.budgetNear) > 5) issues.push({ path: ["budgetNear"], message: "budgetNear out of bounds (maximum 5)" });
+  if (FORCE_TASK_STATUS === 400 && !issues.length) issues.push({ path: ["title"], message: "error forced for testing" });
   if (issues.length) return send(res, 400, { error: "invalid_input", issues });
-  if ((visitorOpenByIp.get(ip) ?? 0) >= 10) return send(res, 429, { error: "too_many_open_tasks", message: "10 tâches ouvertes maximum par IP." }, { "Retry-After": "30" });
+  if ((visitorOpenByIp.get(ip) ?? 0) >= 10) return send(res, 429, { error: "too_many_open_tasks", message: "10 open tasks maximum per IP." }, { "Retry-After": "30" });
   visitorOpenByIp.set(ip, (visitorOpenByIp.get(ip) ?? 0) + 1);
-  const t = postTask({ kind: "visitor", label: String(body.requesterLabel ?? "visiteur").slice(0, 60) }, near(Number(body.budgetNear)), body.profession ?? "logo", body.title, body.prompt);
+  const t = postTask({ kind: "visitor", label: String(body.requesterLabel ?? "visitor").slice(0, 60) }, near(Number(body.budgetNear)), body.profession ?? "logo", body.title, body.prompt);
   send(res, 201, t);
 }
 
@@ -363,7 +365,7 @@ const server = http.createServer(async (req, res) => {
       let since = Number(req.headers["last-event-id"] ?? url.searchParams.get("since") ?? 0) || 0;
       res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-store", Connection: "keep-alive", "X-Accel-Buffering": "no" });
       res.write("retry: 1500\n\n");
-      if (since > journal.length) res.write(`event: reset\ndata: ${JSON.stringify({ lastSeq: journal.length })}\n\n`), (since = 0); // serveur redémarré : rejeu complet
+      if (since > journal.length) res.write(`event: reset\ndata: ${JSON.stringify({ lastSeq: journal.length })}\n\n`), (since = 0); // server restarted: full replay
       for (const ev of journal) if (ev.seq > since) res.write(`id: ${ev.seq}\nevent: ${ev.type}\ndata: ${JSON.stringify(ev)}\n\n`);
       clients.add(res);
       const ping = setInterval(() => res.write(": ping\n\n"), 15000);
@@ -377,10 +379,10 @@ const server = http.createServer(async (req, res) => {
     let dm;
     if ((dm = p.match(/^\/api\/tasks\/([\w-]+)\/deliverable(?:\/([\w.-]+))?$/)) && !args["no-catalogue"]) {
       const d = deliverables.get(dm[1]);
-      if (!d) return send(res, 404, { error: { code: "UNKNOWN_DELIVERABLE", message: "pas de livrable" } });
+      if (!d) return send(res, 404, { error: { code: "UNKNOWN_DELIVERABLE", message: "no deliverable" } });
       if (!dm[2]) return send(res, 200, d);
       const f = d.files.find((x) => x.name === dm[2]);
-      if (!f) return send(res, 404, { error: { code: "UNKNOWN_FILE", message: "fichier inconnu" } });
+      if (!f) return send(res, 404, { error: { code: "UNKNOWN_FILE", message: "unknown file" } });
       res.writeHead(200, { "Content-Type": f.mime + "; charset=utf-8", "Content-Disposition": url.searchParams.get("download") ? `attachment; filename="${f.name}"` : "inline", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox" });
       return res.end(f.content);
     }
@@ -395,8 +397,8 @@ const server = http.createServer(async (req, res) => {
     if ((m = p.match(/^\/api\/tasks\/([\w-]+)$/))) { const t = tasks.get(m[1]); return t ? send(res, 200, { task: withBadge(t), bids: bidsByTask.get(t.id) ?? [], escrow: escrows.get(t.id) }) : send(res, 404, { error: "not_found" }); }
     if (p === "/api/events") { const since = Number(url.searchParams.get("since") ?? 0), limit = Math.min(1000, Number(url.searchParams.get("limit") ?? 200)); return send(res, 200, { events: journal.filter((e) => e.seq > since).slice(0, limit), lastSeq: journal.length }); }
     if (p.startsWith("/api/")) return send(res, 404, { error: "not_found" });
-    if (p === "/classique") { res.writeHead(302, { Location: "/?classique" }); return res.end(); } // le vrai backend doit faire de même
-    // statique
+    if (p === "/classique") { res.writeHead(302, { Location: "/?classique" }); return res.end(); } // the real backend must do the same
+    // static
     let f = path.join(ROOT, p === "/" ? "index.html" : p);
     if (!f.startsWith(ROOT) || f.includes(path.sep + "dev" + path.sep)) { res.writeHead(403); return res.end(); }
     fs.readFile(f, (err, buf) => {
@@ -408,6 +410,6 @@ const server = http.createServer(async (req, res) => {
 });
 
 if (!args["no-listen"]) {
-  server.listen(PORT, HOST, () => console.log(`[fake-server] http://${HOST}:${PORT}  (tick ${TICK_MS} ms, ${TESTNET ? "testnet" : "mock"}${DEGRADED ? ", séquestre dégradé" : ""}) : FAUX BACKEND DE DEV`));
+  server.listen(PORT, HOST, () => console.log(`[fake-server] http://${HOST}:${PORT}  (tick ${TICK_MS} ms, ${TESTNET ? "testnet" : "mock"}${DEGRADED ? ", degraded escrow" : ""}) : FAKE DEV BACKEND`));
   start();
 }

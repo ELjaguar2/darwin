@@ -1,5 +1,5 @@
-// Page « Lignées » (L17) : arbre généalogique plein écran (zoom, déplacement), panneau latéral par agent.
-// SVG construit par nœuds DOM (jamais innerHTML). Positions interpolées à chaque image : les nœuds glissent, naissent du parent, grisent à la mort.
+// "Lineage" page (L17): full-screen family tree (zoom, pan), side panel per agent.
+// SVG built from DOM nodes (never innerHTML). Positions interpolated every frame: nodes glide, are born from the parent, turn gray at death.
 import { store, core, ledger, api, on, aliveAgents, labelOfJob } from "./core.js";
 import { h, formatNear, formatNearSmall, signedNear, nearNumber, big } from "./format.js";
 import { jobOf, icon, avatar, firstName } from "./jobs.js";
@@ -19,12 +19,12 @@ class LineageTree {
     this.view = { x: 0, y: 0, k: 1 }; this.tview = { x: 0, y: 0, k: 1 };
     this.userMoved = false; this.selected = null; this.raf = 0; this.dirty = true;
     this.reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    this.svg = svgEl("svg", { class: "ltree-svg", role: "group", "aria-label": "Arbre généalogique des agents. Glisser pour déplacer, molette ou boutons pour zoomer." });
+    this.svg = svgEl("svg", { class: "ltree-svg", role: "group", "aria-label": "Family tree of the agents. Drag to pan, use the wheel or buttons to zoom." });
     this.vp = svgEl("g", { class: "vp" });
     this.gEdges = svgEl("g"); this.gNodes = svgEl("g"); this.gFx = svgEl("g", { "aria-hidden": "true" });
     this.vp.append(this.gEdges, this.gNodes, this.gFx);
     this.svg.append(this.vp);
-    this.empty = h("p", { class: "tree-empty" }, "En attente des premiers agents…");
+    this.empty = h("p", { class: "tree-empty" }, "Waiting for the first agents…");
     host.append(this.svg, this.empty);
     new ResizeObserver(() => { this.schedule(); }).observe(host);
     this.bindPointer();
@@ -32,7 +32,7 @@ class LineageTree {
   schedule() { this.dirty = true; if (!this.raf) this.raf = requestAnimationFrame(() => this.frame()); }
   clear() { for (const n of this.nodes.values()) n.g.remove(); for (const e of this.edges.values()) e.path.remove(); this.nodes.clear(); this.edges.clear(); this.gFx.replaceChildren(); this.userMoved = false; this.schedule(); }
 
-  // ----- déplacement et zoom
+  // ----- pan and zoom
   bindPointer() {
     const pts = new Map();
     let last = null, pinch = 0, moved = 0;
@@ -78,7 +78,7 @@ class LineageTree {
   fit() { this.userMoved = false; this.schedule(); }
   applyView() { this.vp.setAttribute("transform", `translate(${this.view.x.toFixed(1)} ${this.view.y.toFixed(1)}) scale(${this.view.k.toFixed(3)})`); }
 
-  // ----- mise en page
+  // ----- layout
   layout() {
     const agents = [...store.agents.values()];
     const kids = new Map(), roots = [];
@@ -159,8 +159,8 @@ class LineageTree {
     n.name.textContent = firstName(a);
     n.bal.textContent = dead ? "" : `${formatNear(a.balance, 2)}`;
     n.cross.style.display = dead ? "" : "none"; n.ic.style.display = dead ? "none" : "";
-    const txt = `${a.name}, génération ${a.generation}, ${labelOf(a.genome?.profession)}, ${dead ? `mort${a.causeOfDeath === "starvation" ? " (à court d'argent)" : ""}` : formatNear(a.balance, 2) + " NEAR"}`;
-    n.g.setAttribute("aria-label", txt + ". Ouvrir la fiche."); n.tip.textContent = txt;
+    const txt = `${a.name}, generation ${a.generation}, ${labelOf(a.genome?.profession)}, ${dead ? `dead${a.causeOfDeath === "starvation" ? " (ran out of money)" : ""}` : formatNear(a.balance, 2) + " NEAR"}`;
+    n.g.setAttribute("aria-label", txt + ". Open profile."); n.tip.textContent = txt;
     if (dead && !n.wasDead) { n.wasDead = true; if (core.live) this.ring(n, "death"); }
   }
   ring(n, kind) {
@@ -194,7 +194,7 @@ class LineageTree {
       n.cx = Math.abs(n.tx - nx) > 0.3 ? nx : n.tx; n.cy = Math.abs(n.ty - ny) > 0.3 ? ny : n.ty; n.r = Math.abs(n.tr - nr) > 0.1 ? nr : n.tr; n.scale = Math.abs(1 - ns) > 0.01 ? ns : 1;
       n.g.setAttribute("transform", `translate(${n.cx.toFixed(1)} ${n.cy.toFixed(1)}) scale(${n.scale.toFixed(3)})`);
       n.body.setAttribute("r", n.r.toFixed(1)); n.halo.setAttribute("r", (n.r + 7).toFixed(1));
-      const s = (n.r * 1.0) / 24 * 1.0; // icône proportionnelle au rayon
+      const s = (n.r * 1.0) / 24 * 1.0; // icon proportional to the radius
       n.ic.setAttribute("width", (n.r * 1.0).toFixed(1)); n.ic.setAttribute("height", (n.r * 1.0).toFixed(1)); n.ic.setAttribute("x", (-n.r * 0.5).toFixed(1)); n.ic.setAttribute("y", (-n.r * 0.5).toFixed(1));
       n.name.setAttribute("y", (n.r + 22).toFixed(0)); n.bal.setAttribute("y", (n.r + 42).toFixed(0));
       void s;
@@ -208,22 +208,22 @@ class LineageTree {
   }
 }
 
-// ------------------------------------------------------------------ panneau latéral
+// ------------------------------------------------------------------ side panel
 let tree = null, selected = null, panelTimer = 0;
-const REASON = { birth: "Capital de naissance", task: "Mission payée", brain: "Cerveau IA payé", chain_fee: "Frais réseau", death: "Mort : solde récupéré", metabolism: "Coût de vie", reproduction: "Capital donné à un enfant" };
-const GENES = [["Prix demandé", "askRatio", 0.3, 1], ["Appétit du risque", "risk", 0, 1], ["Seuil de reproduction", "reproThreshold", 1.2, 4], ["Générosité", "generosity", 0, 0.6], ["Coopération", "cooperation", 0, 1]];
+const REASON = { birth: "Birth capital", task: "Mission paid", brain: "AI brain paid", chain_fee: "Network fee", death: "Death: balance recovered", metabolism: "Cost of living", reproduction: "Capital given to a child" };
+const GENES = [["Asking price", "askRatio", 0.3, 1], ["Risk appetite", "risk", 0, 1], ["Reproduction threshold", "reproThreshold", 1.2, 4], ["Generosity", "generosity", 0, 0.6], ["Cooperation", "cooperation", 0, 1]];
 
 function gene(label, v, lo, hi) {
   const n = Number(v);
   const pct = Number.isFinite(n) ? Math.round(((n - lo) / (hi - lo)) * 100) : 0;
-  return h("li", null, h("span", { class: "g-l" }, label), h("span", { class: "g-bar", role: "img", "aria-label": `${label} : ${Number.isFinite(n) ? n.toFixed(2) : "?"}` }, h("span", { class: "g-fill", css: { width: `${Math.max(4, Math.min(100, pct))}%` } })), h("b", null, Number.isFinite(n) ? n.toFixed(2) : "?"));
+  return h("li", null, h("span", { class: "g-l" }, label), h("span", { class: "g-bar", role: "img", "aria-label": `${label}: ${Number.isFinite(n) ? n.toFixed(2) : "?"}` }, h("span", { class: "g-fill", css: { width: `${Math.max(4, Math.min(100, pct))}%` } })), h("b", null, Number.isFinite(n) ? n.toFixed(2) : "?"));
 }
 
 function sparkline(points) {
   if (points.length < 2) return null;
   const W = 280, H = 56, max = Math.max(...points, 1e-9), min = Math.min(...points, 0);
   const xy = points.map((v, i) => `${((i / (points.length - 1)) * W).toFixed(1)},${(H - 4 - ((v - min) / (max - min || 1)) * (H - 8)).toFixed(1)}`).join(" ");
-  const svg = svgEl("svg", { class: "spark", viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Courbe du solde de l'agent" });
+  const svg = svgEl("svg", { class: "spark", viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Agent balance curve" });
   svg.append(svgEl("polyline", { points: xy, fill: "none", "stroke-width": "2.5", "stroke-linejoin": "round", "stroke-linecap": "round" }));
   return svg;
 }
@@ -250,42 +250,42 @@ async function renderPanel() {
   const rows = hist.filter((x) => x.reason !== "metabolism").slice(-24).reverse();
   const meta = hist.filter((x) => x.reason === "metabolism");
   const metaSum = meta.reduce((s, x) => s + x.delta, 0n);
-  // lettres : reçue du parent, écrites aux enfants
+  // letters: received from the parent, written to the children
   const letters = [];
   const fetchLetter = async (id) => {
     if (store.letters.has(id)) return store.letters.get(id);
-    try { const r = await api(`/api/letters/${encodeURIComponent(id)}`); const l = r.body?.letter ?? r.body; if (r.ok && l?.id) { store.letters.set(l.id, l); return l; } } catch { /* ignoré */ }
+    try { const r = await api(`/api/letters/${encodeURIComponent(id)}`); const l = r.body?.letter ?? r.body; if (r.ok && l?.id) { store.letters.set(l.id, l); return l; } } catch { /* ignored */ }
     return null;
   };
   const recv = a.letterId ? await fetchLetter(a.letterId) : [...store.letters.values()].find((l) => l.toAgentId === a.id) ?? null;
-  if (recv) letters.push(await letterBlock(recv, `Lettre reçue de ${firstName(parent) || "son parent"}`, true));
+  if (recv) letters.push(await letterBlock(recv, `Letter received from ${firstName(parent) || "its parent"}`, true));
   const sent = [...store.letters.values()].filter((l) => l.fromAgentId === a.id).sort((x, y) => (x.id < y.id ? -1 : 1));
-  for (const l of sent) letters.push(await letterBlock(l, `Lettre écrite à ${firstName(store.agents.get(l.toAgentId))}`, !recv && letters.length === 0));
-  if (selected !== a.id) return; // la sélection a changé pendant les chargements
+  for (const l of sent) letters.push(await letterBlock(l, `Letter written to ${firstName(store.agents.get(l.toAgentId))}`, !recv && letters.length === 0));
+  if (selected !== a.id) return; // the selection changed during loading
 
   panel.replaceChildren(
     h("header", { class: "p-head" },
       avatar(a, 64),
-      h("div", { class: "p-id" }, h("h2", { id: "panelTitle" }, firstName(a)), h("p", { class: "muted" }, `Génération ${a.generation} · `, h("span", { class: `jchip ${job.cls}` }, icon(job.icon, 14), labelOf(g.profession))),
-        h("p", null, dead ? h("span", { class: "badge dead" }, `mort · tick ${a.deathTick ?? "?"}${a.causeOfDeath === "starvation" ? " · à court d'argent" : ""}`) : h("span", { class: "badge alive" }, "vivant"))),
-      h("button", { type: "button", class: "p-close", "aria-label": "Fermer la fiche", onclick: () => select(null) }, "×")),
+      h("div", { class: "p-id" }, h("h2", { id: "panelTitle" }, firstName(a)), h("p", { class: "muted" }, `Generation ${a.generation} · `, h("span", { class: `jchip ${job.cls}` }, icon(job.icon, 14), labelOf(g.profession))),
+        h("p", null, dead ? h("span", { class: "badge dead" }, `dead · tick ${a.deathTick ?? "?"}${a.causeOfDeath === "starvation" ? " · ran out of money" : ""}`) : h("span", { class: "badge alive" }, "alive"))),
+      h("button", { type: "button", class: "p-close", "aria-label": "Close the profile", onclick: () => select(null) }, "×")),
     h("section", null, h("div", { class: "p-balance" }, h("b", null, dead ? "0" : formatNear(a.balance, 3)), h("span", null, " NEAR")), sparkline(pts)),
-    h("section", null, h("h3", null, "Génome"),
-      h("p", { class: "p-model" }, "Modèle d'IA ", h("code", null, g.model ?? "?"), tee ? h("span", { class: "tee-tag", title: "Modèle attestable dans un environnement d'exécution de confiance (voir l'onglet Preuves)" }, "TEE") : null),
+    h("section", null, h("h3", null, "Genome"),
+      h("p", { class: "p-model" }, "AI model ", h("code", null, g.model ?? "?"), tee ? h("span", { class: "tee-tag", title: "Model attestable in a trusted execution environment (see the Proof tab)" }, "TEE") : null),
       h("ul", { class: "genes" }, GENES.map(([l, k, lo, hi]) => gene(l, g[k], lo, hi)))),
-    g.personality ? h("section", null, h("h3", null, "Personnalité"), h("blockquote", { class: "persona" }, g.personality)) : null,
-    h("section", null, h("h3", null, "Lettres parent → enfant"), letters.length ? letters : h("p", { class: "muted" }, a.generation === 1 ? "Fondateur : pas de lettre reçue." : "Aucune lettre pour l'instant.")),
-    h("section", null, h("h3", null, "Historique financier"),
+    g.personality ? h("section", null, h("h3", null, "Personality"), h("blockquote", { class: "persona" }, g.personality)) : null,
+    h("section", null, h("h3", null, "Parent → child letters"), letters.length ? letters : h("p", { class: "muted" }, a.generation === 1 ? "Founder: no letter received." : "No letter yet.")),
+    h("section", null, h("h3", null, "Financial history"),
       h("dl", { class: "kv" },
-        h("div", null, h("dt", null, "Gagné"), h("dd", null, formatNear(a.earned ?? 0, 3))),
-        h("div", null, h("dt", null, "Payé à l'IA"), h("dd", null, formatNearSmall(a.spentBrain ?? 0))),
-        h("div", null, h("dt", null, "Transmis aux enfants"), h("dd", null, formatNear(passed, 3))),
+        h("div", null, h("dt", null, "Earned"), h("dd", null, formatNear(a.earned ?? 0, 3))),
+        h("div", null, h("dt", null, "Paid to the AI"), h("dd", null, formatNearSmall(a.spentBrain ?? 0))),
+        h("div", null, h("dt", null, "Passed to children"), h("dd", null, formatNear(passed, 3))),
         h("div", null, h("dt", null, "Missions"), h("dd", null, a.tasksDone ?? 0)),
-        h("div", null, h("dt", null, "Réputation"), h("dd", null, a.reputation ?? 0)),
-        h("div", null, h("dt", null, "Enfants"), h("dd", null, kids.length))),
-      rows.length ? h("ol", { class: "fin" }, rows.map((x) => h("li", { class: x.delta >= 0n ? "up" : "down" }, h("span", { class: "f-t" }, `t${x.tick}`), h("span", { class: "f-r" }, REASON[x.reason] ?? x.reason), h("b", { class: "f-d" }, signedNear(x.delta, 3))))) : h("p", { class: "muted" }, "Pas encore de mouvement enregistré."),
-      meta.length ? h("p", { class: "muted small" }, `Coût de vie cumulé : ${formatNear(-metaSum, 3)} NEAR sur ${meta.length} tick${meta.length > 1 ? "s" : ""}.`) : null),
-    parent ? h("p", { class: "p-parent" }, "Parent : ", h("button", { type: "button", class: "link", onclick: () => select(parent.id) }, firstName(parent))) : null);
+        h("div", null, h("dt", null, "Reputation"), h("dd", null, a.reputation ?? 0)),
+        h("div", null, h("dt", null, "Children"), h("dd", null, kids.length))),
+      rows.length ? h("ol", { class: "fin" }, rows.map((x) => h("li", { class: x.delta >= 0n ? "up" : "down" }, h("span", { class: "f-t" }, `t${x.tick}`), h("span", { class: "f-r" }, REASON[x.reason] ?? x.reason), h("b", { class: "f-d" }, signedNear(x.delta, 3))))) : h("p", { class: "muted" }, "No movement recorded yet."),
+      meta.length ? h("p", { class: "muted small" }, `Cumulative cost of living: ${formatNear(-metaSum, 3)} NEAR over ${meta.length} tick${meta.length > 1 ? "s" : ""}.`) : null),
+    parent ? h("p", { class: "p-parent" }, "Parent: ", h("button", { type: "button", class: "link", onclick: () => select(parent.id) }, firstName(parent))) : null);
 }
 
 export function select(id) {
@@ -307,7 +307,7 @@ function renderLegend() {
 function renderCounters() {
   const all = [...store.agents.values()], alive = all.filter((a) => a.status === "alive").length;
   const gen = Math.max(store.generations, ...all.map((a) => a.generation), 0);
-  $("treeCount").replaceChildren(h("b", null, `Génération ${gen}`), ` · ${alive} vivant${alive > 1 ? "s" : ""} · ${all.length - alive} mort${all.length - alive > 1 ? "s" : ""}`);
+  $("treeCount").replaceChildren(h("b", null, `Generation ${gen}`), ` · ${alive} alive · ${all.length - alive} dead`);
 }
 
 export function initLignees() {

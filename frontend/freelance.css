@@ -1,4 +1,4 @@
-/* Lot L16 : métiers, spécialisation, marché, cycle de vie des tâches, livrables. Chargé après style.css. */
+/* Lot L16: professions, specialization, market, task lifecycle, deliverables. Loaded after style.css. */
 .sw.p-unknown { background: var(--dead); } .node.p-unknown .body { fill: var(--dead); }
 .sw.sm { width: 16px; height: 16px; font-size: 10px; vertical-align: middle; }
 .c-spec { grid-column: span 7; } .c-market { grid-column: span 5; }
@@ -8,7 +8,7 @@
 .tasks { max-height: 640px; }
 .legend li.zero { opacity: .5; } .legend li b { font-variant-numeric: tabular-nums; }
 
-/* spécialisation : barres empilées par génération */
+/* specialization: stacked bars per generation */
 .spec { display: grid; gap: 8px; margin-top: 10px; }
 .spec-row { display: grid; grid-template-columns: 52px minmax(0, 1fr) 76px; gap: 10px; align-items: center; font-size: 13px; }
 .spec-gen { font-weight: 700; color: var(--muted); }
@@ -19,7 +19,7 @@
 .spec-n { color: var(--muted); font-size: 12px; text-align: right; }
 .spec-note { padding-top: 4px; }
 
-/* marché */
+/* market */
 .mevents { display: grid; gap: 6px; }
 .mevents.hist { max-height: 150px; overflow: auto; }
 .mev { display: grid; grid-template-columns: 74px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 10px; background: var(--surface2); border-left: 4px solid var(--muted); font-size: 13px; }
@@ -47,7 +47,7 @@
 .life-l { display: grid; gap: 1px; min-width: 0; font-weight: 600; } .life-l small { font-weight: 400; color: var(--muted); }
 .txchip { font: 11px ui-monospace, Consolas, monospace; font-weight: 400; word-break: break-all; }
 
-/* livrable */
+/* deliverable */
 .deliverable { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: 12px; padding: 10px; background: var(--bg); min-width: 0; }
 .dl-summary { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: 13px; }
 .verdict { font-weight: 800; padding: 2px 12px; border-radius: 999px; font-size: 14px; }

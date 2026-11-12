@@ -1,4 +1,4 @@
-/* Darwin L17 : interface épurée, sombre par défaut, grandes polices et contrastes pour la vidéo. Aucune ressource externe. */
+/* Darwin L17: clean interface, dark by default, large fonts and contrast for video. No external resource. */
 :root {
   color-scheme: dark;
   --bg: #070b17; --bg2: #0c1224; --surface: #111a33; --surface2: #18234a; --line: #2a3866;
@@ -38,7 +38,7 @@ a { color: var(--accent); }
 .noscript { padding: 16px; }
 main { flex: 1; display: flex; flex-direction: column; min-height: 0; outline: none; }
 
-/* ---------- en-tête ---------- */
+/* ---------- header ---------- */
 .top { display: flex; align-items: center; gap: 18px; padding: 12px clamp(12px, 3vw, 32px); position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 86%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
 .brand { display: inline-flex; align-items: center; gap: 10px; font-size: 26px; font-weight: 800; letter-spacing: -.02em; color: var(--text); text-decoration: none; }
 .brand-mark { width: 26px; height: 26px; border-radius: 50%; background: conic-gradient(var(--p-logo), var(--p-finance), var(--p-marketing), var(--p-translation), var(--p-logo)); box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 50%, transparent); }
@@ -192,7 +192,7 @@ main { flex: 1; display: flex; flex-direction: column; min-height: 0; outline: n
 .toast.click { cursor: pointer; } .toast.out { opacity: 0; transform: translateX(30px); transition: all .7s; }
 @keyframes tin { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
 
-/* ---------- page Lignées ---------- */
+/* ---------- Lineage page ---------- */
 body[data-page="lignees"] { height: 100dvh; overflow: hidden; }
 .page-lignees { display: flex; position: relative; min-height: 0; }
 .page-lignees[hidden] { display: none; }
@@ -306,8 +306,8 @@ body[data-page="lignees"] { height: 100dvh; overflow: hidden; }
 
 .feed, .composer { scroll-margin-top: 90px; }
 
-/* NB-2 : en rejeu, les notifications se placent sous le bandeau (boutons x1/x5/x20 toujours accessibles) */
-body[data-mode="replay"] .toasts { top: 170px; } /* repli ; valeur exacte posée par darwin.js sous le bandeau */
+/* NB-2: in replay, notifications sit below the banner (x1/x5/x20 buttons always reachable) */
+body[data-mode="replay"] .toasts { top: 170px; } /* fallback; exact value set by darwin.js below the banner */
 .conn[data-ended="true"] .dot { background: var(--muted); animation: none; }
 
 /* V-6 / V-7 : avertissements visibles */

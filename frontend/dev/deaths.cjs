@@ -1,4 +1,4 @@
-// Attend la première mort d'un agent contre le vrai backend et capture l'arbre + lignées + liste.
+// Waits for the first agent death against the real backend and captures the tree + lineages + list.
 // REAL_URL=http://127.0.0.1:3210 NODE_PATH=... node frontend/dev/deaths.cjs <fichierSortie.png>
 const { chromium } = require("playwright");
 const URL_ = process.env.REAL_URL || "http://127.0.0.1:3000";
@@ -18,12 +18,12 @@ const URL_ = process.env.REAL_URL || "http://127.0.0.1:3000";
     crossVisible: getComputedStyle(document.querySelector(".node.dead .cross")).display,
     deadInList: document.querySelectorAll("#agents li.dead").length,
     lineageTxt: [...document.querySelectorAll(".lin-txt")].map((e) => e.textContent),
-    morts: document.getElementById("stDead").textContent,
+    dead: document.getElementById("stDead").textContent,
     tick: document.getElementById("tickInfo").textContent,
   }));
   console.log(JSON.stringify(info, null, 1));
   await p.evaluate(() => scrollTo(0, 0));
   await p.screenshot({ path: process.argv[2] || "morts.png" });
-  console.log("erreurs", errs);
+  console.log("errors", errs);
   await b.close();
 })();

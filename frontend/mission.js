@@ -1,21 +1,21 @@
-// Page « Mission » (L17) : agents vivants en cartes, barre de mission façon LLM, fil de chat en direct.
-// Aucune logique métier : le métier et le budget proposés par la barre sont une aide de saisie (le serveur valide et applique ses bornes).
-// Aucun innerHTML : texte en nœuds Text, livrables via deliverable.js (SVG uniquement en <img data:>, jamais injecté).
+// "Mission" page (L17): living agents as cards, LLM-style mission bar, live chat feed.
+// No business logic: the profession and budget suggested by the bar are an input aid (the server validates and applies its bounds).
+// No innerHTML: text as Text nodes, deliverables via deliverable.js (SVG only as <img data:>, never injected).
 import { store, core, api, on, txUrl, aliveAgents, labelOfJob } from "./core.js";
-import { h, formatNear, formatNearSmall, nearNumber, big, nearInput, parseNearToYocto, shortHash, errorMessages, requesterBadge } from "./format.js";
+import { h, formatNear, formatNearSmall, nearNumber, big, nearInput, parseNearToYocto, shortHash, errorMessages, requesterBadge, badgeText } from "./format.js";
 import { jobOf, icon, avatar, firstName } from "./jobs.js";
 import { buildChatDeliverable } from "./chat-deliverable.js";
 
 const JOB_IDS = ["logo", "finance", "architecture", "marketing", "translation", "legal"];
 const RULES = [
-  ["translation", /tradui|traduc|translat|en anglais|en espagnol|en allemand|en italien/i],
-  ["legal", /juridi|rgpd|gdpr|contrat|cgu|cgv|l[ée]gal|conformit|mentions l/i],
-  ["logo", /logo|logotype|identit[ée] visuelle|embl[èe]me|pictogramme/i],
-  ["finance", /financ|budget|bilan|rentab|chiffre d'affaires|tr[ée]sorerie|pr[ée]vision|marge|\bROI\b|ventes/i],
-  ["architecture", /architect|\bAPI\b|microservice|base de donn|infrastructure|backend|logiciel|d[ée]ploiement|diagramme|sch[ée]ma/i],
-  ["marketing", /marketing|slogan|accroche|annonce|newsletter|publicit|texte|fiche produit|r[ée]seaux|description|r[ée]dige|[ée]cris/i],
+  ["translation", /tradui|traduc|translat|in english|in french|in spanish|in german|in italian|en anglais|en espagnol|en allemand|en italien/i],
+  ["legal", /juridi|rgpd|gdpr|contract|terms of (use|service)|privacy policy|compliance|l[ée]gal|lawful|cgu|cgv|conformit|mentions l/i],
+  ["logo", /logo|logotype|brand identity|visual identity|emblem|icon|identit[ée] visuelle|embl[èe]me|pictogramme/i],
+  ["finance", /financ|budget|balance sheet|profitab|revenue|cash ?flow|forecast|margin|\bROI\b|sales|bilan|rentab|chiffre d'affaires|tr[ée]sorerie|pr[ée]vision|marge|ventes/i],
+  ["architecture", /architect|\bAPI\b|microservice|database|infrastructure|backend|software|deployment|diagram|schema|base de donn|logiciel|d[ée]ploiement|diagramme|sch[ée]ma/i],
+  ["marketing", /marketing|slogan|tagline|headline|ad copy|advert|newsletter|product (page|sheet)|social media|description|write|copy|accroche|annonce|publicit|texte|fiche produit|r[ée]seaux|r[ée]dige|[ée]cris/i],
 ];
-/** Aide de saisie : devine le métier d'après les mots de la mission (null si rien ne ressort). */
+/** Input aid: guesses the profession from the words of the mission (null if nothing stands out). */
 export function inferJob(text) {
   for (const [id, re] of RULES) if (re.test(text)) return id;
   return null;
@@ -27,11 +27,11 @@ const labelOf = (p) => labelOfJob(p, jobOf(p).label);
 const minBudget = (p) => { const s = specOf(p); return s ? big(s.nearPrice) : null; };
 
 let onOpenAgent = () => {};
-const mine = new Set(); // ids des missions postées depuis cette page
+const mine = new Set(); // ids of missions posted from this page
 const speaking = new Map(); // agentId -> timer
 const sel = { job: "marketing", jobTouched: false, budgetTouched: false };
 
-// ------------------------------------------------------------------ cartes d'agents
+// ------------------------------------------------------------------ agent cards
 const cards = new Map();
 function gaugeMax(a) {
   const founders = [...store.agents.values()].filter((x) => x.generation === 1).map((x) => big(x.birthCapital)).filter((v) => v > 0n);
@@ -60,7 +60,7 @@ export function renderStrip() {
     c.btn.classList.toggle("low", ratio < 0.25);
     c.btn.classList.toggle("full", ratio >= 0.98);
     c.name.textContent = firstName(a);
-    c.btn.setAttribute("aria-label", `${firstName(a)}, ${labelOf(a.genome?.profession)}, ${formatNear(a.balance, 2)} NEAR. Ouvrir sa fiche.`);
+    c.btn.setAttribute("aria-label", `${firstName(a)}, ${labelOf(a.genome?.profession)}, ${formatNear(a.balance, 2)} NEAR. Open profile.`);
     c.btn.title = `${firstName(a)} · ${labelOf(a.genome?.profession)} · ${formatNear(a.balance, 3)} NEAR`;
   }
   for (const [id, c] of [...cards]) {
@@ -69,7 +69,7 @@ export function renderStrip() {
     c.btn.classList.add("leaving");
     setTimeout(() => c.btn.remove(), 700);
   }
-  // l'ordre suit la naissance
+  // order follows birth
   list.forEach((a, i) => { const c = cards.get(a.id); if (c && strip.children[i] !== c.btn && !c.btn.classList.contains("leaving")) strip.insertBefore(c.btn, strip.children[i] ?? null); });
   const empty = $("stripEmpty");
   empty.hidden = list.length > 0;
@@ -77,7 +77,7 @@ export function renderStrip() {
     const all = [...store.agents.values()];
     const gen = all.reduce((m, a) => Math.max(m, Number(a.generation) || 0), 0);
     const ended = core.mode === "replay" && core.replayInfo?.phase === "ended";
-    empty.textContent = all.length ? `${ended ? "Rejeu terminé · " : ""}Plus aucun agent vivant · génération ${gen}` : ended ? "Rejeu terminé" : "En attente des premiers agents…";
+    empty.textContent = all.length ? `${ended ? "Replay finished · " : ""}No living agent left · generation ${gen}` : ended ? "Replay finished" : "Waiting for the first agents…";
   }
 }
 let stripTimer = 0;
@@ -91,7 +91,7 @@ function speak(agentId) {
   speaking.set(agentId, setTimeout(() => { c.btn.classList.remove("speaking"); speaking.delete(agentId); }, 2600));
 }
 
-// ------------------------------------------------------------------ fil de chat
+// ------------------------------------------------------------------ chat feed
 const threads = new Map(); // taskId -> thread
 const MAX_THREADS = 14;
 let queue = [], qTimer = 0;
@@ -102,22 +102,22 @@ function pump() {
     qTimer = 0;
     const fn = queue.shift();
     if (!fn) return;
-    try { fn(); } catch (e) { console.warn("fil", e?.message); }
+    try { fn(); } catch (e) { console.warn("feed", e?.message); }
     if (queue.length) qTimer = setTimeout(step, queue.length > 14 ? 40 : queue.length > 6 ? 220 : 520);
   };
   qTimer = setTimeout(step, 0);
 }
-function flushQueue() { clearTimeout(qTimer); qTimer = 0; const q = queue; queue = []; for (const fn of q) { try { fn(); } catch (e) { console.warn("fil", e?.message); } } }
-/** Ordre garanti : en rattrapage (silent) tout passe tout de suite, sinon les messages sont cadencés pour rester lisibles. */
+function flushQueue() { clearTimeout(qTimer); qTimer = 0; const q = queue; queue = []; for (const fn of q) { try { fn(); } catch (e) { console.warn("feed", e?.message); } } }
+/** Guaranteed order: during catch-up (silent) everything goes through at once, otherwise messages are paced to stay readable. */
 function enqueue(fn, silent) { if (silent) { flushQueue(); fn(true); } else { queue.push(() => fn(false)); pump(); } }
 
 function requesterTag(t) {
   const r = t.requester;
-  if (mine.has(t.id)) return { text: "vous · financé par le compte de démo", cls: "tag-me", title: "Mission postée depuis cette page ; le budget est avancé par le compte de démonstration." };
-  if (r?.kind === "simulated") return { text: "simulé", cls: "tag-sim", title: "Client artificiel : cette mission ne vient pas d'un humain." };
-  if (r?.kind === "agent") return { text: "sous-traitance", cls: "tag-agent", title: "Mission confiée par un agent à un autre." };
+  if (mine.has(t.id)) return { text: "you · funded by the demo account", cls: "tag-me", title: "Mission posted from this page; the budget is advanced by the demo account." };
+  if (r?.kind === "simulated") return { text: "simulated", cls: "tag-sim", title: "Artificial client: this mission does not come from a human." };
+  if (r?.kind === "agent") return { text: "subcontract", cls: "tag-agent", title: "Mission handed from one agent to another." };
   const b = requesterBadge(r, t.badge);
-  return { text: `${r?.label ? String(r.label) : "visiteur"} · financé par le compte de démo`, cls: "tag-visitor", title: b.title ?? "" };
+  return { text: `${r?.label ? badgeText(String(r.label)) : "visitor"} · funded by the demo account`, cls: "tag-visitor", title: b.title ?? "" };
 }
 
 function ensureThread(task, silent) {
@@ -141,17 +141,17 @@ function money(y, d = 3) { return `${formatNear(y, d)} NEAR`; }
 function pitchOf(b, a) {
   const p = typeof b.pitch === "string" ? b.pitch.trim() : "";
   if (p) return p.slice(0, 240);
-  // le journal réel ne garde pas toujours la phrase de pitch : on résume l'offre sans rien inventer
+  // the real log does not always keep the pitch sentence: summarize the bid without inventing anything
   const eta = Number(b.etaTicks);
-  return `${Number.isFinite(eta) && eta > 0 ? `Livraison en ${eta} tick${eta > 1 ? "s" : ""}` : "Offre déposée"}${a ? ` · ${labelOf(a.genome?.profession)}` : ""}.`;
+  return `${Number.isFinite(eta) && eta > 0 ? `Delivery in ${eta} tick${eta > 1 ? "s" : ""}` : "Bid placed"}${a ? ` · ${labelOf(a.genome?.profession)}` : ""}.`;
 }
 
 function txChip(hash, label) {
   if (!hash) return null;
   const url = txUrl(hash);
   return url
-    ? h("a", { class: "tx-link", href: url, target: "_blank", rel: "noopener noreferrer", title: `${label} : ${hash}`, "aria-label": `${label}, transaction ${hash} sur l'explorateur (nouvel onglet)` }, "preuve ↗")
-    : h("span", { class: "tx-link off", title: `${label} : ${hash}` }, core.mode === "mock" ? "mock" : shortHash(hash));
+    ? h("a", { class: "tx-link", href: url, target: "_blank", rel: "noopener noreferrer", title: `${label}: ${hash}`, "aria-label": `${label}, transaction ${hash} on the explorer (new tab)` }, "proof ↗")
+    : h("span", { class: "tx-link off", title: `${label}: ${hash}` }, core.mode === "mock" ? "mock" : shortHash(hash));
 }
 
 function bubble(agentId, body, extra = "") {
@@ -173,17 +173,17 @@ function msgNode(th, m) {
         t.prompt && t.prompt !== t.title ? h("div", { class: "prm" }, String(t.prompt).slice(0, 400)) : null));
     }
     case "bid": return bubble(m.agentId, h("div", null, h("span", { class: "price" }, money(m.price, 3)), h("span", { class: "pitch" }, m.pitch)), "bid");
-    case "award": return h("div", { class: "msg sys" }, h("span", { class: "pill-sys" }, "★ ", h("b", null, m.name), ` remporte la mission · ${money(m.price, 3)}${m.bids ? ` · ${m.bids} offre${m.bids > 1 ? "s" : ""}` : ""}`), txChip(m.tx, "Séquestre verrouillé"));
-    case "work": return bubble(m.agentId, h("div", { class: "work" }, h("span", { class: "dots", "aria-hidden": "true" }, h("i"), h("i"), h("i")), `réfléchit${m.cost ? ` · cerveau payé ${formatNearSmall(m.cost)} NEAR` : ""}`), "work");
-    case "submit": return bubble(m.agentId, h("div", null, "Livrable remis", m.hash ? h("code", { class: "hash" }, shortHash(m.hash)) : null), "submit");
+    case "award": return h("div", { class: "msg sys" }, h("span", { class: "pill-sys" }, "★ ", h("b", null, m.name), ` wins the mission · ${money(m.price, 3)}${m.bids ? ` · ${m.bids} bid${m.bids > 1 ? "s" : ""}` : ""}`), txChip(m.tx, "Escrow locked"));
+    case "work": return bubble(m.agentId, h("div", { class: "work" }, h("span", { class: "dots", "aria-hidden": "true" }, h("i"), h("i"), h("i")), `thinking${m.cost ? ` · brain paid ${formatNearSmall(m.cost)} NEAR` : ""}`), "work");
+    case "submit": return bubble(m.agentId, h("div", null, "Deliverable submitted", m.hash ? h("code", { class: "hash" }, shortHash(m.hash)) : null), "submit");
     case "deliverable": return h("div", { class: "msg deliv" }, m.node);
     case "verdict": return h("div", { class: `msg judge ${m.ok ? "ok" : "ko"}` }, h("div", { class: "bub" },
-      h("div", { class: "who" }, h("span", { class: "judge-ico", "aria-hidden": "true" }, "⚖"), "Juge", m.validator ? h("span", { class: "muted" }, ` ${m.validator}`) : null),
-      h("div", null, h("b", { class: "vd" }, m.ok ? "Accepté ✓" : "Rejeté ✗"), Number.isFinite(m.score) ? ` · score ${Math.round(m.score * 100)} %` : "", m.reason ? h("div", { class: "why" }, String(m.reason).slice(0, 260)) : null)));
-    case "paid": return h("div", { class: "msg sys paid" }, h("span", { class: "pill-sys paid" }, h("b", null, "payé ✓"), ` ${money(m.amount, 3)} → ${m.name}`), txChip(m.tx, "Paiement du séquestre"));
-    case "refund": return h("div", { class: "msg sys bad" }, h("span", { class: "pill-sys bad" }, `remboursé · ${money(m.amount, 3)} rendus au client`), txChip(m.tx, "Remboursement"));
-    case "expired": return h("div", { class: "msg sys bad" }, h("span", { class: "pill-sys bad" }, `expirée · ${{ no_bids: "aucune offre", deadline: "délai dépassé", unfunded: "client sans fonds", winner_dead: "le gagnant est mort" }[m.reason] ?? m.reason ?? ""}`));
-    case "sub": return h("div", { class: "msg sys" }, h("span", { class: "pill-sys" }, `${m.name} sous-traite une partie du travail`));
+      h("div", { class: "who" }, h("span", { class: "judge-ico", "aria-hidden": "true" }, "⚖"), "Judge", m.validator ? h("span", { class: "muted" }, ` ${m.validator}`) : null),
+      h("div", null, h("b", { class: "vd" }, m.ok ? "Accepted ✓" : "Rejected ✗"), Number.isFinite(m.score) ? ` · score ${Math.round(m.score * 100)}%` : "", m.reason ? h("div", { class: "why" }, String(m.reason).slice(0, 260)) : null)));
+    case "paid": return h("div", { class: "msg sys paid" }, h("span", { class: "pill-sys paid" }, h("b", null, "paid ✓"), ` ${money(m.amount, 3)} → ${m.name}`), txChip(m.tx, "Escrow payment"));
+    case "refund": return h("div", { class: "msg sys bad" }, h("span", { class: "pill-sys bad" }, `refunded · ${money(m.amount, 3)} returned to the client`), txChip(m.tx, "Refund"));
+    case "expired": return h("div", { class: "msg sys bad" }, h("span", { class: "pill-sys bad" }, `expired · ${{ no_bids: "no bids", deadline: "deadline passed", unfunded: "client without funds", winner_dead: "the winner died" }[m.reason] ?? m.reason ?? ""}`));
+    case "sub": return h("div", { class: "msg sys" }, h("span", { class: "pill-sys" }, `${m.name} subcontracts part of the work`));
     default: return h("div");
   }
 }
@@ -191,7 +191,7 @@ function msgNode(th, m) {
 function summaryLine(th) {
   const t = th.task;
   const win = t.winnerId ? firstName(store.agents.get(t.winnerId)) : null;
-  const state = th.state === "paid" ? ["payé ✓", "ok"] : th.state === "refund" ? ["remboursé", "ko"] : th.state === "expired" ? ["expirée", "ko"] : ["en cours", "live"];
+  const state = th.state === "paid" ? ["paid ✓", "ok"] : th.state === "refund" ? ["refunded", "ko"] : th.state === "expired" ? ["expired", "ko"] : ["in progress", "live"];
   return h("button", { type: "button", class: "t-sum", "aria-expanded": String(th.isOpen), onclick: () => { th.open = !th.isOpen; th.collapsedByUser = !th.open; renderThread(th); } },
     h("span", { class: `st ${state[1]}` }, state[0]),
     h("span", { class: "t-title" }, t.title),
@@ -213,7 +213,7 @@ function renderThread(th) {
 }
 function finishThread(th, state) {
   th.done = true; th.state = state; th.doneAt = Date.now();
-  setTimeout(() => { if (th.open === null && !mine.has(th.id) && th.el.isConnected) renderThread(th); }, 9000); // se replie seul après quelques secondes
+  setTimeout(() => { if (th.open === null && !mine.has(th.id) && th.el.isConnected) renderThread(th); }, 9000); // collapses by itself after a few seconds
 }
 function push(th, msg, silent) { msg.silent = silent; th.msgs.push(msg); renderThread(th); }
 
@@ -222,7 +222,7 @@ function taskOfWinner(agentId) {
   return null;
 }
 
-/** Entrée des événements du journal. */
+/** Entry point for log events. */
 export function ingest(ev, { silent = false } = {}) {
   const d = ev.data ?? {};
   switch (ev.type) {
@@ -272,15 +272,15 @@ export function ingest(ev, { silent = false } = {}) {
     case "deliverable.produced": {
       enqueue((s) => {
         const th = threads.get(d.taskId); if (!th) return;
-        const inline = Array.isArray(d.files) && d.files.some((f) => typeof f?.content === "string") ? { taskId: d.taskId, files: d.files } : null; // journal futur : contenu dans files[]
+        const inline = Array.isArray(d.files) && d.files.some((f) => typeof f?.content === "string") ? { taskId: d.taskId, files: d.files } : null; // future log: content in files[]
         const msg = { kind: "deliverable", node: buildChatDeliverable(inline, d) };
         push(th, msg, s);
-        // le contenu (texte, SVG) vient de l'API ; sans contenu (rejeu d'un journal), la liste des fichiers reste affichée
-        // en rejeu, le contenu éventuel est déjà dans files[] : on n'interroge pas l'API (404 attendu pour les anciens journaux)
+        // the content (text, SVG) comes from the API; without content (log replay), the file list stays displayed
+        // in replay, any content is already in files[]: the API is not queried (404 expected for old logs)
         if (core.mode === "replay") return;
         api(`/api/tasks/${encodeURIComponent(d.taskId)}/deliverable`).then((r) => {
           if (r.ok && r.body && Array.isArray(r.body.files)) { msg.node = buildChatDeliverable(r.body, d); renderThread(th); }
-        }).catch(() => { /* conservé tel quel */ });
+        }).catch(() => { /* kept as is */ });
       }, silent);
       break;
     }
@@ -329,7 +329,7 @@ export function resetMission() {
   renderStrip();
 }
 
-// ------------------------------------------------------------------ barre de mission
+// ------------------------------------------------------------------ mission bar
 function setStatus(kind, title, lines = []) {
   const box = $("mStatus");
   box.className = `m-status ${kind}`;
@@ -343,15 +343,15 @@ function renderChips() {
   const btn = $("jobBtn");
   btn.replaceChildren(icon(jb.icon, 18), h("span", null, labelOf(sel.job)), h("span", { class: "chev", "aria-hidden": "true" }, "▾"));
   btn.className = `chip job-chip ${jb.cls}`;
-  btn.setAttribute("aria-label", `Métier : ${labelOf(sel.job)}. Cliquer pour changer.`);
+  btn.setAttribute("aria-label", `Profession: ${labelOf(sel.job)}. Click to change.`);
   const min = minBudget(sel.job);
   $("budgetMin").textContent = min != null ? `min. ${nearInput(min)}` : "";
   if (min != null) {
     const cur = parseNearToYocto($("budgetInput").value);
     if (!sel.budgetTouched || cur == null || cur < min) { $("budgetInput").value = nearInput(min); sel.budgetTouched = false; }
   }
-  $("jobHelp").textContent = spec?.deliverable ? `Livrable : ${spec.deliverable}` : "";
-  const warn = sel.job === "legal" ? "Ceci n'est pas un avis juridique : faites relire la checklist par un professionnel." : sel.job === "logo" ? "Le logo est original : 3 dessins inédits, jamais une marque existante." : "";
+  $("jobHelp").textContent = spec?.deliverable ? `Deliverable: ${spec.deliverable}` : "";
+  const warn = sel.job === "legal" ? "This is not legal advice: have the checklist reviewed by a professional." : sel.job === "logo" ? "The logo is original: 3 new drawings, never an existing brand." : "";
   $("jobWarn").textContent = warn;
   $("jobWarn").hidden = !warn;
   const ids = core.catalogue ? [...core.catalogue.keys()].filter((i) => JOB_IDS.includes(i)) : JOB_IDS;
@@ -371,7 +371,7 @@ function renderMode() {
   $("mSend").disabled = replay;
   $("jobBtn").disabled = replay;
   $("budgetInput").disabled = replay;
-  input.placeholder = replay ? "Missions désactivées en rejeu" : "Décrivez votre mission…";
+  input.placeholder = replay ? "Missions disabled during replay" : "Describe your mission…";
   $("composer").classList.toggle("off", replay);
   $("replayNote").hidden = !replay;
   $("publicNote").hidden = replay;
@@ -381,7 +381,7 @@ let cooldown = 0;
 function lockSend(sec) {
   clearInterval(cooldown);
   const b = $("mSend");
-  if (!sec) { b.disabled = core.mode === "replay"; b.classList.remove("wait"); b.textContent = ""; b.append(h("span", { class: "sr" }, "Envoyer la mission"), arrowIcon()); return; }
+  if (!sec) { b.disabled = core.mode === "replay"; b.classList.remove("wait"); b.textContent = ""; b.append(h("span", { class: "sr" }, "Send the mission"), arrowIcon()); return; }
   let left = Math.min(60, Math.max(1, Math.ceil(sec)));
   b.disabled = true; b.classList.add("wait");
   const tick = () => { b.textContent = `${left}s`; if (left-- <= 0) { clearInterval(cooldown); lockSend(0); } };
@@ -401,15 +401,15 @@ async function submit() {
   const prompt = $("mInput").value.trim();
   const budgetNear = $("budgetInput").value.trim().replace(",", ".");
   const errs = [];
-  if (prompt.length < 10) errs.push("Décrivez la mission en quelques mots de plus (10 caractères minimum).");
-  if (!/^\d+(\.\d{1,6})?$/.test(budgetNear)) errs.push("Budget : un nombre décimal en NEAR, 6 décimales maximum (ex. 0.05).");
+  if (prompt.length < 10) errs.push("Describe the mission with a few more words (10 characters minimum).");
+  if (!/^\d+(\.\d{1,6})?$/.test(budgetNear)) errs.push("Budget: a decimal number in NEAR, 6 decimals maximum (e.g. 0.05).");
   const min = minBudget(sel.job), cur = parseNearToYocto(budgetNear);
-  if (min != null && cur != null && cur < min) errs.push(`Budget trop bas : le minimum pour « ${labelOf(sel.job)} » est ${nearInput(min)} NEAR (vous proposez ${budgetNear}).`);
+  if (min != null && cur != null && cur < min) errs.push(`Budget too low: the minimum for "${labelOf(sel.job)}" is ${nearInput(min)} NEAR (you offer ${budgetNear}).`);
   if (errs.length) { setStatus("err", errs[0], errs.slice(1)); return; }
   const first = prompt.split(/\n/)[0].trim();
-  const payload = { title: (first.length > 80 ? first.slice(0, 77) + "…" : first), prompt, profession: sel.job, budgetNear, requesterLabel: "visiteur" };
+  const payload = { title: (first.length > 80 ? first.slice(0, 77) + "…" : first), prompt, profession: sel.job, budgetNear, requesterLabel: "visitor" };
   $("mSend").disabled = true;
-  setStatus("info", "Envoi…");
+  setStatus("info", "Sending…");
   try {
     const r = await api("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(payload) });
     const retry = Number(r.headers.get("Retry-After")) || 0;
@@ -421,22 +421,22 @@ async function submit() {
       lockSend(0);
       if (t.id) {
         mine.add(t.id);
-        const th = ensureThread({ requester: { kind: "visitor", label: "visiteur" }, ...payload, budget: String(parseNearToYocto(budgetNear) ?? 0n), ...t }, false);
+        const th = ensureThread({ requester: { kind: "visitor", label: "visitor" }, ...payload, budget: String(parseNearToYocto(budgetNear) ?? 0n), ...t }, false);
         if (th) { th.open = true; renderThread(th); }
         $("feed").scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
       }
     } else if (r.status === 400) {
       const m = errorMessages(r.body);
-      setStatus("err", /budget|trop bas|minimum/i.test(m.join(" ")) ? "Budget refusé par le serveur" : "Le serveur refuse cette mission", m.length ? m : ["Données invalides."]); lockSend(0);
+      setStatus("err", /budget|trop bas|minimum/i.test(m.join(" ")) ? "Budget rejected by the server" : "The server rejects this mission", m.length ? m : ["Invalid data."]); lockSend(0);
     } else if (r.status === 429) {
-      setStatus("warn", "Trop de missions pour le moment.", [...errorMessages(r.body), retry ? `Réessayez dans ${retry} s.` : "Réessayez dans un moment."]); lockSend(retry || 15);
+      setStatus("warn", "Too many missions right now.", [...errorMessages(r.body), retry ? `Try again in ${retry} s.` : "Try again in a moment."]); lockSend(retry || 15);
     } else if (r.status === 503) {
       const pending = r.body?.error?.code === "VALIDATION_PENDING";
-      setStatus("warn", pending ? "Validation en cours, patientez un instant." : "Service indisponible.", [...errorMessages(r.body)]); lockSend(retry || 5);
+      setStatus("warn", pending ? "Validation in progress, please wait a moment." : "Service unavailable.", [...errorMessages(r.body)]); lockSend(retry || 5);
     } else if (r.status === 403) {
-      setStatus("err", "Requête refusée.", ["Ouvrez la page depuis l'adresse du serveur (protection anti-CSRF)."]); lockSend(0);
-    } else { setStatus("err", `Erreur inattendue (${r.status}).`, errorMessages(r.body)); lockSend(0); }
-  } catch { setStatus("err", "Serveur injoignable.", ["Vérifiez que le backend tourne puis réessayez."]); lockSend(0); }
+      setStatus("err", "Request refused.", ["Open the page from the server address (anti-CSRF protection)."]); lockSend(0);
+    } else { setStatus("err", `Unexpected error (${r.status}).`, errorMessages(r.body)); lockSend(0); }
+  } catch { setStatus("err", "Server unreachable.", ["Check that the backend is running, then try again."]); lockSend(0); }
 }
 
 function autosize() {
@@ -463,5 +463,5 @@ export function initMission({ openAgent }) {
   on("reset", resetMission);
   on("loaded", () => { renderStrip(); renderMode(); renderChips(); });
   renderChips(); renderMode(); lockSend(0);
-  // les missions terminées se replient d'elles-mêmes ; rien d'autre à planifier
+  // finished missions collapse by themselves; nothing else to schedule
 }

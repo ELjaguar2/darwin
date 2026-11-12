@@ -1,5 +1,5 @@
-// État client reconstruit depuis /api/state puis le flux d'événements. Aucune logique métier : pur reflet du journal.
-// Types (recopiés en JSDoc, voir shared/types.ts) : Agent, Task, Letter, DarwinEvent {seq, ts, tick, type, data}.
+// Client state rebuilt from /api/state then the event stream. No business logic: pure mirror of the log.
+// Types (copied as JSDoc, see shared/types.ts) : Agent, Task, Letter, DarwinEvent {seq, ts, tick, type, data}.
 import { explorerUrl, txKindLabel, big } from "./format.js";
 
 export const EVENT_TYPES = [
@@ -23,9 +23,9 @@ export class Store {
     this.agents = new Map();
     this.tasks = new Map();
     this.letters = new Map();
-    this.feed = []; // transactions : {key, hash, seq, tick, label, from, to, amount, url, mock, source}
+    this.feed = []; // transactions: {key, hash, seq, tick, label, from, to, amount, url, mock, source}
     this.feedByHash = new Map();
-    this.chronicle = []; // phrases : {seq, tick, kind, text, agentId?}
+    this.chronicle = []; // sentences: {seq, tick, kind, text, agentId?}
     this.warnings = [];
     this.lastSeq = 0;
     this.tick = 0;
@@ -36,13 +36,13 @@ export class Store {
     this.sim = { running: false, paused: false, stopped: null };
     this.totals = { alive: 0, dead: 0, born: 0, tasksSettled: 0, totalBalance: "0" };
     this.generations = 0;
-    this.bidCount = new Map(); // taskId -> nombre d'offres
-    this.deliverables = new Map(); // taskId -> métadonnées (événement deliverable.produced)
-    this.marketEvents = []; // MarketEvent[] (dédoublonnés par id, plus récent en tête)
-    this.snapshot = null; // dernière population.snapshot : {tick, byProfession, byGeneration}
+    this.bidCount = new Map(); // taskId -> number of bids
+    this.deliverables = new Map(); // taskId -> metadata (deliverable.produced event)
+    this.marketEvents = []; // MarketEvent[] (deduplicated by id, most recent first)
+    this.snapshot = null; // last population.snapshot: {tick, byProfession, byGeneration}
   }
 
-  /** Dernier instantané de population (état serveur ou événement), garde le plus récent. Forme tolérée : objet ou {data}. */
+  /** Latest population snapshot (server state or event), keeps the most recent. Accepted shape: object or {data}. */
   setSnapshot(s) {
     const d = s?.data ?? s;
     if (!d || typeof d !== "object" || typeof d.byGeneration !== "object" || !d.byGeneration) return;
@@ -58,13 +58,13 @@ export class Store {
     if (this.marketEvents.length > 60) this.marketEvents.length = 60;
   }
 
-  /** Événements de marché actifs au tick courant (calcul local, repli si /api/catalogue est absent). */
+  /** Market events active at the current tick (local computation, fallback if /api/catalogue is missing). */
   activeMarketEvents() { return this.marketEvents.filter((e) => e.startTick <= this.tick && this.tick < e.endTick); }
 
   subscribe(fn) { this.subs.add(fn); return () => this.subs.delete(fn); }
   notify(ev) { for (const fn of this.subs) fn(ev, this); }
 
-  /** Charge un instantané SimState. */
+  /** Loads a SimState snapshot. */
   load(state) {
     this.reset();
     this.mode = state.mode ?? "mock";
@@ -84,7 +84,7 @@ export class Store {
     this.notify({ type: "__loaded" });
   }
 
-  /** Borne la mémoire : on garde les MAX_TASKS tâches les plus récentes (Map = ordre d'insertion). */
+  /** Bounds memory: keeps the MAX_TASKS most recent tasks (Map = insertion order). */
   trimTasks() {
     while (this.tasks.size > MAX_TASKS) { const k = this.tasks.keys().next().value; this.tasks.delete(k); this.bidCount.delete(k); }
   }
@@ -96,15 +96,15 @@ export class Store {
     if (!hash) return;
     const url = explorerUrl(hash, { explicit, chainKind: this.chain.kind, base: this.explorerBase });
     const mock = /^mock_/.test(hash) || this.chain.kind === "mock";
-    const minor = source === "chain.tx" && kind === "transfer" && !!to && to === this.chain.masterId; // métabolisme : même transfert vers le compte maître à chaque tick
+    const minor = source === "chain.tx" && kind === "transfer" && !!to && to === this.chain.masterId; // metabolism: same transfer to the master account every tick
     const known = this.feedByHash.get(hash);
     if (known) {
-      if (source !== "chain.tx") known.minor = false; // enrichit l'entrée existante (chain.tx + événement métier partagent le même hash)
+      if (source !== "chain.tx") known.minor = false; // enriches the existing entry (chain.tx + business event share the same hash)
       if (label && source !== "chain.tx") known.label = label;
       known.from ??= from; known.to ??= to; known.amount ??= amount; known.url ??= url;
       return known;
     }
-    const it = { key: hash, hash, seq, tick, label: minor ? "Coût de vie (métabolisme)" : label, from, to, amount, url, mock, source, minor, fresh: true };
+    const it = { key: hash, hash, seq, tick, label: minor ? "Cost of living (metabolism)" : label, from, to, amount, url, mock, source, minor, fresh: true };
     this.feed.unshift(it);
     this.feedByHash.set(hash, it);
     if (this.feed.length > MAX_FEED) { const old = this.feed.pop(); this.feedByHash.delete(old.hash); }
@@ -116,7 +116,7 @@ export class Store {
     if (this.chronicle.length > MAX_CHRONICLE) this.chronicle.pop();
   }
 
-  /** Applique un événement du journal. `live=false` : rejeu d'historique (feed uniquement, pas d'effet sur l'état). */
+  /** Applies a log event. `live=false`: history replay (feed only, no effect on state). */
   apply(ev, { live = true } = {}) {
     if (!ev || typeof ev.seq !== "number") return;
     if (live) { if (ev.seq <= this.lastSeq) return; this.lastSeq = ev.seq; this.tick = Math.max(this.tick, ev.tick ?? 0); }
@@ -126,18 +126,18 @@ export class Store {
       case "deliverable.produced": if (d.taskId) this.deliverables.set(d.taskId, d); break;
       case "market.event":
         this.addMarketEvent(d.event);
-        if (live && d.event) this.chron(ev, "sys", `Marché : ${d.event.title} (${d.event.profession}, demande ×${d.event.demandMultiplier}).`);
+        if (live && d.event) this.chron(ev, "sys", `Market: ${d.event.title} (${d.event.profession}, demand ×${d.event.demandMultiplier}).`);
         break;
       case "population.snapshot": this.setSnapshot({ tick: d.tick ?? ev.tick, byProfession: d.byProfession, byGeneration: d.byGeneration }); break;
       case "sim.started":
         this.mode = d.mode ?? this.mode; this.sim.running = true; this.sim.stopped = null;
-        if (live) this.chron(ev, "sys", `Simulation lancée (${d.mode}, preset ${d.preset}).`);
+        if (live) this.chron(ev, "sys", `Simulation started (${d.mode}, preset ${d.preset}).`);
         break;
-      case "sim.paused": if (live) { this.sim.paused = true; this.chron(ev, "sys", "Simulation en pause."); } break;
-      case "sim.resumed": if (live) { this.sim.paused = false; this.chron(ev, "sys", "Simulation reprise."); } break;
+      case "sim.paused": if (live) { this.sim.paused = true; this.chron(ev, "sys", "Simulation paused."); } break;
+      case "sim.resumed": if (live) { this.sim.paused = false; this.chron(ev, "sys", "Simulation resumed."); } break;
       case "sim.stopped":
         if (live) { this.sim.running = false; this.sim.stopped = d.reason; this.generations = Math.max(this.generations, d.generations ?? 0);
-          this.chron(ev, "death", `Simulation terminée (${{ extinction: "extinction totale", manual: "arrêt manuel", max_ticks: "durée maximale", error: "erreur" }[d.reason] ?? d.reason}), ${d.generations} génération(s).`); }
+          this.chron(ev, "death", `Simulation ended (${{ extinction: "total extinction", manual: "manual stop", max_ticks: "maximum duration", error: "error" }[d.reason] ?? d.reason}), ${d.generations} generation(s).`); }
         break;
       case "sim.tick":
         if (live) { this.totals = { ...this.totals, alive: d.alive, totalBalance: d.totalBalance }; this.tasksOpen = d.tasksOpen; }
@@ -149,24 +149,24 @@ export class Store {
           this.totals = { ...this.totals, born: this.agents.size, alive: [...this.agents.values()].filter((a) => a.status === "alive").length };
           const p = d.parentId ? A(d.parentId) : null;
           if (p) { p.childrenIds = p.childrenIds ?? []; if (!p.childrenIds.includes(d.agent.id)) p.childrenIds.push(d.agent.id); }
-          this.chron(ev, "birth", p ? `${d.agent.name} naît de ${p.name} (génération ${d.agent.generation}).` : `${d.agent.name}, fondateur (${d.agent.genome?.profession}).`, { agentId: d.agent.id });
+          this.chron(ev, "birth", p ? `${d.agent.name} is born from ${p.name} (generation ${d.agent.generation}).` : `${d.agent.name}, founder (${d.agent.genome?.profession}).`, { agentId: d.agent.id });
         }
-        this.addTx({ hash: d.birthTx, seq: ev.seq, tick: ev.tick, label: "Naissance", to: d.agent?.accountId, amount: d.agent?.birthCapital, source: ev.type });
+        this.addTx({ hash: d.birthTx, seq: ev.seq, tick: ev.tick, label: "Birth", to: d.agent?.accountId, amount: d.agent?.birthCapital, source: ev.type });
         break;
       }
       case "agent.reproduced":
         if (live) { const p = A(d.parentId), c = A(d.childId); if (p) p.lastReproTick = ev.tick;
-          const m = Object.keys(d.mutations ?? {}); if (c && m.length) this.chron(ev, "mut", `${c.name} a muté : ${m.join(", ")}.`, { agentId: d.childId }); }
+          const m = Object.keys(d.mutations ?? {}); if (c && m.length) this.chron(ev, "mut", `${c.name} mutated: ${m.join(", ")}.`, { agentId: d.childId }); }
         break;
       case "agent.died":
         if (live) { const a = A(d.agentId); if (a) { a.status = "dead"; a.causeOfDeath = d.cause; a.deathTick = ev.tick; a.diedAt = ev.ts; a.balance = "0"; }
           this.totals = { ...this.totals, dead: [...this.agents.values()].filter((x) => x.status === "dead").length, alive: [...this.agents.values()].filter((x) => x.status === "alive").length };
-          this.chron(ev, "death", `${a?.name ?? d.agentId} meurt (${{ starvation: "à court d'argent", manual: "arrêt manuel", reset: "réinitialisation" }[d.cause] ?? d.cause}).`, { agentId: d.agentId }); }
-        this.addTx({ hash: d.tx, seq: ev.seq, tick: ev.tick, label: "Mort : solde récupéré", from: A(d.agentId)?.accountId, to: d.sweptTo, amount: d.swept, source: ev.type });
+          this.chron(ev, "death", `${a?.name ?? d.agentId} dies (${{ starvation: "ran out of money", manual: "manual stop", reset: "reset" }[d.cause] ?? d.cause}).`, { agentId: d.agentId }); }
+        this.addTx({ hash: d.tx, seq: ev.seq, tick: ev.tick, label: "Death: balance recovered", from: A(d.agentId)?.accountId, to: d.sweptTo, amount: d.swept, source: ev.type });
         break;
       case "letter.written":
         if (live && d.letter) { this.letters.set(d.letter.id, d.letter); const c = A(d.letter.toAgentId); if (c) c.letterId = d.letter.id;
-          this.chron(ev, "letter", `${this.name(d.letter.fromAgentId)} écrit à ${this.name(d.letter.toAgentId)}.`, { letterId: d.letter.id }); }
+          this.chron(ev, "letter", `${this.name(d.letter.fromAgentId)} writes to ${this.name(d.letter.toAgentId)}.`, { letterId: d.letter.id }); }
         break;
       case "task.posted":
         if (live && d.task && d.task.id) { this.tasks.set(d.task.id, d.task); this.trimTasks(); }
@@ -178,7 +178,7 @@ export class Store {
       case "task.expired": if (live) { const t = this.tasks.get(d.taskId); if (t) { t.status = "expired"; t.expiredReason = d.reason; } } break;
       case "escrow.locked":
         if (live) { const t = this.tasks.get(d.taskId); if (t) t.escrow = { status: "locked", amount: d.amount, payer: d.payer, lockTx: d.tx }; }
-        this.addTx({ hash: d.tx, seq: ev.seq, tick: ev.tick, label: `Séquestre verrouillé (${d.taskId})`, from: d.payer, amount: d.amount, source: ev.type });
+        this.addTx({ hash: d.tx, seq: ev.seq, tick: ev.tick, label: `Escrow locked (${d.taskId})`, from: d.payer, amount: d.amount, source: ev.type });
         break;
       case "task.submitted":
         if (live) { const t = this.tasks.get(d.taskId); if (t) { t.status = "submitted"; t.result = { ...(t.result ?? {}), resultHash: d.resultHash }; } }
@@ -191,26 +191,26 @@ export class Store {
           const a = this.agentByAccount(d.payee); if (a) { a.tasksDone = (a.tasksDone ?? 0) + 1; a.earned = (big(a.earned ?? 0) + big(d.amount)).toString(); }
           this.totals = { ...this.totals, tasksSettled: (this.totals.tasksSettled ?? 0) + 1 };
           const tk = this.tasks.get(d.taskId);
-          this.chron(ev, "pay", `${a?.name ?? d.payee} est payé pour « ${tk?.title ?? d.taskId} ».`, { agentId: a?.id, taskId: d.taskId }); }
-        this.addTx({ hash: d.tx, seq: ev.seq, tick: ev.tick, label: `Séquestre libéré (${d.taskId})`, to: d.payee, amount: d.amount, source: ev.type });
+          this.chron(ev, "pay", `${a?.name ?? d.payee} is paid for "${tk?.title ?? d.taskId}".`, { agentId: a?.id, taskId: d.taskId }); }
+        this.addTx({ hash: d.tx, seq: ev.seq, tick: ev.tick, label: `Escrow released (${d.taskId})`, to: d.payee, amount: d.amount, source: ev.type });
         break;
       case "escrow.refunded":
         if (live) { const t = this.tasks.get(d.taskId); if (t) { t.status = t.status === "expired" ? "expired" : "rejected"; t.escrow = { ...(t.escrow ?? {}), status: "refunded", settleTx: d.tx }; } }
-        this.addTx({ hash: d.tx, seq: ev.seq, tick: ev.tick, label: `Séquestre remboursé (${d.taskId})`, to: d.payer, amount: d.amount, source: ev.type });
+        this.addTx({ hash: d.tx, seq: ev.seq, tick: ev.tick, label: `Escrow refunded (${d.taskId})`, to: d.payer, amount: d.amount, source: ev.type });
         break;
       case "reputation.updated":
         if (live) { const a = A(d.agentId); if (a) a.reputation = d.total; }
-        this.addTx({ hash: d.tx, seq: ev.seq, tick: ev.tick, label: `Réputation ${d.delta > 0 ? "+" : ""}${d.delta}`, source: ev.type });
+        this.addTx({ hash: d.tx, seq: ev.seq, tick: ev.tick, label: `Reputation ${d.delta > 0 ? "+" : ""}${d.delta}`, source: ev.type });
         break;
       case "brain.charged":
         if (live) { const a = A(d.agentId); if (a) a.spentBrain = (big(a.spentBrain ?? 0) + big(d.cost)).toString(); }
-        this.addTx({ hash: d.tx, seq: ev.seq, tick: ev.tick, label: `Cerveau IA payé (${d.model}${d.mock ? ", mock" : ""})`, from: A(d.agentId)?.accountId, amount: d.cost, source: ev.type });
+        this.addTx({ hash: d.tx, seq: ev.seq, tick: ev.tick, label: `AI brain paid (${d.model}${d.mock ? ", mock" : ""})`, from: A(d.agentId)?.accountId, amount: d.cost, source: ev.type });
         break;
       case "balance.changed":
         if (live) { const a = A(d.agentId); if (a) a.balance = d.balance; }
         break;
       case "funding.received":
-        this.addTx({ hash: d.tx, seq: ev.seq, tick: ev.tick, label: d.source === "demo" ? "Financement du compte de démo" : d.source === "faucet" ? "Faucet testnet" : "Financement (compte maître)", to: d.to, amount: d.amount, source: ev.type });
+        this.addTx({ hash: d.tx, seq: ev.seq, tick: ev.tick, label: d.source === "demo" ? "Demo account funding" : d.source === "faucet" ? "Testnet faucet" : "Funding (master account)", to: d.to, amount: d.amount, source: ev.type });
         break;
       case "chain.tx":
         this.addTx({ hash: d.hash, seq: ev.seq, tick: ev.tick, label: txKindLabel(d.kind), from: d.from, to: d.to, amount: d.amount, explicit: d.explorerUrl, source: "chain.tx", kind: d.kind });
@@ -223,7 +223,7 @@ export class Store {
     if (live) this.notify(ev);
   }
 
-  /** Arbre : liste d'agents -> forêt. */
+  /** Tree: list of agents -> forest. */
   lineageStats() {
     const roots = [...this.agents.values()].filter((a) => !a.parentId);
     return roots.map((r) => {
