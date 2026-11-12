@@ -17,6 +17,8 @@ export interface EventCatalog {
   "agent.reproduced": { parentId: string; childId: string; transferred: Yocto; mutations: Record<string, [unknown, unknown]> };
   "agent.died": { agentId: string; cause: CauseOfDeath; finalBalance: Yocto; swept: Yocto; sweptTo?: string; tx?: string };
   "letter.written": { letter: Letter };
+  // L25: the parent's letter is really handed to the child (advice in every AI call of the child). status "empty": nothing transmitted.
+  "letter.received": { childId: string; parentId: string; letterId?: string; length: number; excerpt: string; status: "received" | "empty"; fallback?: boolean };
   // market
   "task.posted": { task: Task };
   "bid.placed": { bid: Bid };
@@ -52,7 +54,7 @@ export type EventType = keyof EventCatalog;
 
 export const EVENT_TYPES = [
   "sim.started", "sim.paused", "sim.resumed", "sim.stopped", "sim.tick",
-  "agent.born", "agent.reproduced", "agent.died", "letter.written",
+  "agent.born", "agent.reproduced", "agent.died", "letter.written", "letter.received",
   "task.posted", "bid.placed", "task.awarded", "task.expired", "escrow.locked", "task.submitted",
   "task.validated", "escrow.released", "escrow.refunded", "subcontract.created", "subcontract.integrated", "subcontract.fallback", "reputation.updated",
   "deliverable.produced", "market.event",

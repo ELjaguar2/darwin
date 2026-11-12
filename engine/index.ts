@@ -5,7 +5,7 @@ import {
 import { CATALOGUE } from "../shared/catalogue.ts";
 import { executeMessages } from "../brain/prompts.ts";
 import { bal, type Ctx, type EngineOptions } from "./context.ts";
-import { chargeBrain, debit, flushAll, resolveModel, syncBalances, warnOnce } from "./economy.ts";
+import { adviceOf, chargeBrain, debit, flushAll, resolveModel, syncBalances, warnOnce } from "./economy.ts";
 import { canReproduce, createFounders, die, reproduce } from "./lifecycle.ts";
 import { extractDeliverable } from "../market/deliverable.ts";
 import { runChecks } from "../market/checks.ts";
@@ -152,7 +152,7 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
       const price = resolveModel(ctx, a);
       const resp = await deps.brain.complete({
         agentId: a.id, purpose: "execute_task", model: price.id, maxTokens: Math.max(sim.maxTokensPerCall, CATALOGUE[t.profession].maxOutputTokens),
-        messages: executeMessages(a.genome, { title: t.title, prompt: t.prompt, profession: t.profession }),
+        messages: executeMessages(a.genome, { title: t.title, prompt: t.prompt, profession: t.profession }, adviceOf(ctx, a)),
       });
       await chargeBrain(ctx, a, "execute_task", resp, price);
       const wonPrice = wonPrices.get(`${a.id}|${t.id}`);
@@ -206,7 +206,7 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
       const price = resolveModel(ctx, a);
       const resp = await deps.brain.complete({
         agentId: a.id, purpose: "execute_task", model: price.id, maxTokens: Math.max(sim.maxTokensPerCall, CATALOGUE[job.childProfession].maxOutputTokens),
-        messages: executeMessages(a.genome, { title: job.brief.title, prompt: job.brief.prompt, profession: job.childProfession }),
+        messages: executeMessages(a.genome, { title: job.brief.title, prompt: job.brief.prompt, profession: job.childProfession }, adviceOf(ctx, a)),
       });
       await chargeBrain(ctx, a, "execute_task", resp, price);
       return resp.text;

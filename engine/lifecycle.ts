@@ -1,6 +1,7 @@
 // Life cycle: birth, reproduction (mutation + letter), death. Everything goes through the injected Chain, Brain and journal.
 import { formatNear, hashObject, type Agent, type CauseOfDeath, type Genome, type Letter } from "../shared/index.ts";
 import { bal, type Ctx } from "./context.ts";
+import { reserve } from "./policy.ts";
 import { chargeBrain, emitTx, flushAgent, resolveModel, warnOnce } from "./economy.ts";
 import { createFounderGenome, mutateGenome } from "./genome.ts";
 import { ENGLISH_RULE } from "../brain/prompts.ts";
@@ -104,27 +105,37 @@ export function letterRequestMessages(parent: Agent, child: Agent, mutations: Re
   return [{ role: "system" as const, content: `${parent.genome.personality}\n${ENGLISH_RULE}` }, { role: "user" as const, content: user }];
 }
 
-/** Parent -> child letter, written by the parent's brain (cost debited from the parent). Labelled fallback if the brain fails. Always in English. */
+/** Dedicated token cap of a letter (independent of sim.maxTokensPerCall, like deliverables): a short cap gave empty letters on a real model. */
+export const LETTER_MAX_TOKENS = 900;
+
+/** Parent -> child letter, written by the parent's brain (cost of every attempt debited from the parent). Always in English.
+ *  Empty answer: ONE retry; still empty: empty letter, `LETTER_EMPTY` warning, the child gets no advice. Brain failure: labelled fallback. */
 async function writeLetter(ctx: Ctx, parent: Agent, child: Agent, mutations: Record<string, [unknown, unknown]>) {
-  const { brain, journal, now, config } = ctx.deps;
+  const { brain, journal, now } = ctx.deps;
   const messages = letterRequestMessages(parent, child, mutations);
-  let text: string;
+  let text = "";
   let model = parent.genome.model;
   let mock = true;
+  let fallback = false;
   try {
     const price = resolveModel(ctx, parent);
     model = price.id;
-    const resp = await brain.complete({
-      agentId: parent.id, purpose: "letter", model, maxTokens: config.sim.maxTokensPerCall,
-      messages,
-    });
-    await chargeBrain(ctx, parent, "letter", resp, price);
-    text = resp.text;
-    mock = resp.mock;
-    model = resp.model;
+    for (let attempt = 0; attempt < 2 && !text.trim(); attempt++) {
+      if (attempt > 0 && bal(parent) < reserve(ctx, parent)) break; // the retry never dips into the parent's reserve
+      const resp = await brain.complete({ agentId: parent.id, purpose: "letter", model, maxTokens: LETTER_MAX_TOKENS, messages });
+      await chargeBrain(ctx, parent, "letter", resp, price);
+      text = resp.text;
+      mock = resp.mock;
+      model = resp.model;
+    }
+    if (!text.trim()) {
+      text = "";
+      warnOnce(ctx, "LETTER_EMPTY", `Empty letter from ${parent.id} to ${child.id} after a retry: the child receives no advice`);
+    }
   } catch (e) {
     warnOnce(ctx, "LETTER_FALLBACK", `Fallback letter (brain unavailable): ${(e as Error).message}`);
     text = `[fallback] Dear ${child.name}, work hard, spend little, and only reproduce when you have some margin.`;
+    fallback = true;
   }
   const letter: Letter = {
     id: `l-${pad(++ctx.nextLetter)}`, fromAgentId: parent.id, toAgentId: child.id, generation: child.generation,
@@ -133,6 +144,11 @@ async function writeLetter(ctx: Ctx, parent: Agent, child: Agent, mutations: Rec
   ctx.letters.set(letter.id, letter);
   child.letterId = letter.id;
   journal.emit({ type: "letter.written", data: { letter: structuredClone(letter) } });
+  const clean = text.trim();
+  journal.emit({
+    type: "letter.received",
+    data: { childId: child.id, parentId: parent.id, letterId: letter.id, length: clean.length, excerpt: clean.slice(0, 160), status: clean ? "received" : "empty", ...(fallback ? { fallback: true } : {}) },
+  });
 }
 
 /** Death: logical balance below minVital. Settles debts, marks the registry, sweeps the remaining balance to the master. */
