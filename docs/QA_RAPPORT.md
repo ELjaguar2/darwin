@@ -252,3 +252,50 @@ Findings (non blocking):
 - `/api/letters` does not exist (404 `NOT_FOUND`); letters are in `/api/agents/:id/letter` and in `letter.written` events (as the README says).
 - Visible French (replay, historical, expected): task titles and prompts ("Analyse de rentabilité...", "Résume en deux phrases..."), agent personalities ("Tu es un graphiste freelance...") and old profession labels (Writing, Summary, Analysis) in run8/run9b.
 - `docs/SECURITE.md` line 357 cites captures that no longer exist (`l17-testnet-degrade`, `l17-recette-tn-preuves-t100`, `l17-rejeu-preuves-mobile`); owner: securite.
+
+## Final clone-neuf, 2026-11-12 night
+
+Fresh `git clone` of `main` at `d66b7d4` into an empty folder, no `.env`, Node v22.17.1, Windows 11, headless Chromium 1280x800 (no video), one server process at a time on ports 33xx, nothing running at the end, free RAM never below 2600 MB. No secret, no real network call (replay and mock only). Browser scripts live outside the repo.
+
+| Step | Expected | Seen | Verdict |
+|---|---|---|---|
+| `npm ci` | installs | OK (npm audit notices only) | OK |
+| `npm test` | 425 tests, 30 files | 30 files, 425 passed | OK |
+| `npm run typecheck` | no error | no error | OK |
+| `npm run scan-secrets` (and `scan:secrets`) | no secret | "OK: no secret detected" (281 files, 157 commits, 7 allowlisted dummy values) | OK |
+| `npm run replay` (run 9c) | 5 `[darwin]` lines, 2525 events | exact lines, `2525 events ... speed x5` (x100 in my run), `replay started`; end: `phase ended`, generations 3, 6 roots, 4 dead (`a-249398`, `a-249400`, `a-249403`, `a-249404`), 12 alive, `t-9975887` deliverable = `logo-1..3.svg` | OK |
+| README 6b step 6: `POST /api/tasks {}` in replay | 403 `REPLAY_READ_ONLY` | exact body | OK |
+| `DARWIN_REPLAY_FILE=run10... npm run replay` | 1090 events | `1090 events from run10-subcontracting-journal.jsonl, recorded on 2026-11-12` | OK |
+| `DARWIN_REPLAY_FILE=run8... npm run replay` | 1819 events | `1819 events ... recorded on 2026-11-10`; end: generations 3, 7 dead | OK |
+| `node scripts/subcontract-proof.mjs run10` | 18 checks | "Automatic checks: 18/18 passed"; 6 created, 5 integrated, 1 fallback, 3 complete; commission 0.0576, children 0.1200 | OK |
+| `node scripts/check-formulaire.mjs` | <= 2000 | idea: 1992 characters, OK | OK |
+| `npm run start:mock`, README step 1 | 3 `[darwin]` lines | exact (mode mock, chain mock, brain mock, preset normal) | OK |
+| Steps 2-5 (health, config, agents, stream) | as written | health fields as written; 4 founders `a-0001..a-0004`; SSE `retry: 3000`, `sim.started`, `chain.tx` with `mock_` hashes | OK |
+| Step 6 (POST task) | 201, Location, `posted`, visitor badge | 201, `Location: /api/tasks/t-0031`, `posted`, badge "Visitor (funded by the demo account)" | OK |
+| Step 7 (task result) | settled, winner, bids with pitch, validation accepted 0.8, `validatedBy`, escrow released | settled, winner `a-0004`, accepted 0.8, escrow released, payer `visitors.darwin.mock.testnet`, `mock_` hashes, proof. Differences: the response is wrapped (`{task, bids, escrow}`), the validator field is named `validator` (README says `validatedBy`), lock/settle are `lockTx`/`settleTx` | Non-blocking doc nit (D-1) |
+| Step 8 (invalid POST) | 400 INVALID_INPUT with the two messages | exact | OK |
+| Steps 9-12 (lineage, letter, tasks, pause/resume) | as written | 2 generations, 4 roots; letter `l-0001` `[mock] Dear child...`; founder letter 404; badges `simulated` 30, `subcontracting` 3, visitor 2 of 35; pause/resume `ok` | OK |
+| Step 13: `DARWIN_MODE=testnet npm run start:demo` (forced env), 95 s | stays mock; dead with starvation; 3 generations | startup line "mode mock (chain mock, brain mock, preset demo)", health `mode mock`; 8 dead `starvation`; generations 3 | OK |
+| Step 14, `/?classique` | HTTP 200 | 200 | OK |
+| Browser, replay run 9c, desktop | 3 tabs, pill, banner, x1/x5/x20 without token | tabs Mission / Lineage / Proof; pill "REPLAY recorded real run"; banner "Replay of a real testnet run from November 12, 2026"; buttons x1, x5, x20 each set speed 1/5/20 with no token; box disabled "Missions disabled during replay"; Proof at end: 3 generations, 12 alive, 4 dead, 68 missions paid | OK |
+| Browser, mission thread run 9c | marketing then logo up to "paid ✓" | "Write a 3-sentence product pitch for an organic bakery in Rennes" (Hugo, 0.024, "visitor, funded by the demo account", judge score 100%) reaches "paid ✓"; "Logo for Archibald Consulting" (Emma, 0.045, 3 SVGs) reaches "paid ✓"; 64 nearblocks links on the page, e.g. `https://testnet.nearblocks.io/txns/...` | OK |
+| Browser, replay run 10 | Proof counters 6/5/1/0/0.1200/0.1200/0.0576, "integrated", "Subcontracted to ..." | 6 created, 5 integrated, 1 fallback (no_bids 1), 0 expired, 0.1200 delegated, 0.1200 paid to children, 0.0576 commission; table with "integrated ✓" and explorer links; thread shows "Subcontracted part / Subcontracted to Mendel (marketing)" | OK |
+| Browser, mock, default budget | mission to "paid ✓" | pill "MOCK simulated chain and AI"; budget pre-filled `0.96`, placeholder "Describe your mission…", note "Public data: ..."; sent, thread reached "paid ✓" within the polling window; Lineage "Generation 2 · 9 alive · 0 dead" | OK |
+| Mobile 375 px (replay 9c and mock, 3 tabs each) | no horizontal scroll | scrollWidth 375 = innerWidth 375 everywhere | OK |
+| Console / CSP | none | 0 error, 0 warning in the three browser passes | OK |
+| Visible French | none outside historical journal content, contract values, sentences to translate | only the "Translate into English: « ... »" prompts of the simulated client (expected). None in Mission/Lineage/Proof chrome | OK |
+| `docs/BESOINS_HUMAIN.md` | French, with the 13 November checklist | present ("CHECKLIST DE DEMAIN (vendredi 13 novembre 2026)", table a..., plus an evening plan) | OK |
+| "TO BE FILLED IN" / "TO CONFIRM" | none left | none in README, POST_X, FORMULAIRE; VIDEO_SCRIPT has two generic instruction sentences mentioning the marker TO CONFIRM (line 11, search before recording), no residual marker. README line 279 "(To be filled by the human.)" is the genuine human field (second project) | OK |
+
+### Bugs
+
+- Blocking: none.
+- D-1 (non-blocking, README owner): section 9 step 7 says `"validatedBy":"brain:mock/small"`; the API field is `validator`. The task payload is wrapped as `{task, bids, escrow}` and escrow hashes are `lockTx`/`settleTx`. A judge doing a literal grep for `validatedBy` finds nothing.
+
+### Residuals
+
+- README step 14 and 6b say the run 9c mission rendering was not re-checked; it is now (both missions reach "paid ✓" in the thread, at the point they occur; the feed keeps 30 threads, so after the end of the replay they have scrolled out of the Mission tab, the data stays in `/api/replay/missions`).
+- The "commission lost" / "fallback" pills of the Mission thread in run 10 were not re-read one by one this time (Proof counters and the integrated section were). Not run: testnet mode, real AI, Intents (by design).
+- `docs/CONFORMITE.md` had an uncommitted change in the main working tree (not mine, not committed here).
+
+Verdict: GO. The README steps pass from a clean clone in mock and replay modes.
