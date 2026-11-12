@@ -164,6 +164,7 @@ Append-only journal, `seq` increasing without gaps. Adding a type requires modif
 | `agent.reproduced` | engine | parentId, childId, transferred, mutations (gene -> [before, after]) |
 | `agent.died` | engine | agentId, cause, finalBalance, swept, sweptTo, tx |
 | `letter.written` | engine | letter |
+| `letter.received` | engine | childId, parentId, letterId?, length, excerpt (<= 160 characters), status ("received" \| "empty"), fallback? (true: labelled fallback letter because the brain was unavailable). Emitted at birth right after `letter.written` (L25): the letter is handed to the child as advice in every one of its AI calls; "empty": nothing transmitted (`LETTER_EMPTY` warning) |
 | `task.posted` | market | task |
 | `bid.placed` | market | bid |
 | `task.awarded` | market | taskId, bidId, winnerId, price, bids |
