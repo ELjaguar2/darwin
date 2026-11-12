@@ -1,5 +1,5 @@
-// Vérification visuelle : lance le faux serveur, ouvre la page en desktop et mobile, enregistre des captures.
-// Usage : NODE_PATH=<dossier node_modules contenant playwright> node frontend/dev/shot.cjs <dossierSortie> [attenteMs] ["args du faux serveur"]
+// Visual check: starts the fake server, opens the page on desktop and mobile, saves screenshots.
+// Usage: NODE_PATH=<node_modules folder containing playwright> node frontend/dev/shot.cjs <outputFolder> [waitMs] ["fake server args"]
 const { chromium } = require("playwright");
 const { spawn } = require("child_process");
 const path = require("path");
@@ -9,7 +9,7 @@ const wait = Number(process.argv[3] || 30000);
 const extra = (process.argv[4] || "").split(" ").filter(Boolean);
 const port = 3201;
 (async () => {
-  const REAL = process.env.REAL_URL; // ex. http://127.0.0.1:3210 : teste contre le vrai backend au lieu du faux serveur
+  const REAL = process.env.REAL_URL; // e.g. http://127.0.0.1:3210: tests against the real backend instead of the fake server
   const srv = REAL ? { kill() {} } : spawn("node", [path.join(ROOT, "fake-server.mjs"), `--port=${port}`, "--tick=150", ...extra], { stdio: "inherit" });
   await new Promise((r) => setTimeout(r, 800));
   const b = await chromium.launch();

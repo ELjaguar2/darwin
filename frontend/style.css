@@ -1,4 +1,4 @@
-/* Darwin : feuille de style unique, sans dépendance. Thèmes clair/sombre par variables. */
+/* Darwin: single stylesheet, no dependency. Light/dark themes via variables. */
 :root {
   color-scheme: light;
   --bg: #f3f5fb; --surface: #ffffff; --surface2: #eef1f9; --line: #d5dbeb;
@@ -25,7 +25,7 @@ a { color: var(--accent); }
 .muted { color: var(--muted); } .small { font-size: 13px; }
 .noscript { padding: 16px; }
 
-/* ---- en-tête ---- */
+/* ---- header ---- */
 .top { display: grid; grid-template-columns: minmax(0, 1.3fr) auto minmax(0, 2fr) auto; gap: 16px 24px; align-items: center; padding: 16px clamp(12px, 2vw, 28px); }
 .brand h1 { font-size: clamp(26px, 3.2vw, 40px); letter-spacing: -0.02em; line-height: 1; background: linear-gradient(90deg, var(--accent), var(--p-logo)); -webkit-background-clip: text; background-clip: text; color: transparent; width: fit-content; }
 .tag { color: var(--muted); font-size: 13px; margin-top: 6px; max-width: 46ch; }

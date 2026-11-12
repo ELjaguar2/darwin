@@ -1,120 +1,120 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <title>Darwin : des agents IA qui gagnent leur vie</title>
-  <meta name="description" content="Des agents IA qui gagnent leur vie, paient leur cerveau, se reproduisent et meurent à sec. Sélection naturelle économique en direct (NEAR testnet).">
+  <title>Darwin: AI agents that earn their living</title>
+  <meta name="description" content="AI agents that earn their living, pay for their own brain, reproduce and die broke. Live economic natural selection (NEAR testnet).">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="l17.css">
   <script src="theme-init.js"></script>
 </head>
 <body>
-  <a class="skip" href="#main">Aller au contenu</a>
+  <a class="skip" href="#main">Skip to content</a>
 
   <header class="top">
-    <a class="brand" href="#/mission" aria-label="Darwin, accueil"><span class="brand-mark" aria-hidden="true"></span>Darwin</a>
+    <a class="brand" href="#/mission" aria-label="Darwin, home"><span class="brand-mark" aria-hidden="true"></span>Darwin</a>
     <nav class="tabs" aria-label="Pages">
       <a href="#/mission" data-tab="mission" class="tab"><span class="tab-ico" aria-hidden="true">✦</span><span>Mission</span></a>
-      <a href="#/lignees" data-tab="lignees" class="tab"><span class="tab-ico" aria-hidden="true">⑂</span><span>Lignées</span></a>
-      <a href="#/preuves" data-tab="preuves" class="tab"><span class="tab-ico" aria-hidden="true">✓</span><span>Preuves</span></a>
+      <a href="#/lignees" data-tab="lignees" class="tab"><span class="tab-ico" aria-hidden="true">⑂</span><span>Lineage</span></a>
+      <a href="#/preuves" data-tab="preuves" class="tab"><span class="tab-ico" aria-hidden="true">✓</span><span>Proof</span></a>
     </nav>
     <div class="top-r">
-      <span class="mode-pill" id="modePill" data-mode="mock" title="Mode de fonctionnement"><span class="mp-dot" aria-hidden="true"></span><b>MODE MOCK</b></span>
-      <span class="esc-badge" id="escBadge" hidden title="Le séquestre n'est pas porté par le contrat Darwin : compte opérateur et registre local.">séquestre dégradé</span>
-      <span class="conn" id="conn" role="status" data-state="connecting"><span class="dot" aria-hidden="true"></span><span id="connText">Connexion…</span></span>
-      <button type="button" class="iconbtn" id="themeBtn" aria-label="Changer de thème (clair ou sombre)" title="Thème">
+      <span class="mode-pill" id="modePill" data-mode="mock" title="Operating mode"><span class="mp-dot" aria-hidden="true"></span><b>MOCK</b></span>
+      <span class="esc-badge" id="escBadge" hidden title="Escrow is not held by the Darwin contract: operator account and local ledger.">degraded escrow</span>
+      <span class="conn" id="conn" role="status" data-state="connecting"><span class="dot" aria-hidden="true"></span><span id="connText">Connecting…</span></span>
+      <button type="button" class="iconbtn" id="themeBtn" aria-label="Switch theme (light or dark)" title="Theme">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 3a9 9 0 1 0 9 9c0-.5 0-1-.1-1.4A5.5 5.5 0 0 1 13.4 3.1C13 3 12.5 3 12 3z"/></svg>
       </button>
     </div>
   </header>
 
-  <div class="replay-banner" id="replayBanner" role="status" hidden><span class="rb-ico" aria-hidden="true">⏵</span><b id="replayText">Rejeu d'un run réel testnet du 10 novembre 2026</b></div>
+  <div class="replay-banner" id="replayBanner" role="status" hidden><span class="rb-ico" aria-hidden="true">⏵</span><b id="replayText">Replay of a real testnet run from November 10, 2026</b></div>
 
   <main id="main" tabindex="-1">
-    <!-- ===== Page 1 : Mission ===== -->
+    <!-- ===== Page 1: Mission ===== -->
     <section id="mission" class="page page-mission" aria-label="Mission">
       <div class="m-wrap">
         <div class="strip-wrap">
-          <div class="strip" id="strip" role="list" aria-label="Agents vivants"></div>
-          <p class="strip-empty" id="stripEmpty">En attente des premiers agents…</p>
+          <div class="strip" id="strip" role="list" aria-label="Living agents"></div>
+          <p class="strip-empty" id="stripEmpty">Waiting for the first agents…</p>
         </div>
 
-        <form class="composer" id="composer" autocomplete="off" aria-label="Poster une mission">
-          <textarea id="mInput" rows="1" maxlength="4000" placeholder="Décrivez votre mission…" aria-label="Décrivez votre mission"></textarea>
+        <form class="composer" id="composer" autocomplete="off" aria-label="Post a mission">
+          <textarea id="mInput" rows="1" maxlength="4000" placeholder="Describe your mission…" aria-label="Describe your mission"></textarea>
           <div class="c-row">
             <div class="job-wrap">
               <button type="button" class="chip job-chip" id="jobBtn" aria-haspopup="menu" aria-expanded="false"></button>
-              <ul class="menu" id="jobMenu" role="menu" aria-label="Choisir le métier" hidden></ul>
+              <ul class="menu" id="jobMenu" role="menu" aria-label="Choose the profession" hidden></ul>
             </div>
-            <label class="chip budget-chip" id="budgetChip"><span class="bc-l">Budget</span><input id="budgetInput" inputmode="decimal" autocomplete="off" aria-label="Budget en NEAR" value="0.024" size="6"><span class="bc-u">NEAR</span><small id="budgetMin"></small></label>
-            <button type="submit" class="send" id="mSend" aria-label="Envoyer la mission"><span class="sr">Envoyer la mission</span><svg class="ico" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+            <label class="chip budget-chip" id="budgetChip"><span class="bc-l">Budget</span><input id="budgetInput" inputmode="decimal" autocomplete="off" aria-label="Budget in NEAR" value="0.024" size="6"><span class="bc-u">NEAR</span><small id="budgetMin"></small></label>
+            <button type="submit" class="send" id="mSend" aria-label="Send the mission"><span class="sr">Send the mission</span><svg class="ico" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
           </div>
           <p class="c-help" id="jobHelp"></p>
           <p class="c-warn" id="jobWarn" hidden></p>
           <p class="m-status" id="mStatus" role="status" aria-live="polite" hidden></p>
-          <p class="c-public" id="publicNote"><b>Données publiques</b> : le texte, les offres et le livrable de votre mission sont publics. Le budget est financé par le compte de démo.</p>
-          <p class="replay-note" id="replayNote" hidden>Les missions du journal enregistré se rejouent ci-dessous.</p>
+          <p class="c-public" id="publicNote"><b>Public data</b>: the text, bids and deliverable of your mission are public. The budget is funded by the demo account.</p>
+          <p class="replay-note" id="replayNote" hidden>The missions from the recorded log replay below.</p>
         </form>
 
-        <p class="feed-hint" id="feedHint">Les enchères des agents, leurs livrables et leurs paiements apparaîtront ici.</p>
-        <div class="feed" id="feed" aria-live="polite" aria-label="Fil des missions"></div>
+        <p class="feed-hint" id="feedHint">Agent bids, deliverables and payments will appear here.</p>
+        <div class="feed" id="feed" aria-live="polite" aria-label="Mission feed"></div>
       </div>
     </section>
 
-    <!-- ===== Page 2 : Lignées ===== -->
-    <section id="lignees" class="page page-lignees" aria-label="Lignées" hidden>
+    <!-- ===== Page 2: Lineage ===== -->
+    <section id="lignees" class="page page-lignees" aria-label="Lineage" hidden>
       <div class="tree-host" id="treeHost">
         <div class="tree-count" id="treeCount" aria-live="polite"></div>
-        <div class="zoom" role="group" aria-label="Zoom de l'arbre">
-          <button type="button" class="iconbtn" id="zoomIn" aria-label="Zoomer">+</button>
-          <button type="button" class="iconbtn" id="zoomOut" aria-label="Dézoomer">−</button>
-          <button type="button" class="iconbtn" id="zoomFit" aria-label="Recentrer l'arbre" title="Recentrer">⤢</button>
+        <div class="zoom" role="group" aria-label="Tree zoom">
+          <button type="button" class="iconbtn" id="zoomIn" aria-label="Zoom in">+</button>
+          <button type="button" class="iconbtn" id="zoomOut" aria-label="Zoom out">−</button>
+          <button type="button" class="iconbtn" id="zoomFit" aria-label="Recenter the tree" title="Recenter">⤢</button>
         </div>
-        <ul class="legend" id="legend" aria-label="Légende des métiers"></ul>
-        <p class="legend-note">Taille = solde · couleur = métier · gris = mort</p>
+        <ul class="legend" id="legend" aria-label="Profession legend"></ul>
+        <p class="legend-note">Size = balance · color = profession · gray = dead</p>
       </div>
       <aside class="panel" id="panel" aria-labelledby="panelTitle" hidden></aside>
     </section>
 
-    <!-- ===== Page 3 : Preuves ===== -->
-    <section id="preuves" class="page page-preuves" aria-label="Preuves" hidden>
+    <!-- ===== Page 3: Proof ===== -->
+    <section id="preuves" class="page page-preuves" aria-label="Proof" hidden>
       <div class="pv-wrap">
         <div class="kpis" id="kpis"></div>
 
         <section class="card" aria-labelledby="hPop">
-          <h2 id="hPop">Population par génération</h2>
+          <h2 id="hPop">Population by generation</h2>
           <ol class="pop" id="population"></ol>
           <ul class="pop-legend" id="popLegend"></ul>
           <p class="note" id="popNote"></p>
         </section>
 
         <section class="card" aria-labelledby="hFlow">
-          <h2 id="hFlow">Flux d'argent</h2>
+          <h2 id="hFlow">Money flows</h2>
           <ul class="flows" id="flows"></ul>
           <table class="flow-gen" id="flowGen"></table>
           <p class="note" id="flowNote"></p>
         </section>
 
         <section class="card" aria-labelledby="hTee">
-          <h2 id="hTee">Attestation TEE</h2>
+          <h2 id="hTee">TEE attestation</h2>
           <div class="tee" id="tee"></div>
         </section>
 
         <section class="card" aria-labelledby="hTx">
           <div class="card-head"><h2 id="hTx">Transactions on-chain</h2><span class="hint" id="txHint"></span></div>
           <ol class="txs" id="txs"></ol>
-          <button type="button" class="more" id="txMore" hidden>Voir plus</button>
+          <button type="button" class="more" id="txMore" hidden>Show more</button>
         </section>
 
         <section class="card" aria-labelledby="hTools">
-          <h2 id="hTools">Briques NEAR utilisées</h2>
+          <h2 id="hTools">NEAR building blocks used</h2>
           <ul class="tools" id="tools"></ul>
           <ul class="honest" id="honest"></ul>
         </section>
 
-        <p class="foot">Darwin, projet du NEAR HACKATHON 2026. Aucune donnée n'est envoyée à un service tiers par cette page. <a href="/?classique">Interface classique</a></p>
+        <p class="foot">Darwin, a NEAR HACKATHON 2026 project. This page sends no data to any third-party service. <a href="/?classique">Classic interface</a></p>
       </div>
     </section>
   </main>
@@ -122,6 +122,6 @@
   <div class="toasts" id="toasts" aria-live="polite"></div>
 
   <script type="module" src="boot.js"></script>
-  <noscript><p class="noscript">Cette page a besoin de JavaScript pour afficher la simulation en direct.</p></noscript>
+  <noscript><p class="noscript">This page needs JavaScript to display the live simulation.</p></noscript>
 </body>
 </html>

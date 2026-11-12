@@ -1,5 +1,5 @@
-// Arbre généalogique vivant (SVG, sans dépendance). Mise en page déterministe + interpolation des positions
-// par requestAnimationFrame : les nœuds glissent quand l'arbre se réorganise, naissent depuis leur parent, s'éteignent à la mort.
+// Living family tree (SVG, no dependency). Deterministic layout + position interpolation
+// via requestAnimationFrame: nodes glide when the tree reorganizes, are born from their parent, fade out at death.
 import { formatNear, nearNumber, profOf } from "./format.js";
 
 const NS = "http://www.w3.org/2000/svg";
@@ -10,8 +10,8 @@ const svgEl = (tag, attrs = {}, text) => {
   return e;
 };
 
-const SLOT = 62; // largeur d'une feuille
-const ROW = 82; // hauteur d'une génération
+const SLOT = 62; // width of a leaf
+const ROW = 82; // height of a generation
 const PAD_X = 34;
 const PAD_Y = 48;
 const radiusFor = (bal) => Math.max(11, Math.min(25, 10 + Math.sqrt(Math.max(0, nearNumber(bal))) * 3.4));
@@ -27,14 +27,14 @@ export class Tree {
     this.selected = null;
     this.reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
     matchMedia("(prefers-reduced-motion: reduce)").addEventListener?.("change", (e) => { this.reduced = e.matches; });
-    this.svg = svgEl("svg", { class: "tree-svg", role: "group", "aria-label": "Arbre généalogique des agents" });
+    this.svg = svgEl("svg", { class: "tree-svg", role: "group", "aria-label": "Family tree of the agents" });
     this.gEdges = svgEl("g", { class: "edges" });
     this.gNodes = svgEl("g", { class: "nodes" });
     this.gFx = svgEl("g", { class: "fx", "aria-hidden": "true" });
     this.svg.append(this.gEdges, this.gNodes, this.gFx);
     this.empty = document.createElement("p");
     this.empty.className = "tree-empty";
-    this.empty.textContent = "En attente des premiers agents…";
+    this.empty.textContent = "Waiting for the first agents…";
     host.append(this.svg, this.empty);
     this.scale = 1;
     this.raf = 0;
@@ -106,7 +106,7 @@ export class Tree {
       n.agent = a;
       this.updateNodeStatic(n, a, rootOf(a));
     }
-    // arêtes
+    // edges
     for (const a of this.store.agents.values()) {
       if (!a.parentId || !this.store.agents.has(a.parentId)) continue;
       let e = this.edges.get(a.id);
@@ -150,12 +150,12 @@ export class Tree {
     n.glyph.textContent = dead ? "" : prof.glyph;
     n.label.textContent = a.name;
     n.label.setAttribute("y", String(Math.round(n.tr + 13)));
-    const bal = dead ? "mort" : `${formatNear(a.balance, 2)} NEAR`;
-    const cause = dead ? ` (${a.causeOfDeath === "starvation" ? "à court d'argent" : a.causeOfDeath ?? ""})` : "";
-    const txt = `${a.name}, génération ${a.generation}, ${prof.label}, ${bal}${cause}`;
+    const bal = dead ? "dead" : `${formatNear(a.balance, 2)} NEAR`;
+    const cause = dead ? ` (${a.causeOfDeath === "starvation" ? "ran out of money" : a.causeOfDeath ?? ""})` : "";
+    const txt = `${a.name}, generation ${a.generation}, ${prof.label}, ${bal}${cause}`;
     n.g.setAttribute("aria-label", txt);
     n.tip.textContent = txt;
-    // danger : solde faible
+    // danger: low balance
     const low = !dead && nearNumber(a.balance) < nearNumber(a.birthCapital) * 0.3;
     n.g.classList.toggle("low", low);
     if (dead && !n.wasDead) { n.wasDead = true; if (this.live) this.burst(n.id, "death"); }

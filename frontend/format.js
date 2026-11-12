@@ -1,7 +1,7 @@
-// Utilitaires purs (aucun accès au DOM sauf `h`). Jamais d'innerHTML : tout texte passe par textContent.
+// Pure utilities (no DOM access except `h`). Never innerHTML: all text goes through textContent.
 const YOCTO = 10n ** 24n;
 
-/** BigInt tolérant : une valeur non numérique donne 0n au lieu de lever. */
+/** Tolerant BigInt: a non-numeric value gives 0n instead of throwing. */
 export function big(v) { try { return BigInt(v ?? 0); } catch { return 0n; } }
 
 const EXPLORER_HOSTS = new Set(["testnet.nearblocks.io", "nearblocks.io"]);
@@ -9,7 +9,7 @@ function allowedExplorerUrl(u) {
   try { const x = new URL(u); return x.protocol === "https:" && EXPLORER_HOSTS.has(x.hostname) && !x.username && !x.password ? x.href : null; } catch { return null; }
 }
 
-/** yoctoNEAR (chaîne ou bigint) -> nombre de NEAR lisible. */
+/** yoctoNEAR (string or bigint) -> readable NEAR number. */
 export function formatNear(y, digits = 2) {
   let v;
   try { v = BigInt(y ?? 0); } catch { return "?"; }
@@ -22,12 +22,12 @@ export function formatNear(y, digits = 2) {
   return (neg ? "-" : "") + int.toString() + (digits ? "." + frac : "");
 }
 
-/** Montant en NEAR sous forme de nombre (pour dimensionner des éléments graphiques uniquement). */
+/** Amount in NEAR as a number (only for sizing graphic elements). */
 export function nearNumber(y) {
   try { return Number(BigInt(y ?? 0) / (YOCTO / 1000000n)) / 1e6; } catch { return 0; }
 }
 
-/** Petit montant (coût du cerveau IA) : jamais « 0.00 » trompeur. 2 décimales dès 0.01 NEAR, 4 en dessous, « < 0.0001 » sous le seuil, « 0 » si nul. */
+/** Small amount (AI brain cost): never a misleading "0.00". 2 decimals from 0.01 NEAR, 4 below, "< 0.0001" under the threshold, "0" if zero. */
 export function formatNearSmall(y) {
   let v;
   try { v = BigInt(y ?? 0); } catch { return "?"; }
@@ -50,11 +50,11 @@ export function shortHash(h) {
 export const TESTNET_EXPLORER = "https://testnet.nearblocks.io";
 
 /**
- * URL d'explorateur d'une transaction. Priorité à l'URL fournie par le backend ; sinon, en chaîne `near`,
- * `${base}/txns/<hash>` (même format que accounts/near-chain.ts). Aucun lien pour les hashes mock ou locaux.
+ * Explorer URL of a transaction. The backend-provided URL has priority; otherwise, on the `near` chain,
+ * `${base}/txns/<hash>` (same format as accounts/near-chain.ts). No link for mock or local hashes.
  */
 export function explorerUrl(hash, { explicit, chainKind, base } = {}) {
-  const ok = explicit ? allowedExplorerUrl(explicit) : null; // URL d'événement hors liste blanche : ignorée, on reconstruit depuis le hash
+  const ok = explicit ? allowedExplorerUrl(explicit) : null; // Event URL outside the allowlist: ignored, rebuilt from the hash
   if (ok) return ok;
   if (!hash || chainKind !== "near") return null;
   if (/^(mock_|local_)/.test(hash)) return null;
@@ -63,54 +63,58 @@ export function explorerUrl(hash, { explicit, chainKind, base } = {}) {
 
 export const PROFESSIONS = {
   logo: { label: "Logo", glyph: "L", cls: "p-logo" },
-  finance: { label: "Analyse financière", glyph: "F", cls: "p-finance" },
-  architecture: { label: "Architecture logicielle", glyph: "A", cls: "p-architecture" },
-  marketing: { label: "Rédaction marketing", glyph: "M", cls: "p-marketing" },
-  translation: { label: "Traduction", glyph: "T", cls: "p-translation" },
-  legal: { label: "Checklist juridique", glyph: "J", cls: "p-legal" },
+  finance: { label: "Financial analysis", glyph: "F", cls: "p-finance" },
+  architecture: { label: "Software architecture", glyph: "A", cls: "p-architecture" },
+  marketing: { label: "Marketing copywriting", glyph: "M", cls: "p-marketing" },
+  translation: { label: "Translation", glyph: "T", cls: "p-translation" },
+  legal: { label: "Legal checklist", glyph: "J", cls: "p-legal" },
 };
 export const PROFESSION_IDS = Object.keys(PROFESSIONS);
-/** Métier inconnu (valeur inattendue) : libellé brut, couleur neutre. */
+/** Unknown profession (unexpected value): raw label, neutral color. */
 export const profOf = (p) => PROFESSIONS[p] ?? { label: String(p ?? "?"), glyph: "?", cls: "p-unknown" };
 
-/** Montant décimal en NEAR ("0.045") -> yocto (BigInt) ; null si invalide. Calcul exact, sans flottant. */
+/** Decimal NEAR amount ("0.045") -> yocto (BigInt); null if invalid. Exact computation, no floats. */
 export function parseNearToYocto(str) {
   const m = /^(\d+)(?:\.(\d{1,24}))?$/.exec(String(str ?? "").trim());
   if (!m) return null;
   return BigInt(m[1]) * YOCTO + BigInt((m[2] ?? "").padEnd(24, "0"));
 }
-/** yocto -> NEAR décimal sans zéros inutiles (6 décimales max), ex. "0.045". */
+/** yocto -> decimal NEAR without useless zeros (6 decimals max), e.g. "0.045". */
 export function nearInput(y) {
   const s = formatNear(y, 6);
   return s.includes(".") ? s.replace(/0+$/, "").replace(/\.$/, "") : s;
 }
-/** Coût d'IA en USD (très petit) : "0,0012 $". */
+/** AI cost in USD (very small): "$0.0012". */
 export function usd(v) {
   const n = Number(v);
   if (!Number.isFinite(n)) return "?";
-  return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: n < 0.01 ? 5 : 3 }) + " $";
+  return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: n < 0.01 ? 5 : 3 });
 }
-/** Multiplicateur de demande : 3 -> "×3", 0.3 -> "×0,3". */
-export const multLabel = (m) => "×" + Number(m).toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+/** Demand multiplier: 3 -> "×3", 0.3 -> "×0.3". */
+export const multLabel = (m) => "×" + Number(m).toLocaleString("en-US", { maximumFractionDigits: 2 });
 
 const TX_KIND = {
-  create_account: "Naissance (compte créé)", transfer: "Transfert", lock_escrow: "Séquestre verrouillé",
-  release_escrow: "Séquestre libéré", refund_escrow: "Séquestre remboursé", delete_account: "Mort (solde récupéré)",
-  register_agent: "Registre : agent", mark_dead: "Registre : mort", add_reputation: "Réputation",
+  create_account: "Birth (account created)", transfer: "Transfer", lock_escrow: "Escrow locked",
+  release_escrow: "Escrow released", refund_escrow: "Escrow refunded", delete_account: "Death (balance recovered)",
+  register_agent: "Registry: agent", mark_dead: "Registry: death", add_reputation: "Reputation",
 };
 export const txKindLabel = (k) => TX_KIND[k] ?? String(k ?? "transaction");
 
+/** Protocol badge values (API, kept as-is) -> English display labels; fallback to the raw value. */
+export const BADGE_LABEL = { "simulé": "simulated", "simule": "simulated", "sous-traitance": "subcontract", "visiteur": "visitor", "Visiteur": "visitor", "Visiteur (financé par le compte de démo)": "Visitor (funded by the demo account)" };
+export const badgeText = (b) => BADGE_LABEL[b] ?? String(b ?? "?");
+
 export function requesterBadge(r, serverBadge) {
-  if (serverBadge && r?.kind) return { ...requesterBadge(r), text: serverBadge }; // libellé normalisé fourni par le backend
+  if (serverBadge && r?.kind) return { ...requesterBadge(r), text: badgeText(serverBadge) }; // normalized label provided by the backend
   if (!r) return { text: "?", cls: "b-neutral" };
-  if (r.kind === "simulated") return { text: "simulé", title: "Client artificiel : ces tâches ne viennent pas d'un humain.", cls: "b-sim" };
-  if (r.kind === "visitor") return { text: "Visiteur (financé par le compte de démo)", title: "Le visiteur ne paie pas : le compte de démonstration finance la tâche.", cls: "b-visitor" };
-  return { text: "sous-traitance", title: "Tâche confiée par un agent à un autre.", cls: "b-agent" };
+  if (r.kind === "simulated") return { text: "simulated", title: "Artificial client: these tasks do not come from a human.", cls: "b-sim" };
+  if (r.kind === "visitor") return { text: "Visitor (funded by the demo account)", title: "The visitor does not pay: the demo account funds the task.", cls: "b-visitor" };
+  return { text: "subcontract", title: "Task handed from one agent to another.", cls: "b-agent" };
 }
 
-export const STATUS_LABEL = { posted: "enchères", awarded: "attribuée", submitted: "livrée", settled: "payée", rejected: "remboursée", expired: "expirée" };
+export const STATUS_LABEL = { posted: "bidding", awarded: "awarded", submitted: "delivered", settled: "paid", rejected: "refunded", expired: "expired" };
 
-/** Petit constructeur DOM sûr. h("div", {class:"x", onclick}, "texte", enfant...) */
+/** Small safe DOM builder. h("div", {class:"x", onclick}, "text", child...) */
 export function h(tag, attrs, ...kids) {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs ?? {})) {
@@ -128,7 +132,7 @@ export function h(tag, attrs, ...kids) {
   return el;
 }
 
-/** Message lisible depuis un corps d'erreur HTTP de forme inconnue (zod issues, {message}, {error}, …). */
+/** Readable message from an HTTP error body of unknown shape (zod issues, {message}, {error}, ...). */
 export function errorMessages(body) {
   const out = [];
   const walk = (b) => {
@@ -137,7 +141,7 @@ export function errorMessages(body) {
     if (Array.isArray(b)) { b.forEach(walk); return; }
     if (typeof b === "object") {
       if (b.message && typeof b.message === "string") {
-        const p = Array.isArray(b.path) && b.path.length ? b.path.join(".") + " : " : "";
+        const p = Array.isArray(b.path) && b.path.length ? b.path.join(".") + ": " : "";
         out.push(p + b.message);
       }
       for (const k of ["issues", "errors", "details"]) if (b[k]) walk(b[k]);

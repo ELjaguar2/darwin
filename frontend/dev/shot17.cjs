@@ -1,4 +1,5 @@
-// Capture rapide des 3 pages (développement). Usage : NODE_PATH=... node shot17.cjs <url> <dossier> [prefixe] [attente_ms]
+// Quick capture of the 3 pages (development). Usage: NODE_PATH=... node shot17.cjs <url> <folder> [prefix] [wait_ms]
+// Output files keep their historical names (l17-mission-*, l17-lignees-*, l17-preuves-*).
 const { chromium } = require("playwright");
 const [url, out, prefix = "l17", wait = "15000"] = process.argv.slice(2);
 (async () => {
@@ -20,6 +21,6 @@ const [url, out, prefix = "l17", wait = "15000"] = process.argv.slice(2);
     await p.screenshot({ path: `${out}/${prefix}-preuves-${name}.png`, fullPage: true });
     await ctx.close();
   }
-  console.log("erreurs:", errs.slice(0, 8));
+  console.log("errors:", errs.slice(0, 8));
   await b.close();
 })();

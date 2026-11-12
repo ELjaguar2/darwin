@@ -1,4 +1,4 @@
-// Interface L17 : routage à trois onglets, bandeau de mode toujours visible, notifications discrètes, thème.
+// L17 interface: three-tab routing, always-visible mode banner, discreet notifications, theme.
 import { store, core, api, on, start } from "./core.js";
 import { h, formatNear } from "./format.js";
 import { firstName } from "./jobs.js";
@@ -8,7 +8,7 @@ import { initPreuves } from "./preuves.js";
 
 const $ = (id) => document.getElementById(id);
 const PAGES = ["mission", "lignees", "preuves"];
-const TITLES = { mission: "Mission", lignees: "Lignées", preuves: "Preuves" };
+const TITLES = { mission: "Mission", lignees: "Lineage", preuves: "Proof" };
 
 function route() {
   const m = /^#\/?(mission|lignees|preuves)/.exec(location.hash);
@@ -30,12 +30,12 @@ function renderMeta() {
   const brainReal = store.brain.kind === "nearai" || store.health?.brain?.kind === "nearai";
   const m = core.mode;
   const rmeta = core.replayInfo?.meta ?? {};
-  const realRun = rmeta.recorded?.chain === "near"; // seul un journal marqué « chaîne near » est présenté comme run réel
+  const realRun = rmeta.recorded?.chain === "near"; // only a log marked "near chain" is presented as a real run
   pill.dataset.mode = m;
   pill.replaceChildren(h("span", { class: "mp-dot", "aria-hidden": "true" }),
-    m === "replay" ? h("b", null, "REJEU") : m === "testnet" ? h("b", null, "TESTNET NEAR") : h("b", null, "MODE MOCK"),
-    h("span", { class: "mp-sub" }, m === "replay" ? (realRun ? "run réel enregistré" : "run enregistré") : m === "testnet" ? (brainReal ? "IA réelle · fonds sans valeur" : "IA simulée · fonds sans valeur") : "chaîne et IA simulées"));
-  pill.title = m === "replay" ? `Les données viennent d'un journal enregistré${realRun ? " (run réel sur testnet)" : " (non marqué comme run réel testnet)"}, pas d'une simulation en cours.` : m === "testnet" ? "Réseau de test NEAR : transactions vérifiables, aucun fonds réel." : "Aucune transaction réelle : chaîne et IA simulées en mémoire.";
+    m === "replay" ? h("b", null, "REPLAY") : m === "testnet" ? h("b", null, "NEAR TESTNET") : h("b", null, "MOCK"),
+    h("span", { class: "mp-sub" }, m === "replay" ? (realRun ? "recorded real run" : "recorded run") : m === "testnet" ? (brainReal ? "real AI · valueless funds" : "simulated AI · valueless funds") : "simulated chain and AI"));
+  pill.title = m === "replay" ? `The data comes from a recorded log${realRun ? " (real testnet run)" : " (not marked as a real testnet run)"}, not from a live simulation.` : m === "testnet" ? "NEAR test network: verifiable transactions, no real funds." : "No real transaction: chain and AI are simulated in memory.";
   const esc = core.health?.escrow ?? store.health?.escrow;
   const eb = $("escBadge");
   eb.hidden = !(m === "testnet" && esc && esc !== "contract");
@@ -47,7 +47,7 @@ function renderMeta() {
   c.dataset.state = core.conn.state;
   const ended = m === "replay" && core.replayInfo?.phase === "ended";
   c.dataset.ended = String(ended);
-  $("connText").textContent = m === "replay" && core.conn.state === "live" ? (ended ? "Rejeu terminé" : "Rejeu en cours") : core.conn.text;
+  $("connText").textContent = m === "replay" && core.conn.state === "live" ? (ended ? "Replay finished" : "Replay running") : core.conn.text;
   renderStrip();
   placeToasts();
 }
@@ -56,24 +56,24 @@ function renderReplay() {
   const rp = core.replayInfo ?? {};
   const meta = rp.meta ?? {};
   const on = meta.recordedOn ? new Date(`${meta.recordedOn}T00:00:00Z`) : null;
-  const date = on && !Number.isNaN(on.getTime()) ? on.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }) : null;
-  const kind = meta.recorded?.chain === "near" ? "run réel testnet" : "run enregistré";
-  const label = typeof meta.label === "string" && meta.label ? meta.label.slice(0, 140) : `Rejeu d'un ${kind}${date ? ` du ${date}` : ""}`;
-  const phase = { playing: "en cours", paused: "en pause", ended: "terminé" }[rp.phase] ?? "";
+  const date = on && !Number.isNaN(on.getTime()) ? on.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }) : null;
+  const kind = meta.recorded?.chain === "near" ? "real testnet run" : "recorded run";
+  const label = typeof meta.label === "string" && meta.label ? meta.label.slice(0, 140) : `Replay of a ${kind}${date ? ` from ${date}` : ""}`;
+  const phase = { playing: "playing", paused: "paused", ended: "finished" }[rp.phase] ?? "";
   const pct = rp.total ? Math.min(100, Math.round((Number(rp.position) / Number(rp.total)) * 100)) : 0;
   const ban = $("replayBanner");
   const speeds = [1, 5, 20].map((v) => h("button", { type: "button", "aria-pressed": String(rp.speed === v), onclick: () => replayCtl("speed", { speed: v }) }, `x${v}`));
-  const extra = rp.phase === "ended" ? h("button", { type: "button", onclick: () => replayCtl("restart") }, "Rejouer") : null;
+  const extra = rp.phase === "ended" ? h("button", { type: "button", onclick: () => replayCtl("restart") }, "Replay again") : null;
   ban.replaceChildren(h("span", { class: "rb-ico", "aria-hidden": "true" }, "⏵"), h("b", { id: "replayText" }, label),
-    h("span", { class: "rb-prog", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": String(pct), "aria-label": "Progression du rejeu" }, h("i", { css: { width: `${pct}%` } })),
-    h("span", { class: "rb-txt" }, `${phase}${rp.total ? ` · ${pct} %` : ""}`),
+    h("span", { class: "rb-prog", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": String(pct), "aria-label": "Replay progress" }, h("i", { css: { width: `${pct}%` } })),
+    h("span", { class: "rb-txt" }, `${phase}${rp.total ? ` · ${pct}%` : ""}`),
     h("span", { class: "rp-ctl" }, ...speeds, extra));
 }
 async function replayCtl(name, body) {
-  try { const r = await api(`/api/replay/${name}`, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(body ?? {}) }); if (r.ok && r.body && core.health) { core.health.replay = r.body; core.replayInfo = r.body; renderMeta(); } } catch { /* jeton requis ou serveur arrêté : sans effet */ }
+  try { const r = await api(`/api/replay/${name}`, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(body ?? {}) }); if (r.ok && r.body && core.health) { core.health.replay = r.body; core.replayInfo = r.body; renderMeta(); } } catch { /* token required or server stopped: no effect */ }
 }
 
-// ------------------------------------------------------------------ notifications discrètes
+// ------------------------------------------------------------------ discreet notifications
 function placeToasts() {
   const box = $("toasts"), ban = $("replayBanner");
   if (core.mode === "replay" && !ban.hidden) box.style.top = `${Math.round(Math.max(78, ban.getBoundingClientRect().bottom + 10))}px`;
@@ -96,12 +96,12 @@ function onEvent(ev, { silent } = {}) {
   const d = ev.data ?? {};
   if (ev.type === "agent.born" && d.agent) {
     const p = d.parentId ? store.agents.get(d.parentId) : null;
-    toast("birth", "✦", p ? `${firstName(d.agent)} naît de ${firstName(p)} · génération ${d.agent.generation}` : `${firstName(d.agent)} rejoint la simulation`, d.agent.id);
+    toast("birth", "✦", p ? `${firstName(d.agent)} is born from ${firstName(p)} · generation ${d.agent.generation}` : `${firstName(d.agent)} joins the simulation`, d.agent.id);
   } else if (ev.type === "agent.died") {
     const a = store.agents.get(d.agentId);
-    toast("death", "✝", `${firstName(a) || d.agentId} s'éteint${d.cause === "starvation" ? " : à court d'argent" : ""}`, d.agentId);
+    toast("death", "✝", `${firstName(a) || d.agentId} dies${d.cause === "starvation" ? ": ran out of money" : ""}`, d.agentId);
   } else if (ev.type === "sim.stopped") {
-    toast("sys", "■", `Simulation terminée · ${d.generations ?? "?"} génération${d.generations > 1 ? "s" : ""}`);
+    toast("sys", "■", `Simulation ended · ${d.generations ?? "?"} generation${d.generations > 1 ? "s" : ""}`);
   }
 }
 
@@ -111,13 +111,13 @@ function openAgent(id) {
   setTimeout(() => select(id), 60);
 }
 
-// ------------------------------------------------------------------ thème
+// ------------------------------------------------------------------ theme
 function initTheme() {
   $("themeBtn").addEventListener("click", () => {
     const root = document.documentElement;
     const next = (root.dataset.theme || "dark") === "dark" ? "light" : "dark";
     root.dataset.theme = next;
-    try { localStorage.setItem("darwin-theme", next); } catch { /* stockage indisponible */ }
+    try { localStorage.setItem("darwin-theme", next); } catch { /* storage unavailable */ }
   });
 }
 
