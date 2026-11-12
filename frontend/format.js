@@ -100,8 +100,8 @@ const TX_KIND = {
 };
 export const txKindLabel = (k) => TX_KIND[k] ?? String(k ?? "transaction");
 
-/** Protocol badge values (API, kept as-is) -> English display labels; fallback to the raw value. */
-export const BADGE_LABEL = { "simulé": "simulated", "simule": "simulated", "sous-traitance": "subcontract", "visiteur": "visitor", "Visiteur": "visitor", "Visiteur (financé par le compte de démo)": "Visitor (funded by the demo account)" };
+/** Protocol badge values (English since L19; legacy French values kept for old flows) -> display labels; fallback to the raw value. */
+export const BADGE_LABEL = { "simulated": "simulated", "subcontracting": "subcontract", "Visitor (funded by the demo account)": "Visitor (funded by the demo account)", "simulé": "simulated", "simule": "simulated", "sous-traitance": "subcontract", "visiteur": "visitor", "Visiteur": "visitor", "Visiteur (financé par le compte de démo)": "Visitor (funded by the demo account)" };
 export const badgeText = (b) => BADGE_LABEL[b] ?? String(b ?? "?");
 
 export function requesterBadge(r, serverBadge) {

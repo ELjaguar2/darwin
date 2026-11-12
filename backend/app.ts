@@ -9,7 +9,7 @@ import { bodyLimit } from "hono/body-limit";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import { CATALOGUE, PROFESSIONS, formatNear, redactConfig, scaledPrice, type Task } from "../shared/index.ts";
-import { MarketError, SIMULATED_BADGE, VISITOR_FUNDING_LABEL } from "../market/index.ts";
+import { MarketError, SIMULATED_BADGE, SUBCONTRACT_BADGE, VISITOR_FUNDING_LABEL } from "../market/index.ts";
 import { RateLimiter } from "./rate-limit.ts";
 import { ReplayError } from "./replay.ts";
 import { REPLAY_READ_ONLY_MESSAGE } from "./replay-runtime.ts";
@@ -79,7 +79,7 @@ const defaultIp = (c: Context): string => {
 const digest = (s: string) => createHash("sha256").update(s).digest();
 
 export function taskView(t: Task) {
-  const badge = t.requester.kind === "visitor" ? VISITOR_FUNDING_LABEL : t.requester.kind === "simulated" ? SIMULATED_BADGE : "subcontracting";
+  const badge = t.requester.kind === "visitor" ? VISITOR_FUNDING_LABEL : t.requester.kind === "simulated" ? SIMULATED_BADGE : SUBCONTRACT_BADGE;
   return { ...t, badge, validatedBy: t.validation?.validator };
 }
 

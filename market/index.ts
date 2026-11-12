@@ -1,7 +1,7 @@
 // Task market (L6). Depends only on `shared/` (Chain, Brain, Journal, Config).
 // Hard rules: no release without a recorded `accepted` verdict; refund only on `rejected` or `expired`;
 // the validator is never the paid agent nor the agent that subcontracts; visitor text always in a `user` message.
-// L19: error messages and reasons are English; API protocol values (badge "simulé", "sous-traitance", error/event codes) are unchanged.
+// L19: error messages, reasons and API badge values are English; error/event codes are unchanged.
 import {
   CATALOGUE, ChainError, TaskInputSchema, formatNear, hashObject, journalFiles, nearPriceOf, parseNear, sanitizePitch,
   type Bid, type Deliverable, type Deps, type Escrow, type Market, type Profession, type Requester, type Task, type Validation, type Yocto,
@@ -22,17 +22,25 @@ export * from "./events.ts";
 export * from "./templates.ts";
 
 /**
- * Normalised labels (D-024). The three values below are API PROTOCOL values (`badge` of /api/tasks, read by the frontend and by
- * journal/replay tests): they stay in French on purpose. English display texts live in `BADGE_LABELS` (use them for display).
+ * Normalised labels (D-024). The three values below are the `badge` values of /api/tasks (computed by the backend from
+ * `requester.kind`, never stored in the journal). English since L19; the former French values are still recognised by
+ * `badgeLabelOf` and by the frontend (`LEGACY_BADGES`).
  */
-export const VISITOR_FUNDING_LABEL = "Visiteur (financé par le compte de démo)";
-export const SIMULATED_BADGE = "simulé";
-export const SUBCONTRACT_BADGE = "sous-traitance";
-/** English display labels matching each protocol badge value (L19): `badgeLabel` that the frontend can show. */
+export const VISITOR_FUNDING_LABEL = "Visitor (funded by the demo account)";
+export const SIMULATED_BADGE = "simulated";
+export const SUBCONTRACT_BADGE = "subcontracting";
+/** Former French badge values (before L19), mapped to the current ones: old flows (replays, old clients) may still carry them. */
+export const LEGACY_BADGES: Readonly<Record<string, string>> = {
+  "simulé": SIMULATED_BADGE,
+  "sous-traitance": SUBCONTRACT_BADGE,
+  "Visiteur (financé par le compte de démo)": VISITOR_FUNDING_LABEL,
+};
+/** Display labels matching each badge value (identical to the value since L19; legacy French keys map to the English label). */
 export const BADGE_LABELS: Readonly<Record<string, string>> = {
   [VISITOR_FUNDING_LABEL]: "Visitor (funded by the demo account)",
   [SIMULATED_BADGE]: "simulated",
   [SUBCONTRACT_BADGE]: "subcontracting",
+  ...Object.fromEntries(Object.entries(LEGACY_BADGES).map(([old, cur]) => [old, cur === VISITOR_FUNDING_LABEL ? "Visitor (funded by the demo account)" : cur])),
 };
 /** English display label of a protocol badge value (unknown value: returned as is). */
 export const badgeLabelOf = (badge: string): string => BADGE_LABELS[badge] ?? badge;

@@ -5,8 +5,8 @@
 ## Language (L19)
 Everything the market generates or displays is English: catalogue titles, descriptions and rubrics, simulated-client templates and market-event titles, judge and production prompts (each ends with "Always answer in English."), check messages, rejection reasons, error messages, mock pitches. The target language of a translation defaults to English, even for a task written in French (an explicit "into French" is honoured; any other named language is not checked). Pitches must be English (`pitchLanguageOk`).
 
-**Protocol values deliberately left as they are** (read by the frontend, the backend and journal/replay tests):
-- API badges: `"simulé"` (`SIMULATED_BADGE`), `"sous-traitance"` (`SUBCONTRACT_BADGE`), `"Visiteur (financé par le compte de démo)"` (`VISITOR_FUNDING_LABEL`). English display labels are exported next to them: `BADGE_LABELS` / `badgeLabelOf(badge)` ("simulated", "subcontracting", "Visitor (funded by the demo account)"). The backend can expose them as `badgeLabel`; the frontend should display that.
+**Protocol values left as they are** (read by the frontend, the backend and journal/replay tests):
+- API badges are English since L19: `"simulated"` (`SIMULATED_BADGE`), `"subcontracting"` (`SUBCONTRACT_BADGE`), `"Visitor (funded by the demo account)"` (`VISITOR_FUNDING_LABEL`). They are computed by the backend from `requester.kind` (never stored in the journal). The former French values (`"simulé"`, `"sous-traitance"`, `"Visiteur (financé par le compte de démo)"`) are still recognised through `LEGACY_BADGES` and `badgeLabelOf(badge)` / `BADGE_LABELS`.
 - Deliverable file names `analyse.md`, `texte.md`, `traduction.md`, `checklist.md` (and `logo-N.svg`, `architecture.md`, `schema.mmd`), validator ids (`rule:*`, `brain:*`, `visitor`), error and event codes, rejection codes (`no_bids`, `deadline`).
 - The simulated client label prefix is display-only and is now `Simulated client` (`SIMULATED_LABEL_PREFIX`); the legacy `Client simulé` prefix is still recognised (`LEGACY_SIMULATED_LABEL_PREFIX`). The protocol marker is `requester.kind = "simulated"`.
 - Rubric criterion ids are now English (`originality`, `fidelity`, `fit`, `hook`, ...); the judge verdict parser accepts `reason=` and the legacy `raison=`.
@@ -32,10 +32,10 @@ The operator is the validation oracle: a rule or model chosen by the operator; t
 The market creates and funds (from the master, on first need then top-ups) two sub-accounts: `visitors.<master>` (`funding.received` `source: "demo"`) and `sim-client.<master>` (`source: "master"`). The paying account of a visitor task is always `visitors`: the caller does not choose it. Subcontract tasks are paid by the requesting agent's account (registry `Chain.getAgentRecord`).
 
 ## Visitors and simulated client
-- Visitor label: badge `"Visiteur (financé par le compte de démo)"` (`VISITOR_FUNDING_LABEL`, English display "Visitor (funded by the demo account)"): the operator's test funds, not the visitor's money.
+- Visitor label: badge `"Visitor (funded by the demo account)"` (`VISITOR_FUNDING_LABEL`): the operator's test funds, not the visitor's money.
 - Hourly spending cap of the visitors account: sum of published budgets over a sliding 60 min; beyond it `MarketError VISITOR_CAP_EXCEEDED` (`httpStatus` 429). Value: `opts.visitorHourlyCap`, else `config.sim.visitorHourlyCap` if `shared` adds it (`DARWIN_VISITOR_HOURLY_CAP_NEAR`), else 10 x max budget. The 10 open tasks per IP remain the backend's job.
 - `postVisitorTask(input)`: validates `TaskInputSchema`, bounds `taskBudgetMin/Max` (400).
-- **Simulated** client (`createSimulatedClient(deps, market).tick(tick)`): Poisson draw (`simClientRatePerTick`), varied tasks per profession with English titles and prompts, `requester.kind = "simulated"`, label always prefixed `Simulated client`, badge `"simulé"` (display "simulated"). Never presented as a real client.
+- **Simulated** client (`createSimulatedClient(deps, market).tick(tick)`): Poisson draw (`simClientRatePerTick`), varied tasks per profession with English titles and prompts, `requester.kind = "simulated"`, label always prefixed `Simulated client`, badge `"simulated"`. Never presented as a real client.
 - Visitor text: never in a `system` message. `taskMessages(task, personality)` (for the engine) and `judgeMessages` put it as JSON in a `user` message.
 
 ## Subcontracting

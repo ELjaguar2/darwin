@@ -39,7 +39,7 @@ Errors: `{"error":{"code","message", ...}}`. All amounts are yoctoNEAR strings. 
 | `GET /api/agents/:id` | `{agent, ancestors[], children[], letterReceived?, lettersWritten[], tasks[]}` |
 | `GET /api/agents/:id/letter`, `GET /api/letters/:id` | `{letter}` (404 for a founder) |
 | `GET /api/lineage` | `{generations, roots[], nodes[{id,parentId,generation,status,name,profession,model,birthTick,deathTick?,causeOfDeath?,balance,childrenIds}]}` |
-| `GET /api/tasks?status=&profession=&limit=` | `{tasks}`; each task = `Task` + `badge` (the market's `SIMULATED_BADGE` and `VISITOR_FUNDING_LABEL` labels, or `"subcontracting"`) + `validatedBy` ("validated by: ...") |
+| `GET /api/tasks?status=&profession=&limit=` | `{tasks}`; each task = `Task` + `badge` (English protocol values from `market/index.ts`: `"simulated"` (`SIMULATED_BADGE`), `"Visitor (funded by the demo account)"` (`VISITOR_FUNDING_LABEL`) or `"subcontracting"` (`SUBCONTRACT_BADGE`)) + `validatedBy` ("validated by: ...") |
 | `GET /api/tasks/:id` | `{task, bids[], escrow?}` |
 | `POST /api/tasks` | visitor form (see below) |
 | `GET /api/events?since=&limit=` | `{events[], lastSeq}` (limit <= 1000) |
