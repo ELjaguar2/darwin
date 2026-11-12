@@ -247,7 +247,7 @@ function stepTask(p) {
       visitorOpenByIp.forEach((v, k) => visitorOpenByIp.set(k, Math.max(0, v - 1)));
     }
     // occasional subcontracting
-    if (rnd() < 0.3 + w.genome.cooperation * 0.12 && t.requester.kind !== "agent") {
+    if (rnd() < 0.08 + w.genome.cooperation * 0.12 && t.requester.kind !== "agent") {
       const child = postTask({ kind: "agent", agentId: w.id }, near(0.4), pick(PROFS), "Subcontract: " + pick(TITLES[pick(PROFS)]), "Sub-task handed over by " + w.name + ".");
       // alternate with / without the optional L21 fields (old journals do not carry them)
       const full = child.id.endsWith("1") || child.id.endsWith("3") || child.id.endsWith("5") || child.id.endsWith("7") || child.id.endsWith("9");

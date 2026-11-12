@@ -51,8 +51,9 @@ export function buildChatDeliverable(d, meta) {
     const body = isMermaid(f)
       ? h("pre", { class: "md-code" }, h("code", null, content.slice(0, MAX_INLINE_CHARS)))
       : isMarkdown(f) ? subcontractAware(content, name) : h("div", { class: "md" }, h("pre", { class: "plain" }, content.slice(0, MAX_INLINE_CHARS)));
-    const box = h("div", { class: "cd-text clamp" }, body, f.truncated ? h("p", { class: "muted small" }, `… content truncated in the log (${f.bytes ?? "?"} B in total).`) : null);
-    const more = h("button", { type: "button", class: "cd-more", onclick: () => { const clamped = box.classList.toggle("clamp"); more.textContent = clamped ? "Read all" : "Collapse"; } }, "Read all");
+    const hasSub = !!body.querySelector(".cd-sub"); // the subcontracted part must stay visible: no initial clamp
+    const box = h("div", { class: hasSub ? "cd-text" : "cd-text clamp" }, body, f.truncated ? h("p", { class: "muted small" }, `… content truncated in the log (${f.bytes ?? "?"} B in total).`) : null);
+    const more = h("button", { type: "button", class: "cd-more", onclick: () => { const clamped = box.classList.toggle("clamp"); more.textContent = clamped ? "Read all" : "Collapse"; } }, hasSub ? "Collapse" : "Read all");
     root.append(h("div", { class: "cd-file" },
       h("div", { class: "cd-head" }, h("code", null, name), isMermaid(f) ? h("span", { class: "muted small" }, " diagram source (rendering disabled)") : null,
         taskId ? h("a", { class: "btn-dl", href: fileUrl(taskId, name, true), download: name, "aria-label": `Download ${name}` }, "Download") : null),

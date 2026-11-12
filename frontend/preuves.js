@@ -78,7 +78,7 @@ function renderSubcontracting() {
   const box = $("subBlock"), sm = subs.summary();
   box.hidden = sm.count === 0;
   if (!sm.count) { box.replaceChildren(); return; }
-  const near = (v) => `${formatNear(v, 3)} NEAR`;
+  const near = (v) => `${formatNear(v, 4)} NEAR`;
   const name = (id) => { const a = store.agents.get(id); return a ? firstName(a) : String(id ?? "?"); };
   const link = (hash, label) => { if (!hash) return h("span", { class: "muted" }, "–"); const u = txUrl(hash); return u ? h("a", { class: "hash", href: u, target: "_blank", rel: "noopener noreferrer", "aria-label": `${label}, transaction ${hash} on nearblocks (new tab)` }, shortHash(hash), " ↗") : h("span", { class: "hash", title: hash }, shortHash(hash)); };
   const STATE = { integrated: ["integrated ✓", "ok"], fallback: ["fallback in-house", "ko"], paid: ["paid ✓", "ok"], expired: ["expired", "ko"], refunded: ["refunded", "ko"], awarded: ["awarded", ""], open: ["open", ""] };

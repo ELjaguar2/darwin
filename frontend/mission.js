@@ -100,7 +100,7 @@ function speak(agentId) {
 
 // ------------------------------------------------------------------ chat feed
 const threads = new Map(); // taskId -> thread
-const MAX_THREADS = 14;
+const MAX_THREADS = 30;
 let queue = [], qTimer = 0;
 
 function pump() {
@@ -192,7 +192,11 @@ function msgNode(th, m) {
     case "refund": return h("div", { class: "msg sys bad" }, h("span", { class: "pill-sys bad" }, `refunded · ${money(m.amount, 3)} returned to the client`, subs.childrenOf(th.id).some((c) => subs.record(c)?.status === "integrated") ? " · sub-task commission lost: mission rejected" : ""), txChip(m.tx, "Refund"));
     case "expired": return h("div", { class: "msg sys bad" }, h("span", { class: "pill-sys bad" }, subs.isChild(th.id) && m.reason === "no_bids" ? "sub-task expired, no bidder" : `${subs.isChild(th.id) ? "sub-task " : ""}expired · ${{ no_bids: "no bids", deadline: "deadline passed", unfunded: "client without funds", winner_dead: "the winner died" }[m.reason] ?? m.reason ?? ""}`));
     case "sub": return subNode(m);
-    case "integrated": return h("div", { class: "msg sys sub-int" }, h("span", { class: "pill-sys paid" }, h("b", null, "integrated: "), `${m.name}${m.prof ? ` (${m.prof})` : ""} paid ${money(m.price, 3)}, commission ${money(m.commission, 3)}`), txChip(m.tx, "Sub-task payment"));
+    case "integrated": {
+      const rec = subs.record(m.childId), void_ = rec?.commissionKind === "void";
+      const tail = void_ ? "no commission (parent mission rejected)" : `commission ${money(m.commission, 4)}${rec?.commissionKind === "expected" ? " once the parent is paid" : ""}`;
+      return h("div", { class: `msg sys sub-int${void_ ? " bad" : ""}` }, h("span", { class: `pill-sys ${void_ ? "bad" : "paid"}` }, h("b", null, "integrated: "), `${m.name}${m.prof ? ` (${m.prof})` : ""} paid ${money(m.price, 4)}, ${tail}`), txChip(m.tx, "Sub-task payment"));
+    }
     case "fallback": return h("div", { class: "msg sys bad sub-fb" }, h("span", { class: "pill-sys bad" }, `fallback: done in-house (${FALLBACK_REASON[m.reason] ?? m.reason ?? "failed"}), no commission`));
     default: return h("div");
   }
@@ -200,11 +204,12 @@ function msgNode(th, m) {
 
 /** Sentence of the delegation (L21). Optional parts (budget, commission) are left out when unknown. */
 export function delegationText(name, profLabel, rec) {
-  const head = `${name} delegates a ${profLabel ?? "sub-"}${profLabel ? " " : ""}sub-task to the market`;
+  const head = `${name} delegates a ${profLabel ? `${profLabel} ` : ""}sub-task to the market`;
   const amount = rec?.price ?? rec?.budget ?? null; // escrowed amount once awarded, otherwise the budget offered
   const k = rec?.commissionKind;
-  if (k === "none") return `${head}${amount != null ? ` for ${money(amount, 3)}` : ""}: no money moved, delegator keeps the whole price`;
-  return `${head}${amount != null ? ` for ${money(amount, 3)}` : ""}${rec?.commission != null ? ` and ${k === "expected" ? "expects" : "keeps"} ${k === "max" ? "up to " : ""}${money(rec.commission, 3)} commission` : ""}`;
+  if (k === "void") return `${head}${amount != null ? ` for ${money(amount, 4)}` : ""}: parent mission rejected, no commission`;
+  if (k === "none") return `${head}${amount != null ? ` for ${money(amount, 4)}` : ""}: no money moved, delegator keeps the whole price`;
+  return `${head}${amount != null ? ` for ${money(amount, 4)}` : ""}${rec?.commission != null ? ` and ${k === "expected" ? "expects" : "keeps"} ${k === "max" ? "up to " : ""}${money(rec.commission, 4)} commission` : ""}`;
 }
 const SUB_STATE = { integrated: ["sub-task integrated ✓", "ok"], fallback: ["fallback: done in-house", "ko"], open: ["sub-task open for bids", ""], awarded: ["sub-task awarded", ""], paid: ["sub-task paid ✓", "ok"], expired: ["sub-task expired, no bidder", "ko"], refunded: ["sub-task refunded", "ko"] };
 function subNode(m) {
@@ -212,7 +217,7 @@ function subNode(m) {
   const a = store.agents.get(m.byAgentId);
   const prof = rec?.profession ? labelOf(rec.profession) : null;
   const st = SUB_STATE[rec?.status ?? "open"];
-  const why = rec?.status === "fallback" ? `fallback: done in-house (${FALLBACK_REASON[rec.fallbackReason] ?? rec.fallbackReason ?? "failed"}), no commission` : rec?.status === "expired" && rec.expiredReason && rec.expiredReason !== "no_bids" ? `sub-task expired · ${rec.expiredReason.replace(/_/g, " ")}` : st[0];
+  const why = rec?.status === "fallback" ? `sub-task failed: ${FALLBACK_REASON[rec.fallbackReason] ?? rec.fallbackReason ?? "failed"}` : rec?.status === "expired" && rec.expiredReason && rec.expiredReason !== "no_bids" ? `sub-task expired · ${rec.expiredReason.replace(/_/g, " ")}` : st[0];
   return h("div", { class: "msg sys sub-deleg" }, h("span", { class: "pill-sys deleg" }, "⇄ ", delegationText(firstName(a) || String(m.byAgentId), prof, rec)),
     h("span", { class: `sub-state ${st[1]}` }, why), rec?.releaseTx ? txChip(rec.releaseTx, "Sub-task payment") : rec?.lockTx ? txChip(rec.lockTx, "Sub-task escrow") : null);
 }
@@ -359,7 +364,7 @@ export function ingest(ev, { silent = false } = {}) {
       enqueue((s) => {
         const th = threads.get(d.parentTaskId);
         const rec = subs.record(d.childTaskId);
-        if (th) push(th, { kind: "integrated", name: firstName(store.agents.get(d.childAgentId)), prof: d.childProfession ? labelOf(d.childProfession) : "", price: d.childPrice, commission: d.commission, tx: rec?.releaseTx ?? null }, s);
+        if (th) push(th, { kind: "integrated", childId: d.childTaskId, name: firstName(store.agents.get(d.childAgentId)), prof: d.childProfession ? labelOf(d.childProfession) : "", price: d.childPrice, commission: d.commission, tx: rec?.releaseTx ?? null }, s);
         if (!s) delegating(store.agents.get(d.childAgentId) ? d.childAgentId : rec?.byAgentId);
       }, silent);
       break;
