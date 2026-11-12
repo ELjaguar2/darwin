@@ -167,3 +167,50 @@ Non bloquants :
 | 1. l16 / l17 / e2e | l17 41/41, e2e OK, l16 OK sauf instabilité du test (NB-1) |
 | 2. Rejeu run8 + run9b + classique + mobile | OK, 0 bloquant, 5 défauts mineurs (NB-2 à NB-6) |
 | 3. Testnet avec la clé rotationnée | OK : démarre, agents, SSE, transactions et liens nearblocks ; coût IA 0,0046 USD, 0,779 NEAR sortis du maître (solde 1,909 NEAR), 0 erreur 429 |
+
+---
+
+## Clone neuf 2026-11-12 (L17-integration 0d76273)
+
+- **Procédure** : `git clone --branch lot/L17-integration` dans un dossier neuf du scratchpad (HEAD 0d76273, aucun `.env`, aucun `data/`), Windows 11, Node v22.17.1, Git Bash, Chromium headless (Playwright). README suivi dans l'ordre : replay d'abord, puis mock. Ports 3000 libérés à la fin.
+- **Verdict : GO pour la fusion.** Zéro bloquant. 3 écarts non bloquants (texte du README), voir en bas.
+- Captures : `docs/captures/clone-neuf-1112/` (rejeu : mission, lignées, preuves ; mock : mission ; page classique).
+
+| Étape | Attendu | Vu | Verdict |
+|---|---|---|---|
+| `npm ci` | installe | 4,4 s (cache npm chaud), 0 erreur | OK |
+| 6b-1 `npm run replay` | 4 lignes `[darwin]` + « rejeu démarré » | `MODE REPLAY (1819 événements de run8-journal.jsonl, enregistrés le 2026-11-10, vitesse x5)`, `aucune clé...`, `écoute sur http://127.0.0.1:3000 ...`, ligne contrôle ouvert, `rejeu démarré` : identique | OK |
+| 6b-2 page | pastille REJEU, bandeau, barre, x1/x5/x20 | pill « REJEU run réel enregistré », bandeau « Rejeu d'un run réel testnet du 10 novembre 2026 » visible, « en cours · 5 % », x1 x5 x20, 4 cartes, 6 fils, saisie désactivée, 0 erreur console | OK |
+| 6b-3 lien nearblocks | ouvre la transaction | non cliqué (pas de réseau voulu) ; liens présents dans le flux | non vérifié |
+| 6b-4 `/api/health` | `"mode":"replay"` + objet `replay` | `"mode":"replay"`, `replay{phase:"playing",speed:5,position,total:1819,meta.recordedOn:"2026-11-10"}` (chain `near`, brain `nearai`, `mock:false` sont les valeurs enregistrées) | OK |
+| 6b-5 rechargement | état reconstruit | nouvelle page ouverte en plein rejeu : cartes et fils déjà présents (6 fils, 4 cartes) | OK |
+| 6b-6 POST /api/tasks | 403 REPLAY_READ_ONLY | `HTTP/1.1 403`, `REPLAY_READ_ONLY` | OK |
+| 6b-7 `DARWIN_REPLAY_FILE=...run9b...` | autre journal | `377 événements de run9b-journal.jsonl, 2026-11-11`, bandeau « 11 novembre 2026 », 6 cartes, 0 erreur | OK (la vitesse x20 n'a pas été relancée, non nécessaire) |
+| 7 `npm run start:mock` | 3 lignes | `mode mock (chaîne mock, cerveau mock, preset normal)`, écoute, simulation démarrée : identique | OK |
+| 9-2 health | ok, mock, operator-account | `"mode":"mock"`, kind mock, `escrow:"operator-account"`, `mock:true`, tick croissant | OK |
+| 9-3 config | config publique sans secret | mode, preset normal, seed 42, sim, intents.enabled false | OK |
+| 9-4 agents | 4 fondateurs a-0001..4 | a-0001 logo, a-0002 finance, a-0003 architecture, a-0004 marketing ; enfants gen 2 à partir du tick 32 (~32 s) | OK |
+| 9-5 stream | SSE retry/event/id | `retry: 3000`, `event: sim.started`, `chain.tx` (`mock_...`), `data:` JSON `{seq,ts,tick,type,data}` puis `id:` | OK |
+| 9-6 POST marketing | 201, Location, posted, badge | 201, `location: /api/tasks/t-0006`, `"status":"posted"`, badge « Visiteur (financé par le compte de démo) » | OK |
+| 9-7 tâche réglée | settled, winnerId, bids/pitch, accepted 0.8, released | settled en 2 ticks (tick 9), `winnerId a-0004`, 1 offre avec pitch, `accepted` 0.8 `brain:mock/small`, escrow `released` payer `visitors.darwin.mock.testnet`, hash `mock_`, proof. Réponse enveloppée sous `task`/`bids`/`escrow` | OK |
+| 9-8 POST invalide | 400 INVALID_INPUT | message identique mot pour mot | OK |
+| 9-9 lineage | generations, roots, nodes | gen 2 à tick 56, roots les 4 fondateurs, 8 nœuds avec parentId | OK |
+| 9-10 lettre | letter.written puis lettre | a-0003 -> a-0005, `[mock] Cher enfant...`, `mock:true` ; fondateur a-0001 : 404 | OK |
+| 9-11 tâches | badges simulé / sous-traitance / visiteur | tick 56 : `?limit=50` = 45 simulé + 5 sous-traitance, **tâche visiteur absente** (sortie des 50 plus récentes) ; `limit=1000` : 69 tâches dont 1 visiteur | écart E-2 |
+| 9-12 pause/resume | paused true puis false | `{"ok":true,"running":true,"paused":true,"tick":56}` puis `"paused":false` | OK |
+| 9-13 `start:demo` avec `DARWIN_MODE=testnet` posé | mock quand même | `mode mock (chaîne mock, cerveau mock, preset demo)`, health `mode:mock`. À 90 s (tick 209) : 10 morts `starvation`, génération 3 (README : 15 morts, 5 générations au tick 238, « run de l'auteur ») | OK (chiffres différents, voir E-3) |
+| 9-14 page par défaut (mock) | MODE MOCK, 3 onglets | pill « MODE MOCK chaîne et IA simulées », onglets Mission / Lignées / Preuves, bandeau de rejeu masqué, saisie « Décrivez votre mission… » active, 8 cartes, 14 fils, 0 erreur console | OK |
+| 9-14 `/?classique` | bandeau MODE MOCK, Client simulé, Séquestre dégradé, Publier la tâche | les 4 textes présents, 0 erreur de page | OK |
+| 9-15 `npm test` | tous verts | 22 fichiers, **319 / 319**, 7,9 s | OK |
+| `npm run typecheck` | 0 erreur | 0 erreur, 3,5 s | OK |
+| `npm run scan-secrets` (et `scan:secrets`) | OK | 259 fichiers, 100 commits, 7 exemptions factices, « aucun secret détecté » | OK |
+| Ports | libérés | aucun écouteur sur 3000 | OK |
+
+Temps réels : replay prêt en moins de 8 s ; mock prêt en moins de 7 s ; première génération 2 à ~32 s ; tâche visiteur réglée en ~9 s ; tests 8,9 s ; typecheck 3,5 s. Aucune particularité Windows/PowerShell rencontrée (étape 7 de 6b déjà donnée en syntaxe PowerShell). Le chemin `npm ci` a été testé avec un cache npm chaud : le temps d'un vrai juge sera plus long.
+
+### Écarts (tous non bloquants, texte du README)
+
+- **E-1 (section 7, clone)** : la section 7 dit `npm install` alors que 6b dit `npm ci`. Correction : remplacer `npm install` par `npm ci` (lockfile respecté) dans le bloc `git clone` de la section 7 et dans le résumé français.
+- **E-2 (section 9, étape 11)** : « your visitor task (1 of 50) » faux si l'on attend : à 1 minute la tâche visiteur n'est plus dans `?limit=50` (69 tâches). Correction : « ... and your visitor task (visible in the last 50 only in the first ~30 seconds; use `?limit=1000` to find it) ».
+- **E-3 (section 9, étape 13)** : le README annonce 15 morts / 5 générations à tick 238 ; vu 10 morts / 3 générations à tick 209 (même graine, preset demo, mais la boucle dépend du timing). Correction : « Dead agents with `"causeOfDeath":"starvation"` (about 10 to 15 dead and 3 to 5 generations after 90 s; the exact count varies) ».
+- Remarque (non écart) : l'étape 14 du paragraphe d'intro de la section 9 dit que la page n'a pas été ouverte dans un navigateur : c'est désormais fait (ce rapport), la phrase peut être mise à jour.
