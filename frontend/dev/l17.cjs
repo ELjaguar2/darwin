@@ -142,7 +142,7 @@ const ok = (c, m) => { c ? pass++ : fail++; console.log((c ? "OK   " : "FAIL ") 
     console.log("   L21: delegation messages in the feed:", nsub, txt[0] ? "| " + txt[0] : "");
     ok(nsub >= 1 || REPLAY, "L21: at least one delegation message in the feed");
     ok(txt.every((t) => /delegates a .*sub-task to the market/.test(t)), "L21: sentence \"X delegates a ... sub-task to the market ...\"");
-    ok(txt.some((t) => /for [\d.]+ NEAR/.test(t) && /keeps [\d.]+ NEAR commission/.test(t)) || !nsub, "L21: budget and commission displayed (computed when the journal lacks them)");
+    ok(txt.every((t) => /for [\d.]+ NEAR/.test(t) && (/(keeps|expects) (up to )?[\d.]+ NEAR commission/.test(t) || /no money moved|no commission/.test(t))), "L21: budget and commission displayed (computed when the journal lacks them)");
     ok((await p.$$eval("#feed .thread.sub .rtag.tag-agent", (n) => n.length)) >= (nsub ? 1 : 0), "L21: child task as a linked thread with the \"subcontract\" tag");
     // pure tracker with and without optional fields, on fabricated events
     const r = await p.evaluate(async () => {
