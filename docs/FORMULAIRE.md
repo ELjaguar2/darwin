@@ -41,7 +41,7 @@ NEAR, run for real on testnet (tx ids in the repo): a sub-account and function-c
 
 Honesty: mock is the default; on testnet the payer was the labelled simulated client; AI cost (about 0.03 USD) is local accounting; NEAR Intents (off by default) was never run; escrow is validated by the operator, not trustless; the economy is subsidised.
 
-Run: npm install && npm run start:mock (README: "do X, you will see Y"). Most code written by AI agents (Claude Code), disclosed. MIT.
+Run: npm ci && npm run start:mock (README: "do X, you will see Y"). Most code written by AI agents (Claude Code), disclosed. MIT.
 ```
 <!-- idea:end -->
 
