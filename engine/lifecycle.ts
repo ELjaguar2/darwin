@@ -95,13 +95,19 @@ export async function reproduce(ctx: Ctx, parent: Agent): Promise<Agent | null> 
   return child;
 }
 
-/** Parent -> child letter, written by the parent's brain (cost debited from the parent). Labelled fallback if the brain fails. Always in English. */
-async function writeLetter(ctx: Ctx, parent: Agent, child: Agent, mutations: Record<string, [unknown, unknown]>) {
-  const { brain, journal, now, config } = ctx.deps;
+/** Messages of the letter request (exported so that brain/tools/english-validation.ts replays the exact production prompt). */
+export function letterRequestMessages(parent: Agent, child: Agent, mutations: Record<string, [unknown, unknown]>) {
   const changed = Object.keys(mutations).join(", ") || "none";
   const user =
     `You are ${parent.name}, generation ${parent.generation}. Your child ${child.name} is born with ${formatNear(child.birthCapital, 2)} NEAR. ` +
     `You have completed ${parent.tasksDone} tasks. Genes changed in your child: ${changed}. Write a short "letter to my child" with your survival advice. ${ENGLISH_RULE}`;
+  return [{ role: "system" as const, content: `${parent.genome.personality}\n${ENGLISH_RULE}` }, { role: "user" as const, content: user }];
+}
+
+/** Parent -> child letter, written by the parent's brain (cost debited from the parent). Labelled fallback if the brain fails. Always in English. */
+async function writeLetter(ctx: Ctx, parent: Agent, child: Agent, mutations: Record<string, [unknown, unknown]>) {
+  const { brain, journal, now, config } = ctx.deps;
+  const messages = letterRequestMessages(parent, child, mutations);
   let text: string;
   let model = parent.genome.model;
   let mock = true;
@@ -110,7 +116,7 @@ async function writeLetter(ctx: Ctx, parent: Agent, child: Agent, mutations: Rec
     model = price.id;
     const resp = await brain.complete({
       agentId: parent.id, purpose: "letter", model, maxTokens: config.sim.maxTokensPerCall,
-      messages: [{ role: "system", content: `${parent.genome.personality}\n${ENGLISH_RULE}` }, { role: "user", content: user }],
+      messages,
     });
     await chargeBrain(ctx, parent, "letter", resp, price);
     text = resp.text;
