@@ -3,12 +3,13 @@
 > Owner: redacteur. **The human reviews, adapts and publishes personally.** Mandatory mentions (SPECS L-05): say the project was built at the NEAR HACKATHON, tag **@NEARProtocol** and **#NEARHackathon**, attach the **video** (`docs/VIDEO_SCRIPT.md`): it is MANDATORY, HACKATHON.md (re-read on 2026-11-12) says screenshots alone are not enough. Optional: @NearLegion, @NearBuilders. The post link goes into `demoUrl` of the form (`docs/FORMULAIRE.md`).
 > Replace `<REPO_URL>` with the public repository URL before publishing. Each tweet is at most 280 characters (a URL counts for 23); counts checked by script, then re-check in the X editor.
 > The video must stay under 2 min 20 (likely limit for a free X account); see `docs/VIDEO_SCRIPT.md`.
-> Updated 2026-11-12 from `docs/PREUVES_TESTNET.md` (run 8): testnet and the contract really ran. **Do not cite run 9 (logo order) until an accepted and paid logo is proven** (TO CONFIRM: run 9c).
+> Updated 2026-11-12 from `docs/PREUVES_TESTNET.md` (run 8 and run 9c). Facts used: run 8 (historical, French): generation 3, 12 births, 7 deaths. Run 9c (English): generation 3, 16 births, 4 deaths, two missions paid on testnet (a marketing pitch and a logo).
+> **Honesty rule for the missions**: they were typed into the interface by an automated browser on the developer's behalf, and paid by the operator's demo account. Do not write "a visitor ordered" or "a user paid". The post says "missions" and "client simulated"; the thread says how they were entered.
 
 ## Single post
 
 ```text
-Built at NEAR HACKATHON: Darwin, AI agents that earn from paid, validated work, pay for their own brain, reproduce and die when broke. Real NEAR testnet run: generation 3, 7 deaths. Client simulated. No key needed: <REPO_URL> @NEARProtocol #NEARHackathon
+Built at NEAR HACKATHON: Darwin, AI agents that earn from paid work, pay for their own brain, reproduce, die when broke. Real NEAR testnet run: generation 3, 4 deaths, 2 missions paid (1 logo). Mostly simulated client. <REPO_URL> @NEARProtocol #NEARHackathon
 ```
 
 Attach: the video (the "wow" in the first 10 seconds). Mandatory.
@@ -33,19 +34,20 @@ Attach: the video (the "wow" in the first 10 seconds). Mandatory.
 ```
 
 ```text
-5/ On NEAR testnet, run for real: sub-accounts, function-call keys, a Rust escrow/registry contract, NEAR AI Cloud as the brain. One run: generation 3, 12 births, 7 deaths, 65 escrows. NEAR Intents: not run.
+5/ On NEAR testnet, run for real: sub-accounts, function-call keys, a Rust escrow/registry contract, NEAR AI Cloud as the brain. Run of 12 Nov: generation 3, 16 births, 4 deaths, 78 escrows, 2 missions paid, a logo included. NEAR Intents: not run.
 ```
 
 ```text
-6/ Honest limits: mock mode by default. The payer is a labelled simulated client. Escrow is validated by the operator (not trustless). One real run, not a guarantee. Most code written by AI agents (Claude Code).
+6/ Honest limits: most tasks come from a labelled simulated client. The 2 missions were typed by an automated browser, paid by our demo account. Subcontracting not awarded in that run. Escrow validated by the operator (not trustless). One run, not a guarantee.
 ```
 
 ```text
-7/ Try it: <REPO_URL> (npm ci && npm run start:mock). README has "do X, you will see Y" steps. #NEARHackathon @NEARProtocol
+7/ Try it: <REPO_URL> (npm ci && npm run start:mock, or npm run replay for the recorded run). README has "do X, you will see Y" steps. Most code written by AI agents (Claude Code). #NEARHackathon @NEARProtocol
 ```
 
 ## Checks before publishing
 
-- The text must stay true: re-read `docs/PREUVES_TESTNET.md`; if run 9c proves an accepted and paid logo, it can be added (TO CONFIRM), not before.
+- The text must stay true: re-read `docs/PREUVES_TESTNET.md` section 14. If the video shows the replay, say so in the post or the first reply ("replay of a recorded run, not live").
 - No promise of real gains: testnet NEAR has no value. Never write "the first".
+- Do not describe the two missions as ordered by a visitor or a customer.
 - Check that the repository is public and the X post is public, then copy its URL into the form.
