@@ -1,5 +1,8 @@
 # SPECS — exigences officielles
 
+> **English summary.** Official requirements extracted by the specs guardian from nearhackathon.com, HACKATHON.md, docs.near.org, docs.near-intents.org, cloud.near.ai and github.com/near/agent-skills (read 2026-11-09, re-read 2026-11-12): dates, tracks, deliverables, submission fields and rules (Q-000 to Q-017), judging, NEAR AI Cloud, NEAR Intents, and gaps with the initial prompt.
+> **State:** official sources prevail over `CLAUDE.md`; requirements are checked in `docs/CONFORMITE.md`. The rest of this file is kept in its original French (internal working document, translated on demand).
+
 > Propriétaire : gardien-des-specs. Date de lecture de toutes les sources : **2026-11-09**.
 > Les sources officielles priment sur le prompt initial et sur CLAUDE.md. Les pages sont relues via WebFetch (résumé automatique de la page : citations à re-vérifier avant soumission, car `HACKATHON.md` demande de relire la page vivante avant de soumettre).
 

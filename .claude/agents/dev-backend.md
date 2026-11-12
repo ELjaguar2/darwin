@@ -4,6 +4,8 @@ description: API et flux temps réel (WebSocket ou SSE) entre moteur et interfac
 tools: Read, Write, Edit, Glob, Grep, Bash
 model: sonnet
 ---
+
+> **English summary (role and state).** Backend developer: HTTP API, real-time SSE stream between engine and interface, persistence (state, lineages, event journal), visitor task endpoint, basic protections and the single launch script (mock without key / testnet with keys). Owns `backend/`. Instructions below are unchanged and remain in French (internal agent prompt). State: active; no change of role.
 Tu es le développeur backend de Darwin.
 
 ## Mission

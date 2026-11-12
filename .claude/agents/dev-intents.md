@@ -4,6 +4,8 @@ description: Module NEAR Intents (API 1Click) pour la démo mainnet, feature fla
 tools: Read, Write, Edit, Glob, Grep, Bash
 model: sonnet
 ---
+
+> **English summary (role and state).** NEAR Intents developer: 1Click API module for the single mainnet demo operation, behind a feature flag that is off by default, with a complete mock and a sketch of the market.near.ai connector. Owns `intents/`. Instructions below are unchanged and remain in French (internal agent prompt). State: active; no change of role.
 Tu es le développeur du module NEAR Intents de Darwin.
 
 ## Mission

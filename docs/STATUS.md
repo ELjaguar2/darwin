@@ -1,5 +1,9 @@
 # STATUS — journal
 
+> **English summary.** Chronological project log kept by the project lead and the agents (from 2026-11-09): team set-up, completion of work packages L0 to L17, security and specs-guardian reviews, the real testnet runs (run 8 reached generation 3 with 7 deaths, see `docs/PREUVES_TESTNET.md`), the replay mode, and the testnet master-account top-up (1.91 -> 11.91 NEAR) before run 9c.
+> **State (last entry, 2026-11-12):** `main` at 9a574e5, 343 tests green, run 9c not yet launched (command in `docs/RUN_9C.md` §2). Nothing is published, no mainnet spending.
+> The rest of this file is kept in its original French (internal working document, translated on demand).
+
 - 2026-11-09 14:40 — Mise en place : 14 agents, CLAUDE.md, fichiers de coordination, dépôt git.
 - 2026-11-09 — gardien-des-specs : L0 terminé, docs/SPECS.md et docs/CONFORMITE.md rédigés (sources lues le 2026-11-09, écarts E-01 à E-11 signalés).
 - 2026-11-09 — architecte : L1 terminé (non commité) : docs/ARCHITECTURE.md, décisions D-003 à D-019, squelette shared/ (types, Chain, Brain, mocks, journal, config) avec 11 tests verts, .env.example complété. En attente de validation du gardien des specs.

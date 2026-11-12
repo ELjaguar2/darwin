@@ -1,88 +1,88 @@
 # ARCHITECTURE
 
-> Propriétaire : architecte. Version L1 du 2026-11-09. Sources vérifiées le 2026-11-09 (voir `docs/DECISIONS.md` D-003 à D-019). En cas de conflit entre ce document et le code de `shared/`, le code de `shared/` fait foi et ce document doit être corrigé le jour même.
-> Tout développeur doit pouvoir démarrer son lot depuis ce document seul, en mode mock.
+> Owner: architect (`architecte`). Version L1 of 2026-11-09. Sources verified on 2026-11-09 (see `docs/DECISIONS.md` D-003 to D-019). In case of conflict between this document and the code in `shared/`, the code in `shared/` is authoritative and this document must be corrected the same day.
+> Any developer must be able to start their work package from this document alone, in mock mode.
 
-## 1. Principes
+## 1. Principles
 
-1. **Mock d'abord** : `Chain` et `Brain` sont des interfaces ; `MockChain` et `MockBrain` existent déjà dans `shared/mock/`. Rien ne dépend d'une clé ou du réseau pour tourner.
-2. **Une seule source d'historique** : le journal d'événements (§8). L'interface web et les tests se reconstruisent à partir de lui.
-3. **Argent exact** : yoctoNEAR en `bigint` / chaîne décimale (D-012).
-4. **Jamais de crédit sans preuve vérifiée** : le séquestre ne se libère qu'avec une preuve `accepted` (D-015).
-5. **Dépendances dirigées** : `shared` <- tous ; aucun module ne lit `process.env` (tous reçoivent `Config`) ; aucun module métier n'importe `near-api-js`.
-6. **Honnêteté** : tout ce qui est simulé est étiqueté (`mock:true`, client `simulated`, mode `dégradé`).
+1. **Mock first**: `Chain` and `Brain` are interfaces; `MockChain` and `MockBrain` already exist in `shared/mock/`. Nothing depends on a key or on the network to run.
+2. **A single source of history**: the event journal (§8). The web interface and the tests are rebuilt from it.
+3. **Exact money**: yoctoNEAR as `bigint` / decimal string (D-012).
+4. **Never credit without verified proof**: escrow is only released with an `accepted` proof (D-015).
+5. **Directed dependencies**: `shared` <- everything; no module reads `process.env` (all receive `Config`); no business module imports `near-api-js`.
+6. **Honesty**: everything simulated is labelled (`mock:true`, `simulated` client, `degraded` mode).
 
-## 2. Stack (versions vérifiées le 2026-11-09)
+## 2. Stack (versions verified on 2026-11-09)
 
-| Brique | Choix | Version | Vérification |
+| Component | Choice | Version | Verification |
 |---|---|---|---|
-| Runtime | Node.js | 22 LTS (>= 22.12 mock ; **>= 22.22.2 testnet**) | `engines` de near-api-js 7.4.0 ; docs.near.org/tools/near-api |
-| Langage | TypeScript strict | 6.0.3 | npm |
-| Serveur HTTP + SSE | Hono + `@hono/node-server` | 4.13.17 / 2.1.6 | npm, `npm audit` = 0 |
+| Runtime | Node.js | 22 LTS (>= 22.12 mock; **>= 22.22.2 testnet**) | `engines` of near-api-js 7.4.0; docs.near.org/tools/near-api |
+| Language | TypeScript strict | 6.0.3 | npm |
+| HTTP server + SSE | Hono + `@hono/node-server` | 4.13.17 / 2.1.6 | npm, `npm audit` = 0 |
 | Validation | zod | 4.6.7 | npm |
 | Tests | vitest | 5.1.0 | npm |
-| Exécution TS | tsx | 4.23.15 | npm |
-| Client NEAR | near-api-js (optionnel, dynamique) | 7.4.0 | npm `latest` ; docs.near.org/tools/near-api (`Account`, `JsonRpcProvider`, `createSubAccount`, `transfer`, `callFunction`) |
-| Contrats | Rust, `near-sdk` | 5.30.1 | crates.io ; docs.near.org/smart-contracts/quickstart (« only official SDK ») |
-| Build contrat | `cargo-near` | 0.23.0 | crates.io (la doc cite 0.16.1 testé : le dev-contrats confirme) |
-| RPC testnet | `https://test.rpc.fastnear.com` | — | docs.near.org/api/rpc/providers |
-| IA | NEAR AI Cloud, `https://cloud-api.near.ai/v1` | OpenAI-compatible | SPECS C-01 à C-06 |
-| Frontend | HTML + modules ES + CSS, sans build | — | D-009 |
+| TS execution | tsx | 4.23.15 | npm |
+| NEAR client | near-api-js (optional, dynamic) | 7.4.0 | npm `latest`; docs.near.org/tools/near-api (`Account`, `JsonRpcProvider`, `createSubAccount`, `transfer`, `callFunction`) |
+| Contracts | Rust, `near-sdk` | 5.30.1 | crates.io; docs.near.org/smart-contracts/quickstart ("only official SDK") |
+| Contract build | `cargo-near` | 0.23.0 | crates.io (the docs cite 0.16.1 as tested: dev-contrats confirms) |
+| Testnet RPC | `https://test.rpc.fastnear.com` | — | docs.near.org/api/rpc/providers |
+| AI | NEAR AI Cloud, `https://cloud-api.near.ai/v1` | OpenAI-compatible | SPECS C-01 to C-06 |
+| Frontend | HTML + ES modules + CSS, no build | — | D-009 |
 
-Pas de base de données : l'état vit en mémoire dans le moteur, l'historique dans `data/journal.jsonl` (la simulation repart de zéro à chaque lancement en V1). Pas de Docker nécessaire.
+No database: state lives in memory in the engine, history in `data/journal.jsonl` (in V1 the simulation restarts from zero at every launch). No Docker needed.
 
-Contrainte locale constatée : `rustc`/`cargo` ne sont pas installés sur la machine de développement. Le mode mock n'en a pas besoin ; le dev-contrats installe la chaîne d'outils (gratuit) ou active le repli D-016.
+Local constraint observed: `rustc`/`cargo` are not installed on the development machine. Mock mode does not need them; dev-contrats installs the toolchain (free) or enables the fallback D-016.
 
-## 3. Vue d'ensemble
+## 3. Overview
 
 ```
-                       navigateur  (frontend/ : HTML + ES modules)
+                       browser  (frontend/ : HTML + ES modules)
                           |  GET /api/state, POST /api/tasks      ^ SSE /api/stream
                           v                                       |
  +--------------------------------------------------------------------------+
- | backend/  (Hono)  composition root : construit Config, Chain, Brain,     |
- |                   Journal, Market, Engine ; expose REST + SSE + statique |
+ | backend/  (Hono)  composition root: builds Config, Chain, Brain,         |
+ |                   Journal, Market, Engine; exposes REST + SSE + static   |
  +------+-------------------+----------------------+------------------------+
         |                   |                      |
    engine/  <----------->  market/               intents/ (V2, flag off)
-   cycle de vie, ticks,    tâches, enchères,
-   génome, économie        séquestre, validation,
-        |    |             réputation
+   life cycle, ticks,      tasks, auctions,
+   genome, economy         escrow, validation,
+        |    |             reputation
         |    +--------------+
         v                   v
      brain/ (Brain)     accounts/ (Chain)  ---->  contracts/darwin (Rust, testnet)
      MockBrain          MockChain
      NearAiBrain        NearChain (near-api-js)
         ^                   ^
-        +----  shared/  ----+   types, interfaces, mocks, config, journal, argent
+        +----  shared/  ----+   types, interfaces, mocks, config, journal, money
 ```
 
-## 4. Modules et frontières
+## 4. Modules and boundaries
 
-| Dossier | Propriétaire | Exporte | Peut importer | Ne doit pas |
+| Folder | Owner | Exports | May import | Must not |
 |---|---|---|---|---|
-| `shared/` | architecte | types, `Chain`, `Brain`, `Market`, `Engine`, `Intents`, `Journal`, `Config`, `MockChain`, `MockBrain`, utilitaires (`money`, `rng`, `hash`) | `zod`, `node:crypto` | importer un autre module ; lire `process.env` hors de `loadConfig` |
-| `contracts/darwin/` | dev-contrats | contrat WASM (§10) | Rust uniquement | être requis par le mode mock |
-| `accounts/` | dev-comptes-wallets | `createChain(config): Chain` ; `NearChain` | `shared`, `near-api-js` (import dynamique) | contenir de la logique de marché ou d'évolution ; journaliser une clé |
-| `brain/` | dev-cerveau-ia | `createBrain(config): Brain` ; `NearAiBrain` (+ prompts) | `shared` | débiter un solde (c'est le rôle de l'engine) ; coder un id de modèle sans le vérifier via `/v1/models` |
-| `market/` | dev-marche | `createMarket(deps): Market` | `shared` (donc `Chain` pour séquestre/réputation) | connaître le génome ou le cycle de vie ; appeler `Brain` pour exécuter les tâches |
-| `engine/` | dev-moteur-evolution | `createEngine(deps, market): Engine` ; génome, mutation, lettre, métabolisme | `shared`, interface `Market` | importer `accounts/` ou `brain/` directement (injection) ; émettre un événement hors catalogue |
-| `intents/` | dev-intents | `createIntents(config): Intents` (mock + 1Click `dry:true`) | `shared` | `dry:false`, dépôt, signature mainnet ; démarrer si `INTENTS_ENABLED!=true` |
-| `backend/` | dev-backend | `main.ts`, app Hono, SSE, persistance du journal, scripts de lancement | tout (composition root) | contenir des règles métier |
-| `frontend/` | dev-frontend | pages statiques | HTTP/SSE uniquement (jamais d'import TS des autres dossiers ; types recopiés en JSDoc) | parler à la chaîne ou à l'IA directement |
-| `tests/e2e/` | qa | scénarios bout en bout (démarrent le backend en mock) | tout | modifier le code testé |
-| `scripts/` | securite (`scan-secrets.*`), dev-backend (lancement) | scripts utilitaires | — | embarquer un secret |
+| `shared/` | architect | types, `Chain`, `Brain`, `Market`, `Engine`, `Intents`, `Journal`, `Config`, `MockChain`, `MockBrain`, utilities (`money`, `rng`, `hash`) | `zod`, `node:crypto` | import another module; read `process.env` outside `loadConfig` |
+| `contracts/darwin/` | dev-contrats | WASM contract (§10) | Rust only | be required by mock mode |
+| `accounts/` | dev-comptes-wallets | `createChain(config): Chain`; `NearChain` | `shared`, `near-api-js` (dynamic import) | contain market or evolution logic; log a key |
+| `brain/` | dev-cerveau-ia | `createBrain(config): Brain`; `NearAiBrain` (+ prompts) | `shared` | debit a balance (that is the engine's role); hard-code a model id without checking it via `/v1/models` |
+| `market/` | dev-marche | `createMarket(deps): Market` | `shared` (hence `Chain` for escrow/reputation) | know the genome or the life cycle; call `Brain` to execute tasks |
+| `engine/` | dev-moteur-evolution | `createEngine(deps, market): Engine`; genome, mutation, letter, metabolism | `shared`, `Market` interface | import `accounts/` or `brain/` directly (injection); emit an event outside the catalogue |
+| `intents/` | dev-intents | `createIntents(config): Intents` (mock + 1Click `dry:true`) | `shared` | `dry:false`, deposit, mainnet signing; start if `INTENTS_ENABLED!=true` |
+| `backend/` | dev-backend | `main.ts`, Hono app, SSE, journal persistence, launch scripts | everything (composition root) | contain business rules |
+| `frontend/` | dev-frontend | static pages | HTTP/SSE only (never a TS import from other folders; types copied as JSDoc) | talk to the chain or the AI directly |
+| `tests/e2e/` | qa | end-to-end scenarios (start the backend in mock) | everything | modify the code under test |
+| `scripts/` | securite (`scan-secrets.*`), dev-backend (launch) | utility scripts | — | embed a secret |
 
-Tests unitaires : à côté du code (`engine/xxx.test.ts`, `market/xxx.test.ts`, `shared/shared.test.ts`), lancés par `npm test` (vitest trouve tous les `*.test.ts`). Tests e2e : `tests/e2e/*.test.ts`.
+Unit tests: next to the code (`engine/xxx.test.ts`, `market/xxx.test.ts`, `shared/shared.test.ts`), run by `npm test` (vitest finds all `*.test.ts`). E2E tests: `tests/e2e/*.test.ts`.
 
-## 5. Structure définitive des dossiers
+## 5. Final folder structure
 
 ```
 Darwin/
   CLAUDE.md  README.md  LICENSE(*)  package.json  tsconfig.json  .env.example  .gitignore
   docs/            SPECS, CONFORMITE, ARCHITECTURE, DECISIONS, PLAN, STATUS, BESOINS_HUMAIN, SECURITE, ...
   shared/          index.ts money.ts rng.ts hash.ts types.ts events.ts chain.ts brain.ts bus.ts
-                   config.ts modules.ts mock/{mock-chain.ts,mock-brain.ts} shared.test.ts     (fait, L1)
+                   config.ts modules.ts mock/{mock-chain.ts,mock-brain.ts} shared.test.ts     (done, L1)
   contracts/darwin/  Cargo.toml  src/{lib.rs,registry.rs,escrow.rs,reputation.rs}  tests/        (L3)
   accounts/        index.ts (createChain)  near-chain.ts  keys.ts                                 (L2)
   brain/           index.ts (createBrain)  near-ai-brain.ts  prompts.ts                            (L5)
@@ -91,77 +91,77 @@ Darwin/
   intents/         index.ts (createIntents)  mock-intents.ts  oneclick.ts                          (L9)
   backend/         main.ts  app.ts  sse.ts  journal-store.ts  state.ts                             (L7)
   frontend/        index.html  app.js  tree.js  style.css                                          (L8)
-  scripts/         scan-secrets.mjs  (+ lancement si besoin)
+  scripts/         scan-secrets.mjs  (+ launch scripts if needed)
   tests/e2e/       *.test.ts                                                                       (L12)
-  data/            journal.jsonl (exécution, ignoré par git)
+  data/            journal.jsonl (runtime, ignored by git)
 ```
-(*) `LICENSE` obligatoire (SPECS L-02) : à la charge du rédacteur / chef de projet (MIT proposé).
+(*) `LICENSE` is mandatory (SPECS L-02): the writer / project lead is responsible (MIT proposed).
 
-Imports : toujours avec l'extension `.ts` (`import { X } from "../shared/index.ts"`). `tsconfig.json` couvre tous les dossiers sauf `frontend/` et `contracts/`.
+Imports: always with the `.ts` extension (`import { X } from "../shared/index.ts"`). `tsconfig.json` covers all folders except `frontend/` and `contracts/`.
 
 ## 6. Interfaces
 
-Tout est défini dans `shared/` (code compilé et testé). Résumé ; le détail des signatures est dans le code.
+Everything is defined in `shared/` (compiled and tested code). Summary; the signature details are in the code.
 
 ### 6.1 `Chain` (`shared/chain.ts`)
-- Comptes : `createAccount({label, initialFunding, fundFrom?})` -> sous-compte `label.<maître>` ; `getBalance` ; `transfer` ; `closeAccount` (mort : solde restant renvoyé au bénéficiaire, compte clos).
-- Registre : `registerAgent` (génome + hash, lignée), `markAgentDead`, `getAgentRecord`, `listAgentRecords` : la lignée est conservée après la mort.
-- Séquestre : `lockEscrow` -> `releaseEscrow` (preuve obligatoire, sinon `ChainError PROOF_REQUIRED`) ou `refundEscrow` (motifs `rejected` ou `expired` uniquement, comme le contrat).
-- Réputation : `addReputation` (delta entier non nul, |delta| <= 100 ; crédit seulement après séquestre libéré vers cet agent avec `proofHash` = `resultHash` ; malus seulement après remboursement ; une écriture par tâche et agent, sinon `REPUTATION_EXISTS`), `getReputation`. `MockChain` applique ces règles (D-031).
-- Codes d'erreur notables : `SPEND_CAP_EXCEEDED` (plafond de dépense de `NearChain`, distinct de `INSUFFICIENT_FUNDS`).
-- `AgentRecord.accountId` est le compte payeur (coûts, séquestre) et bénéficiaire (paiements) de l'agent. `getEscrow(taskId)` renvoie `{taskId, payer, amount, status}` (D-030).
-- Toute opération d'écriture renvoie un `TxReceipt` (`hash`, `explorerUrl?`) ; les erreurs sont des `ChainError` typées.
-- Implémentations : `MockChain` (fait ; invariant testé : somme comptes + séquestres constante) ; `NearChain` (L2/L3). Fabrique unique `createChain(config)` dans `accounts/index.ts`.
+- Accounts: `createAccount({label, initialFunding, fundFrom?})` -> sub-account `label.<master>`; `getBalance`; `transfer`; `closeAccount` (death: remaining balance returned to the beneficiary, account closed).
+- Registry: `registerAgent` (genome + hash, lineage), `markAgentDead`, `getAgentRecord`, `listAgentRecords`: the lineage is kept after death.
+- Escrow: `lockEscrow` -> `releaseEscrow` (proof mandatory, otherwise `ChainError PROOF_REQUIRED`) or `refundEscrow` (reasons `rejected` or `expired` only, like the contract).
+- Reputation: `addReputation` (non-zero integer delta, |delta| <= 100; credit only after escrow released to that agent with `proofHash` = `resultHash`; penalty only after a refund; one write per task and agent, otherwise `REPUTATION_EXISTS`), `getReputation`. `MockChain` applies these rules (D-031).
+- Notable error codes: `SPEND_CAP_EXCEEDED` (spending cap of `NearChain`, distinct from `INSUFFICIENT_FUNDS`).
+- `AgentRecord.accountId` is the agent's paying account (costs, escrow) and beneficiary account (payments). `getEscrow(taskId)` returns `{taskId, payer, amount, status}` (D-030).
+- Every write operation returns a `TxReceipt` (`hash`, `explorerUrl?`); errors are typed `ChainError`s.
+- Implementations: `MockChain` (done; tested invariant: sum of accounts + escrows constant); `NearChain` (L2/L3). Single factory `createChain(config)` in `accounts/index.ts`.
 
 ### 6.2 `Brain` (`shared/brain.ts`)
-- `listModels()` (ids + prix USD/Mtok, lus depuis `GET /v1/models`), `defaultModel()`, `complete({agentId, purpose, model, messages, maxTokens})` -> `{text, usage, model, mock}`.
-- Le Brain ne débite rien. L'engine appelle `costYocto(usage, prix, nearUsdRate)` (`shared/money.ts`) et émet `brain.charged` + débite l'agent (D-013).
-- `NearAiBrain` : `POST {NEARAI_BASE_URL}/chat/completions`, en-tête `Authorization: Bearer ${NEARAI_API_KEY}`, `usage.completion_tokens_details.reasoning_tokens` (alias `reasoning_tokens`) à lire ; si `/v1/models` n'a pas le modèle du gène : `BrainError UNKNOWN_MODEL`, repli sur `defaultModel()`. Sans clé : `createBrain` renvoie `MockBrain`.
+- `listModels()` (ids + USD/Mtok prices, read from `GET /v1/models`), `defaultModel()`, `complete({agentId, purpose, model, messages, maxTokens})` -> `{text, usage, model, mock}`.
+- The Brain debits nothing. The engine calls `costYocto(usage, price, nearUsdRate)` (`shared/money.ts`), emits `brain.charged` and debits the agent (D-013).
+- `NearAiBrain`: `POST {NEARAI_BASE_URL}/chat/completions`, header `Authorization: Bearer ${NEARAI_API_KEY}`, `usage.completion_tokens_details.reasoning_tokens` (alias `reasoning_tokens`) must be read; if `/v1/models` does not have the gene's model: `BrainError UNKNOWN_MODEL`, fallback to `defaultModel()`. Without a key: `createBrain` returns `MockBrain`.
 
 ### 6.3 `Market`, `Engine`, `Intents` (`shared/modules.ts`)
-- `Deps` = `{config, chain, brain, journal, rng, now}` injecté dans toutes les fabriques.
-- `Market` : `postTask`, `placeBid`, `step(tick)`, `submitResult` (valide puis libère ou rembourse), `getTask`, `listTasks`, `openTasks`.
-- `Engine` : `start/pause/resume/stop`, `tick()` (un tick sans horloge, pour les tests), `getState(): SimState`.
-- `Intents` : `quoteDry` seulement.
+- `Deps` = `{config, chain, brain, journal, rng, now}` injected into all factories.
+- `Market`: `postTask`, `placeBid`, `step(tick)`, `submitResult` (validates, then releases or refunds), `getTask`, `listTasks`, `openTasks`.
+- `Engine`: `start/pause/resume/stop`, `tick()` (one tick without a clock, for tests), `getState(): SimState`.
+- `Intents`: `quoteDry` only.
 
-### 6.3b Propriété des comptes de service et temps (D-027 à D-029)
-- `chain.tx` en mock : `MockChain` n'a pas de journal ; c'est le moteur (`createEngine(deps, market, { emitChainTx: true })`, type `EngineOptions`) qui émet `chain.tx` pour ses transferts. Le backend n'enveloppe pas `MockChain`. Avec `NearChain`, `accounts/` émet déjà : option à false.
-- (D-029) Le marché possède, crée et finance les comptes `sim-client` et `visitors` (`Chain.createAccount`, financement depuis le maître, `funding.received` source `master`/`demo`). Il déduit le tick courant du dernier `step(tick)` ou du journal (pas d'horloge injectée en plus).
-- Calibrage demo : `nearUsdRate` = 0.01 pour que le gène « modèle » pèse dans l'économie (un appel `mock/large` ≈ 0,07 NEAR, `mock/small` ≈ 0,01 NEAR, contre un métabolisme de 0,08/tick). Voir D-028.
+### 6.3b Ownership of service accounts and time (D-027 to D-029)
+- `chain.tx` in mock: `MockChain` has no journal; it is the engine (`createEngine(deps, market, { emitChainTx: true })`, type `EngineOptions`) that emits `chain.tx` for its transfers. The backend does not wrap `MockChain`. With `NearChain`, `accounts/` already emits: option set to false.
+- (D-029) The market owns, creates and funds the `sim-client` and `visitors` accounts (`Chain.createAccount`, funding from the master, `funding.received` source `master`/`demo`). It infers the current tick from the last `step(tick)` or from the journal (no additional injected clock).
+- Demo calibration: `nearUsdRate` = 0.01 so that the "model" gene weighs on the economy (one `mock/large` call ≈ 0.07 NEAR, `mock/small` ≈ 0.01 NEAR, against a metabolism of 0.08/tick). See D-028.
 
-### 6.4 Division du travail agent <-> marché
-L'agent (engine) décide : enchérir ou non, à quel prix (`askRatio` du génome x budget, borné par son coût IA estimé), exécuter (appel `Brain`, coût débité), sous-traiter (créer une tâche fille via `Market.postTask` avec `requester:{kind:"agent"}`). Le marché ne connaît que des identifiants d'agents et des comptes.
+### 6.4 Division of labour agent <-> market
+The agent (engine) decides: whether to bid, at what price (genome `askRatio` x budget, bounded by its estimated AI cost), to execute (`Brain` call, cost debited), to subcontract (create a child task via `Market.postTask` with `requester:{kind:"agent"}`). The market only knows agent identifiers and accounts.
 
-## 7. Schémas de données (`shared/types.ts`)
+## 7. Data schemas (`shared/types.ts`)
 
-Tous sérialisables en JSON ; montants = `Yocto` (chaîne d'entier).
+All JSON-serializable; amounts = `Yocto` (integer string).
 
-| Objet | Champs principaux |
+| Object | Main fields |
 |---|---|
-| **Genome** | `profession` (writer, translator, summarizer, analyst, coder), `model`, `askRatio` [0.3-1] (prix demandé / budget), `risk` [0-1], `reproThreshold` [1.2-4] (multiple du capital de naissance), `generosity` [0-0.6] (part de capital en plus donnée à l'enfant), `cooperation` [0-1] (sous-traitance), `personality` (prompt système). Validé par `GenomeSchema`, bornes dans `GENOME_BOUNDS`. |
+| **Genome** | `profession` (writer, translator, summarizer, analyst, coder), `model`, `askRatio` [0.3-1] (asking price / budget), `risk` [0-1], `reproThreshold` [1.2-4] (multiple of birth capital), `generosity` [0-0.6] (share of extra capital given to the child), `cooperation` [0-1] (subcontracting), `personality` (system prompt). Validated by `GenomeSchema`, bounds in `GENOME_BOUNDS`. |
 | **Agent** | `id` (a-0001), `name`, `accountId`, `generation`, `parentId`, `childrenIds`, `genome`, `status` (alive/dead), `birthTick/deathTick`, `bornAt/diedAt`, `causeOfDeath` (starvation/manual/reset), `birthCapital`, `balance`, `earned`, `spentBrain`, `reputation`, `tasksDone`, `letterId`, `birthTx`. |
 | **Task** | `id` (t-0001), `requester` (`visitor` / `simulated` / `agent`), `parentTaskId?`, `profession`, `title`, `prompt`, `budget`, `status` (posted, awarded, submitted, settled, rejected, expired), `createdTick`, `biddingEndsTick`, `deadlineTick`, `winnerId`, `winningBidId`, `bidIds`, `escrowId`, `result{text,resultHash,submittedTick}`, `validation`. |
 | **Bid** | `id`, `taskId`, `agentId`, `price`, `etaTicks`, `pitch?`, `tick`, `won?`. |
 | **Escrow** | `id` (= taskId), `taskId`, `payer`, `payee?`, `amount`, `status` (locked/released/refunded), `lockTx`, `settleTx`, `proof{resultHash,verdict:"accepted",validator}`. |
-| **Validation** | `verdict` (accepted/rejected), `score` [0-1], `validator` (`brain:<modèle>` / `rule:<nom>` / `visitor`), `reason`, `resultHash`, `tick`. |
+| **Validation** | `verdict` (accepted/rejected), `score` [0-1], `validator` (`brain:<model>` / `rule:<name>` / `visitor`), `reason`, `resultHash`, `tick`. |
 | **Letter** | `id` (l-0001), `fromAgentId`, `toAgentId`, `generation`, `text`, `model`, `mock`, `tick`, `createdAt`. |
 | **DarwinEvent** | `{seq, ts, tick, type, data}` (§8). |
-| **TaskInput** (formulaire visiteur, `TaskInputSchema`) | `title` 3-120, `prompt` 10-4000, `profession`, `budgetNear` (décimal, borné par `DARWIN_TASK_BUDGET_MIN/MAX`), `requesterLabel`. |
+| **TaskInput** (visitor form, `TaskInputSchema`) | `title` 3-120, `prompt` 10-4000, `profession`, `budgetNear` (decimal, bounded by `DARWIN_TASK_BUDGET_MIN/MAX`), `requesterLabel`. |
 
-Règle de désignation des tâches : attribution au meilleur score = prix bas, départagé par réputation (détail laissé à dev-marche, documenté dans `market/`).
+Task award rule: award to the best score = lowest price, ties broken by reputation (details left to dev-marche, documented in `market/`).
 
-## 8. Catalogue d'événements (`shared/events.ts`, type `EventCatalog`)
+## 8. Event catalogue (`shared/events.ts`, type `EventCatalog`)
 
-Journal append-only, `seq` croissant sans trou. Ajouter un type exige de modifier `EventCatalog` + `EVENT_TYPES` + ce tableau.
+Append-only journal, `seq` increasing without gaps. Adding a type requires modifying `EventCatalog` + `EVENT_TYPES` + this table.
 
-| Type | Émis par | Charge utile (`data`) |
+| Type | Emitted by | Payload (`data`) |
 |---|---|---|
 | `sim.started` | engine | mode, preset, seed, chain, brain |
 | `sim.paused` / `sim.resumed` | engine | — |
 | `sim.stopped` | engine | reason (extinction/manual/max_ticks/error), generations |
 | `sim.tick` | engine | alive, tasksOpen, totalBalance |
-| `agent.born` | engine | agent complet, parentId, birthTx |
-| `agent.reproduced` | engine | parentId, childId, transferred, mutations (gène -> [avant, après]) |
+| `agent.born` | engine | full agent, parentId, birthTx |
+| `agent.reproduced` | engine | parentId, childId, transferred, mutations (gene -> [before, after]) |
 | `agent.died` | engine | agentId, cause, finalBalance, swept, sweptTo, tx |
 | `letter.written` | engine | letter |
 | `task.posted` | market | task |
@@ -178,139 +178,139 @@ Journal append-only, `seq` croissant sans trou. Ajouter un type exige de modifie
 | `brain.charged` | engine | agentId, purpose, model, promptTokens, completionTokens, reasoningTokens, cost, costUsd, nearUsdRate, priceSource (`models`/`mock`), mock, tx |
 | `balance.changed` | engine | agentId, balance, delta, reason (metabolism/brain/task/birth/...) |
 | `funding.received` | engine/backend | to, amount, source (master/faucet/demo), tx |
-| `chain.tx` | accounts (NearChain, journal injecté) ; engine en mock (`emitChainTx`, D-027) | kind, from, to, amount, hash, explorerUrl : alimente le « flux de transactions » de l'UI |
-| `intents.quote` | intents | devis `dry:true` seulement |
-| `system.warning` / `system.error` | tous | code, message (jamais de secret) |
+| `chain.tx` | accounts (NearChain, injected journal); engine in mock (`emitChainTx`, D-027) | kind, from, to, amount, hash, explorerUrl: feeds the UI "transaction feed" |
+| `intents.quote` | intents | `dry:true` quote only |
+| `system.warning` / `system.error` | all | code, message (never a secret) |
 
-Règle : tout événement qui touche à l'argent porte un `tx`/`hash` (mock ou réel) pour que l'UI affiche le flux de transactions.
+Rule: every event that touches money carries a `tx`/`hash` (mock or real) so that the UI shows the transaction feed.
 
-## 9. Temps réel et API
+## 9. Real time and API
 
-**Flux : SSE** (D-008). `GET /api/stream` : `Content-Type: text/event-stream` ; chaque message `id: <seq>`, `event: <type>`, `data: <DarwinEvent JSON>` ; en-tête `Last-Event-ID` (ou `?since=<seq>`) rejoue les événements manquants ; commentaire `: ping` toutes les 15 s. Initialisation côté client : `GET /api/state` (`SimState.lastSeq`), puis `EventSource` depuis `lastSeq`.
+**Stream: SSE** (D-008). `GET /api/stream`: `Content-Type: text/event-stream`; each message `id: <seq>`, `event: <type>`, `data: <DarwinEvent JSON>`; the `Last-Event-ID` header (or `?since=<seq>`) replays missed events; `: ping` comment every 15 s. Client-side initialisation: `GET /api/state` (`SimState.lastSeq`), then `EventSource` from `lastSeq`.
 
-| Route | Rôle |
+| Route | Role |
 |---|---|
 | `GET /api/health` | `{ok, mode, chain, brain, tick, escrow: "contract" \| "operator-account"}` (D-022) |
-| `GET /api/config` | configuration publique (`redactConfig`) |
-| `GET /api/state` | `SimState` complet |
-| `GET /api/agents`, `/api/agents/:id` | agents (vivants et morts), détail + lignée |
-| `GET /api/lineage` | arbre `{id, parentId, generation, status}` pour l'arbre généalogique |
-| `GET /api/letters/:id`, `/api/agents/:id/letter` | lettre parent -> enfant |
-| `GET /api/tasks`, `/api/tasks/:id` | tâches, offres, séquestre, validation |
-| `POST /api/tasks` | formulaire visiteur ; corps = `TaskInput` ; 201 + `Task`, 400 si invalide (erreurs zod), 429 au-delà de 10 tâches ouvertes par IP |
-| `GET /api/events?since=&limit=` | journal paginé |
-| `POST /api/sim/start|pause|resume|stop` | contrôle ; exige `Authorization: Bearer ${DARWIN_ADMIN_TOKEN}` ; le token est OBLIGATOIRE dès que `HOST` n'est pas `127.0.0.1` (démarrage refusé sinon, D-023) |
-| `GET /*` | statique `frontend/` |
+| `GET /api/config` | public configuration (`redactConfig`) |
+| `GET /api/state` | full `SimState` |
+| `GET /api/agents`, `/api/agents/:id` | agents (alive and dead), detail + lineage |
+| `GET /api/lineage` | tree `{id, parentId, generation, status}` for the family tree |
+| `GET /api/letters/:id`, `/api/agents/:id/letter` | parent -> child letter |
+| `GET /api/tasks`, `/api/tasks/:id` | tasks, bids, escrow, validation |
+| `POST /api/tasks` | visitor form; body = `TaskInput`; 201 + `Task`, 400 if invalid (zod errors), 429 beyond 10 open tasks per IP |
+| `GET /api/events?since=&limit=` | paginated journal |
+| `POST /api/sim/start|pause|resume|stop` | control; requires `Authorization: Bearer ${DARWIN_ADMIN_TOKEN}`; the token is MANDATORY whenever `HOST` is not `127.0.0.1` (startup refused otherwise, D-023) |
+| `GET /*` | static `frontend/` |
 
-Le serveur écoute `127.0.0.1:3000` par défaut. Aucune route ne renvoie un secret ni la configuration brute.
+The server listens on `127.0.0.1:3000` by default. No route returns a secret or the raw configuration.
 
-## 10. Contrat NEAR `contracts/darwin` (Rust, near-sdk 5.30.1)
+## 10. NEAR contract `contracts/darwin` (Rust, near-sdk 5.30.1)
 
-Un contrat, trois modules, un opérateur (le compte maître). Méthodes minimales :
-- Registre : `register_agent(record)`, `mark_dead(agent_id, death_tick, cause)`, vues `get_agent`, `list_agents(from,limit)`.
-- Séquestre : `lock_escrow(task_id, payer)` payable (le dépôt est reçu par le contrat) , `release_escrow(task_id, payee, proof)` (preuve non vide, verdict `accepted`), `refund_escrow(task_id, reason)`, vue `get_escrow`.
-- Réputation : `add_reputation(agent_id, task_id, delta, proof_hash)`, vue `get_reputation`.
-- Garde : seuls l'opérateur et (pour `lock_escrow`) le payeur autorisé appellent les écritures. Événements NEP-297 en JSON pour chaque écriture.
-- Hypothèse à confirmer par dev-contrats : le payeur de `lock_escrow` est un sous-compte détenu par le moteur ; le moteur signe donc pour les sous-comptes (clés générées par `accounts/`, stockées hors dépôt, jamais journalisées).
+One contract, three modules, one operator (the master account). Minimal methods:
+- Registry: `register_agent(record)`, `mark_dead(agent_id, death_tick, cause)`, views `get_agent`, `list_agents(from,limit)`.
+- Escrow: `lock_escrow(task_id, payer)` payable (the deposit is received by the contract), `release_escrow(task_id, payee, proof)` (non-empty proof, verdict `accepted`), `refund_escrow(task_id, reason)`, view `get_escrow`.
+- Reputation: `add_reputation(agent_id, task_id, delta, proof_hash)`, view `get_reputation`.
+- Guard: only the operator and (for `lock_escrow`) the authorised payer call the write methods. NEP-297 JSON events for every write.
+- Assumption to be confirmed by dev-contrats: the payer of `lock_escrow` is a sub-account held by the engine; the engine therefore signs for sub-accounts (keys generated by `accounts/`, stored outside the repository, never logged).
 
-Mapping `Chain` -> contrat : `registerAgent` -> `register_agent` ; `lockEscrow` -> `lock_escrow` ; `releaseEscrow` -> `release_escrow` ; `addReputation` -> `add_reputation`. `createAccount`, `transfer`, `closeAccount` sont des actions de compte (sans contrat).
+`Chain` -> contract mapping: `registerAgent` -> `register_agent`; `lockEscrow` -> `lock_escrow`; `releaseEscrow` -> `release_escrow`; `addReputation` -> `add_reputation`. `createAccount`, `transfer`, `closeAccount` are account actions (no contract).
 
-## 11. Variables d'environnement
+## 11. Environment variables
 
-Détail commenté dans `.env.example` ; valeurs par défaut dans `shared/config.ts` (`loadConfig`). Les secrets sont marqués SECRET et n'apparaissent jamais dans les logs (`redactConfig`).
+Commented details in `.env.example`; default values in `shared/config.ts` (`loadConfig`). Secrets are marked SECRET and never appear in logs (`redactConfig`).
 
-| Groupe | Variables |
+| Group | Variables |
 |---|---|
 | Mode | `DARWIN_MODE` (mock/testnet), `DARWIN_PRESET` (normal/demo), `DARWIN_CHAIN` (mock/near), `DARWIN_BRAIN` (mock/nearai), `DARWIN_SEED` |
-| Serveur | `HOST`, `PORT`, `DARWIN_DATA_DIR`, `DARWIN_ADMIN_TOKEN` (SECRET, obligatoire si `HOST` != `127.0.0.1`), `DARWIN_VISITOR_HOURLY_CAP_NEAR` (plafond horaire du compte de démo, en NEAR ; lu dans `sim.visitorHourlyCap: bigint`, défauts : mock normal 20 / demo 30, testnet 0,5 ; D-025, D-026) |
+| Server | `HOST`, `PORT`, `DARWIN_DATA_DIR`, `DARWIN_ADMIN_TOKEN` (SECRET, mandatory if `HOST` != `127.0.0.1`), `DARWIN_VISITOR_HOURLY_CAP_NEAR` (hourly cap of the demo account, in NEAR; read into `sim.visitorHourlyCap: bigint`, defaults: mock normal 20 / demo 30, testnet 0.5; D-025, D-026) |
 | NEAR | `NEAR_NETWORK`, `NEAR_RPC_URL`, `NEAR_MASTER_ACCOUNT_ID`, `NEAR_MASTER_PRIVATE_KEY` (SECRET), `NEAR_CONTRACT_ID` |
 | NEAR AI Cloud | `NEARAI_API_KEY` (SECRET), `NEARAI_BASE_URL`, `NEARAI_MODEL`, `NEARAI_TIMEOUT_MS` |
-| Simulation | voir §12 |
+| Simulation | see §12 |
 | Intents | `INTENTS_ENABLED`, `INTENTS_BASE_URL`, `INTENTS_JWT` (SECRET), `INTENTS_DRY_ONLY` |
 
-Résolution (D-011) : `mock` (défaut) = chaîne et cerveau mock. `testnet` = chaîne `near` (exige `NEAR_MASTER_ACCOUNT_ID` et `NEAR_MASTER_PRIVATE_KEY`, sinon erreur claire au démarrage et ligne dans `docs/BESOINS_HUMAIN.md`) ; cerveau `nearai` si `NEARAI_API_KEY`, sinon mock + `system.warning`.
+Resolution (D-011): `mock` (default) = mock chain and brain. `testnet` = `near` chain (requires `NEAR_MASTER_ACCOUNT_ID` and `NEAR_MASTER_PRIVATE_KEY`, otherwise a clear error at startup and a line in `docs/BESOINS_HUMAIN.md`); `nearai` brain if `NEARAI_API_KEY`, otherwise mock + `system.warning`.
 
-## 12. Paramètres de simulation
+## 12. Simulation parameters
 
-Cible : **3 générations complètes en 3 à 5 minutes** avec `DARWIN_PRESET=demo` (mock). Montants en NEAR, durées en ticks. Défauts (mock) ; la table testnet est dans `shared/config.ts`.
+Target: **3 complete generations in 3 to 5 minutes** with `DARWIN_PRESET=demo` (mock). Amounts in NEAR, durations in ticks. Defaults (mock); the testnet table is in `shared/config.ts`.
 
-| Variable | normal | demo | Rôle |
+| Variable | normal | demo | Role |
 |---|---|---|---|
-| `DARWIN_TICK_MS` | 1000 | 400 | durée réelle d'un tick |
-| `DARWIN_FOUNDERS` | 4 | 4 | fondateurs (génération 1) |
-| `DARWIN_MAX_POPULATION` | 24 | 16 | plafond de population (pas de naissance au-delà) |
-| `DARWIN_MAX_TICKS` | 0 (infini) | 900 | arrêt automatique (900 x 0,4 s = 6 min) |
-| `DARWIN_BIRTH_CAPITAL` | 10 | 10 | capital de naissance |
-| `DARWIN_METABOLISM` | 0.05 | 0.08 | coût de vie par tick |
-| `DARWIN_MIN_VITAL` | 1 | 1.5 | sous ce solde : mort |
-| `DARWIN_REPRO_COOLDOWN_TICKS` | 20 | 10 | délai minimal entre deux enfants |
-| `DARWIN_SIM_CLIENT_RATE` | 1.2 | 1.5 | tâches simulées par tick (espérance) |
-| `DARWIN_TASK_BUDGET_MIN/MAX` | 0.5 / 2 | 0.5 / 2.5 | budget des tâches |
-| `DARWIN_BID_WINDOW_TICKS` | 2 | 1 | durée des enchères |
-| `DARWIN_TASK_DEADLINE_TICKS` | 8 | 5 | délai d'exécution |
-| `DARWIN_MUTATION_RATE` / `_SD` | 0.3 / 0.15 | 0.4 / 0.2 | mutation par gène / amplitude relative |
-| `DARWIN_NEAR_USD_RATE` | 3 | 0.01 (D-028) | USD par NEAR pour convertir le coût IA |
-| `DARWIN_MAX_TOKENS_PER_CALL` | 400 | 300 | plafond de tokens par appel IA |
-| `DARWIN_SETTLE_EVERY_TICKS` | 1 | 1 | regroupement des débits on-chain (4 en testnet) |
-| `DARWIN_VISITOR_HOURLY_CAP_NEAR` | 20 | 30 | plafond horaire du compte `visitors` (testnet : 0,5) ; 429 au-delà |
+| `DARWIN_TICK_MS` | 1000 | 400 | real duration of a tick |
+| `DARWIN_FOUNDERS` | 4 | 4 | founders (generation 1) |
+| `DARWIN_MAX_POPULATION` | 24 | 16 | population cap (no births beyond) |
+| `DARWIN_MAX_TICKS` | 0 (infinite) | 900 | automatic stop (900 x 0.4 s = 6 min) |
+| `DARWIN_BIRTH_CAPITAL` | 10 | 10 | birth capital |
+| `DARWIN_METABOLISM` | 0.05 | 0.08 | cost of living per tick |
+| `DARWIN_MIN_VITAL` | 1 | 1.5 | below this balance: death |
+| `DARWIN_REPRO_COOLDOWN_TICKS` | 20 | 10 | minimum delay between two children |
+| `DARWIN_SIM_CLIENT_RATE` | 1.2 | 1.5 | simulated tasks per tick (expectation) |
+| `DARWIN_TASK_BUDGET_MIN/MAX` | 0.5 / 2 | 0.5 / 2.5 | task budgets |
+| `DARWIN_BID_WINDOW_TICKS` | 2 | 1 | auction duration |
+| `DARWIN_TASK_DEADLINE_TICKS` | 8 | 5 | execution deadline |
+| `DARWIN_MUTATION_RATE` / `_SD` | 0.3 / 0.15 | 0.4 / 0.2 | mutation per gene / relative amplitude |
+| `DARWIN_NEAR_USD_RATE` | 3 | 0.01 (D-028) | USD per NEAR to convert the AI cost |
+| `DARWIN_MAX_TOKENS_PER_CALL` | 400 | 300 | token cap per AI call |
+| `DARWIN_SETTLE_EVERY_TICKS` | 1 | 1 | batching of on-chain debits (4 on testnet) |
+| `DARWIN_VISITOR_HOURLY_CAP_NEAR` | 20 | 30 | hourly cap of the `visitors` account (testnet: 0.5); 429 beyond |
 
-Ordre de grandeur voulu (à calibrer par dev-moteur, avec la QA) : un fondateur sans revenu meurt en environ (10 - 1,5) / 0,08 = 106 ticks ; un agent qui gagne en moyenne plus de 0,08 + coût IA par tick atteint le seuil de reproduction (`reproThreshold` x capital) avant le tick 60 ; la 3e génération naît avant le tick 300. Si le calibrage échoue, ajuster les presets (fichier `shared/config.ts`), pas le moteur.
+Intended order of magnitude (to be calibrated by dev-moteur with QA): a founder with no income dies in about (10 - 1.5) / 0.08 = 106 ticks; an agent earning on average more than 0.08 + AI cost per tick reaches the reproduction threshold (`reproThreshold` x capital) before tick 60; the 3rd generation is born before tick 300. If calibration fails, adjust the presets (file `shared/config.ts`), not the engine.
 
-Testnet : montants volontairement minuscules (capital 0.2-0.3 NEAR), ticks lents (3-4 s), débits regroupés ; le faucet limite le total disponible (https://near-faucet.io). Aucun montant n'est fixé par mémoire sur la quantité fournie : le dev-comptes documente ce que le faucet donne réellement.
+Testnet: deliberately tiny amounts (capital 0.2-0.3 NEAR), slow ticks (3-4 s), batched debits; the faucet limits the total available (https://near-faucet.io). No amount is fixed from memory regarding the quantity supplied: dev-comptes documents what the faucet actually gives.
 
-## 13. Boucle d'un tick (contrat de comportement du moteur)
+## 13. One tick loop (behaviour contract of the engine)
 
-1. Métabolisme : `DARWIN_METABOLISM` débité à chaque agent vivant (vers le compte maître ; regroupé si `settleEveryTicks > 1`, le solde logique = solde on-chain moins dettes en attente).
-2. Client simulé : tire `Poisson(simClientRatePerTick)` tâches (budget uniforme, profession aléatoire), `Market.postTask` avec `requester:{kind:"simulated"}`. Les tâches de visiteurs arrivent par `POST /api/tasks`.
-3. Enchères : chaque agent vivant libre de la bonne profession décide d'enchérir (`placeBid`) ; `Market.step(tick)` attribue.
-4. Exécution : le gagnant appelle `Brain.complete` (coût débité, événement `brain.charged`), puis `Market.submitResult`. Avec probabilité liée à `cooperation`, il sous-traite une partie.
-5. Validation et paiement : dans `submitResult` (preuve -> `releaseEscrow`, `addReputation`) ou remboursement.
-6. Reproduction : si solde >= `reproThreshold` x `birthCapital`, population < max, délai écoulé : enfant (mutation, capital = `birthCapital` + `generosity` x surplus, `Chain.createAccount` + `registerAgent`), puis lettre via `Brain` (`letter.written`).
-7. Mort : solde logique < `minVital` : `markAgentDead`, `closeAccount` vers le maître, `agent.died`. Si plus aucun vivant : `sim.stopped(extinction)`.
+1. Metabolism: `DARWIN_METABOLISM` debited from each living agent (to the master account; batched if `settleEveryTicks > 1`, logical balance = on-chain balance minus pending debts).
+2. Simulated client: draws `Poisson(simClientRatePerTick)` tasks (uniform budget, random profession), `Market.postTask` with `requester:{kind:"simulated"}`. Visitor tasks arrive via `POST /api/tasks`.
+3. Auctions: each free living agent of the right profession decides whether to bid (`placeBid`); `Market.step(tick)` awards.
+4. Execution: the winner calls `Brain.complete` (cost debited, `brain.charged` event), then `Market.submitResult`. With a probability tied to `cooperation`, it subcontracts part of the work.
+5. Validation and payment: inside `submitResult` (proof -> `releaseEscrow`, `addReputation`) or refund.
+6. Reproduction: if balance >= `reproThreshold` x `birthCapital`, population < max, cooldown elapsed: child (mutation, capital = `birthCapital` + `generosity` x surplus, `Chain.createAccount` + `registerAgent`), then letter via `Brain` (`letter.written`).
+7. Death: logical balance < `minVital`: `markAgentDead`, `closeAccount` to the master, `agent.died`. If no one is left alive: `sim.stopped(extinction)`.
 8. `sim.tick`.
 
-Tous les tirages passent par `Deps.rng` (graine `DARWIN_SEED`) : en mock, deux exécutions de même graine donnent le même journal (hors horodatages).
+All random draws go through `Deps.rng` (seed `DARWIN_SEED`): in mock, two runs with the same seed give the same journal (apart from timestamps).
 
-## 14. Commandes de lancement
+## 14. Launch commands
 
-| Besoin | Commande | Attendu |
+| Need | Command | Expected |
 |---|---|---|
-| Installer | `npm install` | aucune clé requise |
-| Lancer en mock | `npm start` | page sur http://127.0.0.1:3000 (lot L7 ; script défini dans `package.json`) |
-| Démo rapide mock | `npm run start:demo` | 3 générations en quelques minutes |
-| Tests | `npm test` | vitest, tous verts (11 tests déjà en place dans `shared/`) |
-| Types | `npm run typecheck` | `tsc --noEmit` sans erreur |
-| Testnet | copier `.env.example` vers `.env`, renseigner `NEAR_MASTER_ACCOUNT_ID`, `NEAR_MASTER_PRIVATE_KEY`, optionnellement `NEARAI_API_KEY`, puis `npm run start:testnet` | Node >= 22.22.2 requis |
-| Build contrat | `npm run contracts:build` | exige Rust + `cargo-near` ; inutile en mock |
-| Scan de secrets | `npm run scan-secrets` | script du lot sécurité |
+| Install | `npm install` | no key required |
+| Run in mock | `npm start` | page at http://127.0.0.1:3000 (work package L7; script defined in `package.json`) |
+| Quick mock demo | `npm run start:demo` | 3 generations in a few minutes |
+| Tests | `npm test` | vitest, all green (11 tests already in place in `shared/`) |
+| Types | `npm run typecheck` | `tsc --noEmit` with no error |
+| Testnet | copy `.env.example` to `.env`, fill in `NEAR_MASTER_ACCOUNT_ID`, `NEAR_MASTER_PRIVATE_KEY`, optionally `NEARAI_API_KEY`, then `npm run start:testnet` | Node >= 22.22.2 required |
+| Contract build | `npm run contracts:build` | requires Rust + `cargo-near`; unnecessary in mock |
+| Secret scan | `npm run scan-secrets` | security work package script |
 
-Les scripts `start*` pointent vers `backend/main.ts`, créé au lot L7 : avant L7 ils échouent (normal).
+The `start*` scripts point to `backend/main.ts`, created in work package L7: before L7 they fail (expected).
 
-## 15. Intents (V2, hors V1)
+## 15. Intents (V2, outside V1)
 
-`intents/` (lot L9) : `types.ts`, `base.ts`, `oneclick.ts` (client 1Click complet : `GET /v0/tokens`, `POST /v0/quote` en `dry:true` puis `dry:false`, `POST /v0/deposit/submit`, `GET /v0/status`), `guard.ts` (verrous), `proof.ts` (preuve de dépôt), `mock-intents.ts`, `demo.ts` (CLI : `tokens`, `dry`, `run`, `status`), `intents.test.ts`. Procédure humaine : `intents/DEMO_MAINNET.md`. Mainnet uniquement (Intents n'a pas de testnet) ; le code ne signe jamais, l'humain envoie le dépôt depuis son wallet.
+`intents/` (work package L9): `types.ts`, `base.ts`, `oneclick.ts` (complete 1Click client: `GET /v0/tokens`, `POST /v0/quote` with `dry:true` then `dry:false`, `POST /v0/deposit/submit`, `GET /v0/status`), `guard.ts` (locks), `proof.ts` (deposit proof), `mock-intents.ts`, `demo.ts` (CLI: `tokens`, `dry`, `run`, `status`), `intents.test.ts`. Human procedure: `intents/DEMO_MAINNET.md`. Mainnet only (Intents has no testnet); the code never signs, the human sends the deposit from their wallet.
 
-Verrous : `INTENTS_ENABLED=false` par défaut ; `dry:false` et `deposit/submit` refusés tant que `INTENTS_DRY_ONLY` n'est pas `false` (et feu vert écrit dans `docs/BESOINS_HUMAIN.md`) ; un devis `dry:true` identique est obligatoire avant `dry:false` ; plafond de 5 USD par opération (`maxUsd`) ; clé partenaire optionnelle `INTENTS_JWT` (en-tête `X-API-Key`, jamais journalisée).
+Locks: `INTENTS_ENABLED=false` by default; `dry:false` and `deposit/submit` refused as long as `INTENTS_DRY_ONLY` is not `false` (and written green light in `docs/BESOINS_HUMAIN.md`); an identical `dry:true` quote is mandatory before `dry:false`; cap of 5 USD per operation (`maxUsd`); optional partner key `INTENTS_JWT` (header `X-API-Key`, never logged).
 
-Preuve de dépôt : `verifyDeposit` n'émet une preuve que si `/v0/status` indique `SUCCESS` et recoupe NOTRE devis (correlationId, adresse de dépôt, destinataire, actifs, `amountOut >= minAmountOut`, hash de destination présent, aucun remboursement). Un crédit n'est possible qu'une fois par dépôt et jamais sans preuve émise par `verifyDeposit`. Aucune interaction avec la V1.
+Deposit proof: `verifyDeposit` only issues a proof if `/v0/status` reports `SUCCESS` and cross-checks OUR quote (correlationId, deposit address, recipient, assets, `amountOut >= minAmountOut`, destination hash present, no refund). A credit is only possible once per deposit and never without a proof issued by `verifyDeposit`. No interaction with V1.
 
-## 16. Qualité et sécurité transverses
+## 16. Cross-cutting quality and security
 
-- Aucun module n'écrit un secret dans un log, un événement ou une réponse HTTP (`redactConfig`, messages d'erreur sans clé).
-- Le journal est public par nature (affiché dans l'UI) : ne jamais y mettre de clé, de prompt système complet d'un visiteur ni d'adresse e-mail.
-- Entrées utilisateur : validées par zod (`TaskInputSchema`) ; textes échappés côté frontend (jamais `innerHTML` sur du contenu d'agent ou de visiteur).
-- Limites : 4000 caractères par prompt de tâche, 10 tâches ouvertes par IP, `maxTokensPerCall`.
+- No module writes a secret into a log, an event or an HTTP response (`redactConfig`, error messages without keys).
+- The journal is public by nature (shown in the UI): never put in it a key, a visitor's full system prompt or an e-mail address.
+- User input: validated by zod (`TaskInputSchema`); texts escaped on the frontend side (never `innerHTML` on agent or visitor content).
+- Limits: 4000 characters per task prompt, 10 open tasks per IP, `maxTokensPerCall`.
 
-## 17. Points à faire valider (gardien des specs) et risques
+## 17. Points to be validated (specs guardian) and risks
 
-Questions 1 à 5 tranchées par le gardien le 2026-11-09 (Avis L1, `docs/CONFORMITE.md`) ; décisions D-020 à D-025.
+Questions 1 to 5 settled by the guardian on 2026-11-09 (Opinion L1, `docs/CONFORMITE.md`); decisions D-020 to D-025.
 
-1. **Coût IA sur la chaîne (D-013) : ACCEPTÉ SOUS CONDITIONS (D-020).** Débit NEAR = représentation, pas un paiement à NEAR AI Cloud. `brain.charged` porte `costUsd`, `nearUsdRate`, `priceSource` ; prix inconnu = erreur (`assertValidPrice`), jamais un coût 0 silencieux ; les appels mock sont étiquetés `mock:true`.
-2. **Tokens de raisonnement (C-05) : RÈGLE DURCIE (D-021).** `billable = max(completion, total - prompt, reasoning, 0)` (`shared/money.ts`, testé). Reste à vérifier sur réponse réelle (dev-cerveau, L5) ; peut légèrement surestimer.
-3. **Modèle de confiance du séquestre (D-015) : ACCEPTÉ, divulgation obligatoire (D-024).** `validator` et `resultHash` journalisés, UI « validé par ».
-4. **Tâches de visiteurs financées par la démo (D-014) : ACCEPTÉ SOUS CONDITIONS (D-025).** `funding.received.source = "demo"` ; plafond horaire du compte `visitors.<maître>`.
-5. **Chaîne d'outils Rust absente (D-016) : REPLI SEULEMENT, échéance 2026-11-11 23:59 UTC (D-022).** Mode dégradé : badge permanent, `/api/health.escrow`.
-6. **Node >= 22.22.2 pour le testnet (D-005)** : à annoncer dans le README (J-01 : le juge IA doit pouvoir lancer au moins le mock sur Node 22.12+).
-7. **Faucet et URL d'explorateur testnet** : non vérifiés ici (`ChainInfo.explorerBase` laissé vide) ; dev-comptes les vérifie et les documente.
-8. **LICENSE (L-02)** absente du dépôt ; hors périmètre architecte, à confier au rédacteur.
-9. **Ancien constat** : plusieurs fichiers de coordination ont un encodage corrompu (D-019) ; à corriger par le chef de projet.
+1. **On-chain AI cost (D-013): ACCEPTED WITH CONDITIONS (D-020).** The NEAR debit = representation, not a payment to NEAR AI Cloud. `brain.charged` carries `costUsd`, `nearUsdRate`, `priceSource`; unknown price = error (`assertValidPrice`), never a silent cost of 0; mock calls are labelled `mock:true`.
+2. **Reasoning tokens (C-05): HARDENED RULE (D-021).** `billable = max(completion, total - prompt, reasoning, 0)` (`shared/money.ts`, tested). Still to be verified on a real response (dev-cerveau, L5); may slightly overestimate.
+3. **Escrow trust model (D-015): ACCEPTED, mandatory disclosure (D-024).** `validator` and `resultHash` journalled, UI "validated by".
+4. **Visitor tasks funded by the demo (D-014): ACCEPTED WITH CONDITIONS (D-025).** `funding.received.source = "demo"`; hourly cap on the `visitors.<master>` account.
+5. **Rust toolchain absent (D-016): FALLBACK ONLY, deadline 2026-11-11 23:59 UTC (D-022).** Degraded mode: permanent badge, `/api/health.escrow`.
+6. **Node >= 22.22.2 for testnet (D-005)**: to be announced in the README (J-01: the AI judge must be able to run at least the mock on Node 22.12+).
+7. **Faucet and testnet explorer URL**: not verified here (`ChainInfo.explorerBase` left empty); dev-comptes verifies and documents them.
+8. **LICENSE (L-02)** absent from the repository; outside the architect's scope, to be entrusted to the writer.
+9. **Earlier finding**: several coordination files have corrupted encoding (D-019); to be fixed by the project lead.
