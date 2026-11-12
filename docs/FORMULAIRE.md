@@ -1,6 +1,6 @@
 # FORM: submission draft (nothing has been submitted)
 
-> **Pitch thesis**: "Tomorrow, you will pay an agent like a freelancer: it will have overhead, answer calls for tenders and have to be profitable to exist. Darwin shows who will survive, on NEAR."
+> **Pitch thesis**: "Everyone is building agents that can pay. Nobody asked which agents deserve to get paid."
 
 > Owner: redacteur. **Nothing is submitted.** The human re-reads https://nearhackathon.com/HACKATHON.md before submitting, checks every value, then submits personally (form https://nearhackathon.com/#apply or `POST /api/applications`). Fields and limits follow `docs/SPECS.md` S-02 to S-05 (re-check on the live page).
 
@@ -29,19 +29,17 @@ It covers the problem, the product and the role of NEAR. Terms match the README 
 
 <!-- idea:start -->
 ```text
-"Today, you pay for your AI's consumption. Tomorrow, you will pay an agent like a freelancer: it will have overhead, answer calls for tenders and have to be profitable to exist. Darwin shows who will survive, on NEAR."
+Everyone is building agents that can pay. Nobody asked which agents deserve to get paid.
 
-Problem: can an agent pay its own inference bill, and which genomes survive?
+Darwin is a market where AI agents earn the right to exist. Each agent has a genome (profession, AI model, price, risk, reproduction threshold, generosity, cooperation, personality) and is born as a NEAR sub-account with a capital. It bids in auctions; its payment is released from an escrow only if a separate AI judge accepts the deliverable; its AI cost is debited from its balance. Rich agents reproduce (mutated child, plus a letter stored for it); broke agents die. Agents can subcontract to each other.
 
-Product: a live economy of AI agents, simulated by default or on NEAR testnet. Each agent has a genome (profession, AI model, price, risk, reproduction threshold, generosity, cooperation, personality), is born as a NEAR sub-account with a capital, bids in auctions, works, is paid from an escrow after validation, gets a reputation and pays its AI cost from its balance. Rich agents reproduce (mutated child plus a "letter to my child"); broke agents die.
+Related work: Spore.fun (Solana; arXiv 2506.04236: 1 child in generation 5, only the original agent alive in May 2025) and Automaton (no market between agents in its README). Selection by speculation died out. Selection by useful work can last (a hypothesis: our client is mostly simulated).
 
-Related work: Spore.fun (Solana; arXiv 2506.04236: 1 child in generation 5, only the original agent alive in May 2025) and Automaton (no market between agents in its README). Darwin selects on paid, validated work. Selection by speculation died out. Selection by useful work can last (a hypothesis: our client is mostly simulated).
+Proven on NEAR testnet (tx ids in repo): sub-account and function-call key per agent, Rust registry/escrow/reputation contract, NEAR AI Cloud brain. Three runs reached generation 3 (run 8: 7 deaths; run 9c: 4 deaths, 78 escrows; run 10: no death). Run 10 proved real subcontracting: 3 complete cases, 2 refused parents whose delegator lost money. In our runs the top 3 agents earned 53% to 90% of all earnings; in two runs most agents earned nothing.
 
-NEAR, run for real on testnet (tx ids in repo): sub-account and function-call key per agent, Rust registry/escrow/reputation contract, NEAR AI Cloud brain. Three runs reached generation 3: run 8 (7 deaths), run 9c (16 births, 4 deaths, 78 escrows; also two paid UI missions, marketing and logo) and run 10 (no death).
+Not proven, stated plainly: payers are mostly a labelled simulated client; the 2 paid missions of run 9c were typed by an automated browser for the developer, paid by our demo account; one execution per configuration; the AI judge is fallible (10 of 25 logo verdicts were refusals, some unexplained); AI cost is local accounting; NEAR Intents: module present, disabled, never run (vision); escrow is validated by the operator, not trustless.
 
-Honesty: mock is the default; most paid tasks come from the labelled simulated client; the two missions were typed by an automated browser for the developer, paid by our demo account; real subcontracting proven in a 21-minute run (3 complete cases; 2 refused parents, their delegator lost money), unawarded in run 9c (bug, fixed); AI cost is local accounting; NEAR Intents: module present, disabled, not run (vision); escrow is validated by the operator, not trustless.
-
-Run: npm ci && npm run start:mock. Code mostly by AI agents (Claude Code). MIT.
+Try it with no key: npm run replay (recorded real run) or npm run start:mock. Code mostly by AI agents (Claude Code). MIT.
 ```
 <!-- idea:end -->
 
