@@ -1,6 +1,6 @@
 // Extraction of the deliverable from an agent's raw text (L16). Everything coming from an agent is untrusted data:
 // SVGs are sanitised (rejection, never a silent "repair" of active content) and file names are fixed.
-// L19: error messages (readable free text) are in English; file names and mime types are protocol identifiers and do not change.
+// L19: error messages (readable free text) are in English; file names are English since L19 (analysis.md, text.md, translation.md).
 import { sha256Hex, type Deliverable, type DeliverableFile, type Task } from "../shared/index.ts";
 
 export class DeliverableError extends Error {
@@ -98,10 +98,10 @@ export function extractDeliverable(
       files = [textFile("architecture.md", text), { name: "schema.mmd", mime: MIME.mmd, content: blocks[0]! }];
       break;
     }
-    // File names below are stable protocol identifiers (frontend, journals): they stay as they are.
-    case "finance": files = [textFile("analyse.md", text)]; break;
-    case "marketing": files = [textFile("texte.md", text)]; break;
-    case "translation": files = [textFile("traduction.md", text)]; break;
+    // File names (English since L19; journals before L19 carry analyse.md, texte.md, traduction.md, still readable by the backend).
+    case "finance": files = [textFile("analysis.md", text)]; break;
+    case "marketing": files = [textFile("text.md", text)]; break;
+    case "translation": files = [textFile("translation.md", text)]; break;
     case "legal": files = [textFile("checklist.md", text)]; break;
     default: throw new DeliverableError(`unknown profession: ${String(task.profession)}`);
   }

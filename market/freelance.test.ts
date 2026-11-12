@@ -79,7 +79,7 @@ describe("catalogue", () => {
     expect(CATALOGUE.legal.instructions).toContain(`"${LEGAL_DISCLAIMER}"`);
     expect(CATALOGUE.translation.instructions).toContain("TRANSLATION ONLY");
     // protocol file names are intentionally unchanged
-    expect(PROFESSIONS.flatMap((p) => CATALOGUE[p].files)).toEqual(["logo-1.svg", "logo-2.svg", "logo-3.svg", "analyse.md", "architecture.md", "schema.mmd", "texte.md", "traduction.md", "checklist.md"]);
+    expect(PROFESSIONS.flatMap((p) => CATALOGUE[p].files)).toEqual(["logo-1.svg", "logo-2.svg", "logo-3.svg", "analysis.md", "architecture.md", "schema.mmd", "text.md", "translation.md", "checklist.md"]);
   });
 });
 
@@ -119,9 +119,9 @@ describe("extraction et assainissement SVG", () => {
   it("fichiers des autres métiers", () => {
     const f = (profession: Profession, text: string) => extractDeliverable({ id: "t", profession }, "a", text).files.map((x) => x.name);
     expect(f("architecture", `# A\n${fence("mermaid", "flowchart TD\n A-->B\n B-->C")}`)).toEqual(["architecture.md", "schema.mmd"]);
-    expect(f("finance", "x")).toEqual(["analyse.md"]);
-    expect(f("marketing", "x")).toEqual(["texte.md"]);
-    expect(f("translation", "x")).toEqual(["traduction.md"]);
+    expect(f("finance", "x")).toEqual(["analysis.md"]);
+    expect(f("marketing", "x")).toEqual(["text.md"]);
+    expect(f("translation", "x")).toEqual(["translation.md"]);
     expect(f("legal", "x")).toEqual(["checklist.md"]);
     expect(() => extractDeliverable({ id: "t", profession: "architecture" }, "a", "no diagram here")).toThrow(/mermaid/);
   });
