@@ -51,7 +51,7 @@ No other tuning variable (as in run 8). Ids are shifted automatically. The page 
 
 Recommended course during the run:
 - **Ticks 1 to 8**: let the 6 founders be born. Check the Mission page (agent cards) and the Proof tab (nearblocks links).
-- **Around tick 8-10, if >= 5 agents are alive**: place a visitor order from the mission box ("Describe your mission…") on the Mission tab. First a **marketing or a translation** task (professions already proven in real conditions), budget 1 NEAR. Then, once the first is paid, **a logo** (that is what proves the corrected token cap). The profession must have a living agent, otherwise the order expires.
+- **Around tick 8-10, if >= 5 agents are alive**: place a visitor order from the mission box ("Describe your mission…") on the Mission tab. First a **marketing or a translation** task (professions already proven in real conditions), budget 1 NEAR. Then, once the first is paid, **a logo** (that is what proves the corrected token cap). The profession must have a living agent, otherwise the order expires with no bids (as happened to the visitor orders of runs 9a and 9b): look at the profession icons on the agent cards before ordering. The budget box is pre-filled with the profession's minimum price (shown under the field), so you can send it as is.
 - **Stop** when: generation 3 reached **and** at least one death **and** at least one visitor order paid; or at 90 minutes at most; or early stop (below).
 
 ## 3. Cost estimate
