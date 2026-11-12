@@ -1,5 +1,8 @@
 # SECURITE
 
+> **English summary.** Security review by the `securite` agent: threat model (keys, escrow funds, reputation, prompt injection, public API), secret-scan status (`scripts/scan-secrets.mjs`), per-work-package findings (L2 to L9, frontend L8), verdicts, checklists, master-key rotation (L17, §6) and the pre-merge review of `lot/L17-integration` (§7, fixes recorded in D-046).
+> **State:** passes 1 to 3 recorded no blocking finding; the 7 dummy values found in git history are exempted by `scripts/scan-secrets.allowlist.json` (the full scan exits 0 since L17); no secret value appears in this document or in the repository. The rest of this file is kept in its original French (internal security report).
+
 > Propriétaire : agent securite. Revue L10 : première passe (L3-L6) puis deuxième passe (L2, L7, L9 et vérification des correctifs, `main` au commit `98a30a3`), troisième passe (L8 `frontend/`, après fusion dans `main`), 2026-11-09. Lecture seule sur le code des autres lots : les constats sont des signalements au chef de projet, rien n'a été corrigé. Aucune valeur secrète n'apparaît dans ce document.
 
 ## 1. Modèle de menace (court)

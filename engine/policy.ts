@@ -1,10 +1,10 @@
-// Politique de décision d'un agent : enchérir (prix, risque), sous-traiter. Pure, déterministe, sans effet de bord.
+// Decision policy of an agent: bid (price, risk), subcontract. Pure, deterministic, no side effects.
 import { costYocto, type Agent, type Task } from "../shared/index.ts";
 import { scaledPrice } from "../shared/catalogue.ts";
 import { bal, type Ctx } from "./context.ts";
 import { resolveModel } from "./economy.ts";
 
-/** Coût IA estimé d'une exécution (prompt + moitié du plafond de sortie), au prix du modèle du gène. */
+/** Estimated AI cost of one execution (prompt + half the output cap), at the price of the gene's model. */
 export function estimateCost(ctx: Ctx, a: Agent, task: Task): bigint {
   const price = resolveModel(ctx, a);
   const promptTokens = Math.ceil((a.genome.personality.length + task.prompt.length) / 4) + 20;
@@ -13,13 +13,13 @@ export function estimateCost(ctx: Ctx, a: Agent, task: Task): bigint {
   return costYocto(usage, price, ctx.deps.config.sim.nearUsdRate);
 }
 
-/** Réserve que l'agent refuse d'entamer : minVital x (1 + 2 x (1 - risque)). Un preneur de risque s'expose davantage. */
+/** Reserve the agent refuses to dip into: minVital x (1 + 2 x (1 - risk)). A risk-taker exposes itself more. */
 export function reserve(ctx: Ctx, a: Agent): bigint {
   const k = BigInt(Math.round((1 + 2 * (1 - a.genome.risk)) * 1000));
   return (ctx.deps.config.sim.minVital * k) / 1000n;
 }
 
-/** Offre de l'agent sur une tâche, ou null. Prix = askRatio x budget, plancher = coût IA estimé x 1,1, plafond = budget. */
+/** The agent's bid on a task, or null. Price = askRatio x budget, floor = estimated AI cost x 1.1, ceiling = budget. */
 export function decideBid(ctx: Ctx, a: Agent, task: Task): { price: bigint; etaTicks: number } | null {
   if (task.profession !== a.genome.profession) return null;
   if (task.requester.kind === "agent" && task.requester.agentId === a.id) return null;
@@ -29,14 +29,14 @@ export function decideBid(ctx: Ctx, a: Agent, task: Task): { price: bigint; etaT
   let price = (budget * BigInt(Math.round(a.genome.askRatio * 1000))) / 1000n;
   const floor = (cost * 11n) / 10n;
   if (price < floor) price = floor;
-  // Prix plancher du métier (catalogue) : un freelance ne brade pas sous le tarif de référence de son métier.
+  // Profession price floor (catalogue): a freelancer does not undercut the reference rate of its profession.
   const professionFloor = scaledPrice(a.genome.profession, ctx.deps.config.sim.priceScale);
   if (price < professionFloor) price = professionFloor;
-  if (price > budget) return null; // tâche non rentable pour cet agent
+  if (price > budget) return null; // task not profitable for this agent
   return { price, etaTicks: 1 };
 }
 
-/** Sous-traite avec probabilité cooperation/2 si l'agent peut se le permettre. Budget = 25 % du prix gagné. */
+/** Subcontracts with probability cooperation/2 if the agent can afford it. Budget = 25% of the price earned. */
 export function decideSubcontract(ctx: Ctx, a: Agent, price: bigint): bigint | null {
   if (ctx.deps.rng.next() >= a.genome.cooperation / 2) return null;
   const budget = price / 4n;

@@ -1,3 +1,6 @@
+> **Internal developer checklist (French) — not part of the submission.**
+> Ordered list of the actions only the human can do (publish the repository, X post, form submission, key rotation, faucet top-ups); kept in French on purpose.
+
 # Besoins pour l'humain — mis à jour le 2026-11-12 (lot L17-docs3)
 
 **Échéance : samedi 14 novembre 2026, 23:59 UTC** (soit 00:59 le 15 novembre à Paris, heure d'hiver UTC+1). **Marge de sécurité conseillée : avoir tout soumis le 14 novembre avant 12:00 UTC (13:00 à Paris)**, pour absorber une panne de X, de GitHub ou du formulaire. Le formulaire est à soumettre **une seule fois** et corrigé ensuite via https://nearhackathon.com/request-changes : ne pas le garder pour la dernière heure.

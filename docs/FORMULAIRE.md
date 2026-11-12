@@ -1,31 +1,31 @@
-# FORMULAIRE : brouillon de soumission (aucune soumission faite)
+# FORM: submission draft (nothing has been submitted)
 
-> **Thèse du pitch** : « Aujourd'hui, on paie la consommation de son IA. Demain, on paiera un agent comme un freelance : il aura ses charges, répondra à des appels d'offres et devra être rentable pour exister. Darwin montre qui survivra, sur NEAR. »
+> **Pitch thesis**: "Today, you pay for your AI's consumption. Tomorrow, you will pay an agent like a freelancer: it will have overhead, answer calls for tenders and have to be profitable to exist. Darwin shows who will survive, on NEAR."
 
-> Propriétaire : redacteur. **Rien n'est soumis.** L'humain relit la page https://nearhackathon.com/HACKATHON.md avant de soumettre, vérifie chaque valeur, puis soumet lui-même (formulaire https://nearhackathon.com/#apply ou `POST /api/applications`). Champs et limites d'après `docs/SPECS.md` S-02 à S-05 (à re-vérifier sur la page vivante).
+> Owner: redacteur. **Nothing is submitted.** The human re-reads https://nearhackathon.com/HACKATHON.md before submitting, checks every value, then submits personally (form https://nearhackathon.com/#apply or `POST /api/applications`). Fields and limits follow `docs/SPECS.md` S-02 to S-05 (re-check on the live page).
 
-## Champs
+## Fields
 
-| Champ | Limites | Valeur | Qui fournit |
+| Field | Limits | Value | Provided by |
 |---|---|---|---|
-| `requestId` (API seulement) | UUID, généré une fois et réutilisé aux retries | à générer | humain |
-| `projectName` | 2 à 80 caractères | `Darwin` | proposé |
-| `leadName` | 2 à 80 | **À FOURNIR** | humain |
-| `email` | valide, max 160 ; 2 soumissions max par email | **À FOURNIR** | humain |
-| `size` | `1`, `2 - 4`, `4 - 6`, `6 - 8` ou `8+` | **À FOURNIR** (taille réelle de l'équipe humaine) | humain |
-| `tracks` | ids, chacun une fois | recommandation : `swarms`, `agents` ; éventuellement `open` (et `business`). **Décision de l'humain.** | humain |
-| `nearAddress` | 2 à 64, minuscules ; compte **mainnet** nommé ou implicite (64 car.) créé par l'équipe | **À FOURNIR** (jamais créé par un agent) | humain |
-| `projectUrl` | dépôt public, max 300 | **À FOURNIR** : URL du dépôt, à rendre public avant le 2026-11-14 23:59 UTC | humain |
-| `demoUrl` | post X public, max 300 | **À FOURNIR** : URL du post publié (voir `docs/POST_X.md`) | humain |
-| `idea` | **20 à 2000 caractères** | texte ci-dessous | proposé, relu par l'humain |
-| `consent` | `true` après accord du lead | `true` seulement si le lead lit et accepte : « I agree that the organizers may use these details to review our submission and contact us about this hackathon. » | humain |
-| `website` | piège anti-spam : laisser **vide** (ne pas envoyer de valeur) | vide | -- |
+| `requestId` (API only) | UUID, generated once and reused on retries | to generate | human |
+| `projectName` | 2 to 80 characters | `Darwin` | proposed |
+| `leadName` | 2 to 80 | **TO PROVIDE** | human |
+| `email` | valid, max 160; 2 submissions max per email | **TO PROVIDE** | human |
+| `size` | `1`, `2 - 4`, `4 - 6`, `6 - 8` or `8+` | **TO PROVIDE** (real size of the human team) | human |
+| `tracks` | ids, each once | recommendation: `swarms`, `agents`; possibly `open` (and `business`). **Human decision.** | human |
+| `nearAddress` | 2 to 64, lowercase; a named or implicit (64 chars) **mainnet** account created by the team | **TO PROVIDE** (never created by an agent) | human |
+| `projectUrl` | public repository, max 300 | **TO PROVIDE**: repository URL, to make public before 2026-11-14 23:59 UTC | human |
+| `demoUrl` | public X post, max 300 | **TO PROVIDE**: URL of the published post (see `docs/POST_X.md`) | human |
+| `idea` | **20 to 2000 characters** | text below | proposed, reviewed by the human |
+| `consent` | `true` after the lead agrees | `true` only if the lead reads and accepts: "I agree that the organizers may use these details to review our submission and contact us about this hackathon." | human |
+| `website` | anti-spam trap: leave **empty** (send no value) | empty | -- |
 
-Aucun autre champ ne doit être envoyé (corps limité à 12000 octets). Codes de réponse : 201 enregistré ; 400 corriger (même `requestId`) ; 403 fermé ou cross-site (ne pas réessayer) ; 409 doublon (ne pas contourner) ; 413 trop gros ; 503 réessayer avec le même `requestId`. Corrections après coup : https://nearhackathon.com/request-changes.
+No other field may be sent (body limited to 12000 bytes). Response codes: 201 recorded; 400 fix (same `requestId`); 403 closed or cross-site (do not retry); 409 duplicate (do not work around); 413 too large; 503 retry with the same `requestId`. Corrections afterwards: https://nearhackathon.com/request-changes.
 
-## Texte du champ `idea`
+## Text of the `idea` field
 
-Il contient le problème, le produit et la place de NEAR. Les termes sont ceux du README (ce qui est mock ou non exécuté y est dit). Faits mis à jour le 2026-11-11 d'après `docs/PREUVES_TESTNET.md` (run 8) ; travaux liés vérifiés le 2026-11-11 (arXiv 2506.04236, README d'Automaton). Le run 9 (commande de logo) n'est volontairement pas dans ce texte tant qu'il n'est pas prouvé accepté (À CONFIRMER : run 9c).
+It covers the problem, the product and the role of NEAR. Terms match the README (what is mock or not run is stated there). Facts updated on 2026-11-11 from `docs/PREUVES_TESTNET.md` (run 8); related work checked on 2026-11-11 (arXiv 2506.04236, Automaton README). Run 9 (logo order) is deliberately left out of this text until an accepted and paid logo is proven (TO CONFIRM: run 9c).
 
 <!-- idea:start -->
 ```text
@@ -45,12 +45,12 @@ Run: npm ci && npm run start:mock (README: "do X, you will see Y"). Most code wr
 ```
 <!-- idea:end -->
 
-Vérification du compteur (script) : `node scripts/check-formulaire.mjs` (affiche le nombre de caractères et échoue hors de 20 à 2000). **Ré-exécuter après toute modification du texte**, et garder ce texte aligné sur le README et sur `docs/PREUVES_TESTNET.md` si les faits changent.
+Counter check (script): `node scripts/check-formulaire.mjs` (prints the character count and fails outside 20 to 2000). **Re-run after any change to the text**, and keep this text aligned with the README and `docs/PREUVES_TESTNET.md` if the facts change.
 
-## Ce que l'humain doit faire avant de soumettre
+## What the human must do before submitting
 
-1. Rendre le dépôt public ; vérifier que LICENSE et README y sont.
-2. Publier le post X (`docs/POST_X.md`) avec la vidéo ; copier son URL dans `demoUrl`.
-3. Fournir `leadName`, `email`, `size`, `nearAddress` (compte mainnet), choisir les `tracks`.
-4. Relire le README : confirmer « pas de code antérieur » et dire si un second projet existe.
-5. Afficher le JSON final, relire, et soumettre **une seule fois**. Ne pas utiliser le vrai dépôt ni le vrai email pour des tests de soumission.
+1. Make the repository public; check that LICENSE and README are there.
+2. Publish the X post (`docs/POST_X.md`) with the video; copy its URL into `demoUrl`.
+3. Provide `leadName`, `email`, `size`, `nearAddress` (mainnet account), choose the `tracks`.
+4. Re-read the README: confirm "no prior code" and say whether a second project exists.
+5. Display the final JSON, re-read it, and submit **once**. Do not use the real repository or the real email for submission tests.

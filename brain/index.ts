@@ -1,4 +1,4 @@
-// Point d'entrée du lot L5/L11 : createBrain(config) -> Brain (MockBrain, NearAiBrain, ou NearAiBrain + secours OpenAI-compatible).
+// Entry point of lot L5/L11: createBrain(config) -> Brain (MockBrain, NearAiBrain, or NearAiBrain + OpenAI-compatible fallback).
 import { join } from "node:path";
 import { MockBrain, type Brain, type Config } from "../shared/index.ts";
 import { AiBudget } from "./budget.ts";
@@ -14,21 +14,21 @@ export * from "./prompts.ts";
 
 export interface CreateBrainOptions {
   fetch?: typeof fetch;
-  /** Reçoit les system.warning (ex. repli de prix, garde-fou). Le backend les émet dans le journal. */
+  /** Receives the system.warning events (e.g. price fallback, guardrail). The backend emits them in the journal. */
   onWarning?: (w: { code: string; message: string }) => void;
   guardrails?: Partial<Guardrails>;
-  /** http:// accepté seulement vers localhost (tests explicites). */
+  /** http:// accepted only towards localhost (explicit tests). */
   allowInsecureLocalhost?: boolean;
   /**
-   * Appelé UNE fois quand le plafond d'arrêt du budget IA est atteint : le backend arrête la simulation proprement.
-   * Les appels suivants lèvent BrainError BUDGET_EXHAUSTED.
+   * Called ONCE when the stop cap of the AI budget is reached: the backend stops the simulation cleanly.
+   * Subsequent calls throw BrainError BUDGET_EXHAUSTED.
    */
   onBudgetExhausted?: (info: { spentEur: number; stopEur: number }) => void;
-  /** Budget déjà construit (tests) ; sinon créé dans `<dataDir>` depuis la config. */
+  /** Already-built budget (tests); otherwise created in `<dataDir>` from the config. */
   budget?: AiBudget;
 }
 
-/** Budget persistant (data/ai-budget.json) + journal d'usage (data/ai-usage.jsonl) selon la config. */
+/** Persistent budget (data/ai-budget.json) + usage journal (data/ai-usage.jsonl) according to the config. */
 export function createBudget(config: Config, onExhausted?: CreateBrainOptions["onBudgetExhausted"]): AiBudget {
   return new AiBudget({
     dir: config.server.dataDir,
@@ -40,21 +40,21 @@ export function createBudget(config: Config, onExhausted?: CreateBrainOptions["o
 }
 
 /**
- * Mock par défaut. Réel (config.brain === "nearai") :
- *  - NEARAI_API_KEY : NearAiBrain (catalogue /model/list, liste blanche), + secours AI_* si configuré (bascule après échecs répétés) ;
- *  - sans clé NEAR mais avec AI_* : fournisseur OpenAI-compatible seul ;
+ * Mock by default. Real (config.brain === "nearai"):
+ *  - NEARAI_API_KEY: NearAiBrain (/model/list catalogue, whitelist), + AI_* fallback if configured (switch after repeated failures);
+ *  - no NEAR key but AI_* set: OpenAI-compatible provider alone;
  *  - sans rien : MockBrain + avertissement BRAIN_NO_KEY.
- * Tout appel réel passe par le budget global (plafond d'arrêt, cumul persistant).
+ * Every real call goes through the global budget (stop cap, persistent total).
  */
 export function createBrain(config: Config, opts: CreateBrainOptions = {}): Brain {
   if (config.brain !== "nearai") return new MockBrain();
   const fb = config.ai.fallback;
   if (!config.nearai.apiKey && !fb) {
-    opts.onWarning?.({ code: "BRAIN_NO_KEY", message: "cerveau nearai demandé sans NEARAI_API_KEY : repli sur le cerveau mock" });
+    opts.onWarning?.({ code: "BRAIN_NO_KEY", message: "nearai brain requested without NEARAI_API_KEY: falling back to the mock brain" });
     return new MockBrain();
   }
   const budget = opts.budget ?? createBudget(config, opts.onBudgetExhausted);
-  // Plafond par run : par défaut le plafond d'arrêt du budget (sinon le plafond historique de 2 USD couperait avant).
+  // Per-run cap: by default the budget stop cap (otherwise the historical 2 USD cap would cut earlier).
   const guardrails: Partial<Guardrails> = { maxTokensPerCall: config.sim.maxTokensPerCall, maxUsdPerRun: budget.stopUsd, ...opts.guardrails };
   const common = { fetch: opts.fetch, onWarning: opts.onWarning, allowInsecureLocalhost: opts.allowInsecureLocalhost, guardrails, budget };
   const near = config.nearai.apiKey

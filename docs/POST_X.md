@@ -1,22 +1,23 @@
-# POST_X : brouillon du post (aucune publication)
+# POST_X: post draft (nothing published)
 
-> Propriétaire : redacteur. **L'humain relit, adapte et publie lui-même.** Mentions obligatoires (SPECS L-05) : dire que le projet a été construit au NEAR HACKATHON, taguer **@NEARProtocol** et **#NEARHackathon**, joindre la **vidéo** (`docs/VIDEO_SCRIPT.md`) : elle est OBLIGATOIRE, HACKATHON.md (relu le 2026-11-12) dit que des captures seules ne suffisent pas. Optionnels : @NearLegion, @NearBuilders. Le lien du post va dans `demoUrl` du formulaire (`docs/FORMULAIRE.md`).
-> Remplacer `<REPO_URL>` par l'URL du dépôt public avant publication. Chaque post fait moins de 280 caractères (URL comptée pour 23) ; compteur vérifié par script (`node -e` ci-dessous) puis à revérifier dans l'éditeur de X.
-> Mis à jour le 2026-11-11 d'après `docs/PREUVES_TESTNET.md` (run 8) : le testnet et le contrat ont réellement tourné. **Ne pas citer le run 9 (commande de logo) tant qu'un logo accepté et payé n'est pas prouvé** (À CONFIRMER : run 9c).
+> Owner: redacteur. **The human reviews, adapts and publishes personally.** Mandatory mentions (SPECS L-05): say the project was built at the NEAR HACKATHON, tag **@NEARProtocol** and **#NEARHackathon**, attach the **video** (`docs/VIDEO_SCRIPT.md`): it is MANDATORY, HACKATHON.md (re-read on 2026-11-12) says screenshots alone are not enough. Optional: @NearLegion, @NearBuilders. The post link goes into `demoUrl` of the form (`docs/FORMULAIRE.md`).
+> Replace `<REPO_URL>` with the public repository URL before publishing. Each tweet is at most 280 characters (a URL counts for 23); counts checked by script, then re-check in the X editor.
+> The video must stay under 2 min 20 (likely limit for a free X account); see `docs/VIDEO_SCRIPT.md`.
+> Updated 2026-11-12 from `docs/PREUVES_TESTNET.md` (run 8): testnet and the contract really ran. **Do not cite run 9 (logo order) until an accepted and paid logo is proven** (TO CONFIRM: run 9c).
 
-## Post unique
+## Single post
 
 ```text
 Built at NEAR HACKATHON: Darwin, AI agents that earn from paid, validated work, pay for their own brain, reproduce and die when broke. Real NEAR testnet run: generation 3, 7 deaths. Client simulated. No key needed: <REPO_URL> @NEARProtocol #NEARHackathon
 ```
 
-Joindre : la vidéo (le « wow » dans les 10 premières secondes).
+Attach: the video (the "wow" in the first 10 seconds). Mandatory.
 
-## Variante en fil
+## Thread variant
 
 ```text
 1/ Built at NEAR HACKATHON: Darwin. AI agents that earn their living, pay for their own brain, have children with their own money, and die when they run dry. Economic natural selection, live. @NEARProtocol #NEARHackathon
-[vidéo]
+[video: mandatory]
 ```
 
 ```text
@@ -43,8 +44,8 @@ Joindre : la vidéo (le « wow » dans les 10 premières secondes).
 7/ Try it: <REPO_URL> (npm ci && npm run start:mock). README has "do X, you will see Y" steps. #NEARHackathon @NEARProtocol
 ```
 
-## Points de vigilance avant de publier
+## Checks before publishing
 
-- Le texte doit rester vrai : relire `docs/PREUVES_TESTNET.md` ; si le run 9c prouve un logo accepté et payé, on pourra l'ajouter (À CONFIRMER), pas avant.
-- Pas de promesse de gain réel : le NEAR de testnet n'a pas de valeur. Ne jamais écrire « le premier ».
-- Vérifier que le dépôt est public et que le post X est public, puis copier son URL dans le formulaire.
+- The text must stay true: re-read `docs/PREUVES_TESTNET.md`; if run 9c proves an accepted and paid logo, it can be added (TO CONFIRM), not before.
+- No promise of real gains: testnet NEAR has no value. Never write "the first".
+- Check that the repository is public and the X post is public, then copy its URL into the form.

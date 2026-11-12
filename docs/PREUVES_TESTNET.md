@@ -1,52 +1,54 @@
-# PREUVES TESTNET — ce qui a réellement tourné
+# TESTNET PROOFS — what actually ran
 
-> Mis à jour le 2026-11-12 : §8 = run 8 du 2026-11-10 (génération 3 et morts), §10 = validation du logo du 2026-11-11, §11 = résumé des runs 9a et 9b du 2026-11-11. Règle : seul ce qui figure ici avec un identifiant de transaction, un journal ou une commande reproductible est **prouvé**. Le reste est dit non prouvé. Explorateur : `https://testnet.nearblocks.io/txns/<hash>` (nearblocks, testnet). Aucune dépense mainnet, rien n'est publié. Ce fichier est généré à partir de `docs/preuves/PREUVES_TEMPLATE.md` et des journaux par `node scripts/assemble-preuves.mjs`.
+> Runs before 2026-11-12 were generated in French (agent letters, pitches, deliverables); journals under docs/preuves are historical traces and are not modified.
+>
+> Updated 2026-11-12: §8 = run 8 of 2026-11-10 (generation 3 and deaths), §10 = logo validation of 2026-11-11, §11 = summary of runs 9a and 9b of 2026-11-11, §12 = sha256 fingerprints of the proof journals. Rule: only what appears here with a transaction identifier, a journal or a reproducible command is **proven**. Everything else is stated as not proven. Explorer: `https://testnet.nearblocks.io/txns/<hash>` (nearblocks, testnet). No mainnet spending, nothing is published. This file is generated from `docs/preuves/PREUVES_TEMPLATE.md` and the journals by `node scripts/assemble-preuves.mjs` (the generator scripts emit some table headers in French; the committed English file was translated by hand).
 
-## 1. Résumé honnête
+## 1. Honest summary
 
-| Élément | État |
+| Item | Status |
 |---|---|
-| Compte maître testnet créé avec le CLI officiel (`sponsor-by-faucet-service`) | **Prouvé** (§2) |
-| Contrat Rust déployé et initialisé sur testnet | **Prouvé** (§3) |
-| Séquestres verrouillés puis libérés par le contrat, avec preuve, et réputation écrite | **Prouvé** (§5) |
-| Cerveau réel NEAR AI Cloud, consommation tracée | **Prouvé** (§6) |
-| Attestation TEE d'une réponse, vérifiée de bout en bout | **Prouvé pour un modèle, à la demande** (§7) |
-| Génération 2 sur la vraie chaîne (5 reproductions et 5 lettres dans un seul run) | **Prouvé** (§4) |
-| Génération 3 dans un même run réel | **Prouvé** (run 8, preset `selection`, 59 ticks : génération 3, 12 naissances, 8 reproductions ; §8) |
-| Mort d'un agent sur testnet | **Prouvé** : 7 morts par famine au run 8, `mark_dead` et clôture de compte avec transactions (§8) |
-| `refund_escrow` sur testnet | **Prouvé une fois** : tâche `t-5003` rejetée par le juge, remboursement `rejected` par le contrat, malus de réputation −2 (§8) |
-| Clés function call des agents | **Prouvé au run 8** : clé ajoutée dans la transaction de création, 0 avertissement, 2 clés vérifiées sur la chaîne (échec aux runs 5 à 7, corrigé) |
-| NEAR Intents, mainnet | **Jamais exécuté** (aucune dépense) |
+| Testnet master account created with the official CLI (`sponsor-by-faucet-service`) | **Proven** (§2) |
+| Rust contract deployed and initialised on testnet | **Proven** (§3) |
+| Escrows locked then released by the contract, with proof, and reputation written | **Proven** (§5) |
+| Real NEAR AI Cloud brain, consumption traced | **Proven** (§6) |
+| TEE attestation of a response, verified end to end | **Proven for one model, on demand** (§7) |
+| Generation 2 on the real chain (5 reproductions and 5 letters in a single run) | **Proven** (§4) |
+| Generation 3 in a single real run | **Proven** (run 8, preset `selection`, 59 ticks: generation 3, 12 births, 8 reproductions; §8) |
+| Death of an agent on testnet | **Proven**: 7 deaths by starvation in run 8, `mark_dead` and account closing with transactions (§8) |
+| `refund_escrow` on testnet | **Proven once**: task `t-5003` rejected by the judge, `rejected` refund by the contract, reputation penalty −2 (§8) |
+| Agents' function-call keys | **Proven in run 8**: key added in the creation transaction, 0 warnings, 2 keys verified on the chain (failed in runs 5 to 7, fixed) |
+| NEAR Intents, mainnet | **Never executed** (no spending) |
 
-## 2. Compte maître
+## 2. Master account
 
-- Compte : `darwin-master-7k2.testnet`, créé le 2026-11-10 par le robinet testnet avec `near account create-account sponsor-by-faucet-service darwin-master-7k2.testnet autogenerate-new-keypair --signature-scheme ed25519 save-to-legacy-keychain network-config testnet create` (near-cli-rs 0.31.1).
-- Transaction de création : [`5SiBQfZp…`](https://testnet.nearblocks.io/txns/5SiBQfZpuCzJcUGgLBhcRWYB5Ad8LvBi5qMyzYDjVAi4) (10 NEAR de testnet reçus).
-- La clé privée est dans `.env` (ignoré par git) et dans le dossier d'identifiants local du CLI. Elle n'est pas dans le dépôt : `node scripts/scan-secrets.mjs --no-history` propre, et recherche de la valeur exacte dans les fichiers suivis : 0 occurrence.
+- Account: `darwin-master-7k2.testnet`, created on 2026-11-10 by the testnet faucet with `near account create-account sponsor-by-faucet-service darwin-master-7k2.testnet autogenerate-new-keypair --signature-scheme ed25519 save-to-legacy-keychain network-config testnet create` (near-cli-rs 0.31.1).
+- Creation transaction: [`5SiBQfZp…`](https://testnet.nearblocks.io/txns/5SiBQfZpuCzJcUGgLBhcRWYB5Ad8LvBi5qMyzYDjVAi4) (10 testnet NEAR received).
+- The private key is in `.env` (ignored by git) and in the CLI's local credentials folder. It is not in the repository: `node scripts/scan-secrets.mjs --no-history` clean, and a search for the exact value in tracked files: 0 occurrences.
 
-## 3. Contrat
+## 3. Contract
 
-- Compte contrat : `darwin-contract-7k2.testnet`, créé par le robinet : [`DMmmRkir…`](https://testnet.nearblocks.io/txns/DMmmRkirNdreqTY68SroCm9Uv1hUP9csqNSZNrMmxMcQ).
-- Déploiement + appel `new {"operator":"darwin-master-7k2.testnet"}` : [`EAiE25tj…`](https://testnet.nearblocks.io/txns/EAiE25tjN2LmZkxbNekigvHT4rw6eJsmmMi3vqY9mpxb), 36 Tgas, frais 0,0036 NEAR.
-- WASM de 469 113 octets construit avec `cargo build --target wasm32-unknown-unknown --release` (Rust 1.99.1), **pas** avec `cargo near build`. Le runtime NEAR l'a accepté et exécuté. Pas de build reproductible.
-- Commande réellement utilisée : `near contract deploy darwin-contract-7k2.testnet use-file <wasm> with-init-call new json-args '{"operator":"darwin-master-7k2.testnet"}' prepaid-gas '30 Tgas' attached-deposit '0 NEAR' network-config testnet sign-with-legacy-keychain send` (`sign-with-legacy-keychain` au lieu de `sign-with-keychain` dans `contracts/deploy-testnet.sh`).
-- Vérification indépendante en lecture seule (`near contract call-function as-read-only`, 2026-11-10) : `agents_count` = 32 agents enregistrés ; `get_escrow t-4001` = `status: released`, payeur `sim-client`, bénéficiaire `a-0602`, preuve `verdict: accepted`, validateur `brain:gemini-2.5-flash-lite`, `result_hash 7dd629b9…` ; `get_reputation a-0602` = 7 ; `get_agent a-0604` = génération 2, parent `a-0602`, vivant.
-- Limite de confiance : l'opérateur (compte maître) est l'oracle de validation ; le juge est un modèle externe (non TEE).
+- Contract account: `darwin-contract-7k2.testnet`, created by the faucet: [`DMmmRkir…`](https://testnet.nearblocks.io/txns/DMmmRkirNdreqTY68SroCm9Uv1hUP9csqNSZNrMmxMcQ).
+- Deployment + call `new {"operator":"darwin-master-7k2.testnet"}`: [`EAiE25tj…`](https://testnet.nearblocks.io/txns/EAiE25tjN2LmZkxbNekigvHT4rw6eJsmmMi3vqY9mpxb), 36 Tgas, fee 0.0036 NEAR.
+- 469,113-byte WASM built with `cargo build --target wasm32-unknown-unknown --release` (Rust 1.99.1), **not** with `cargo near build`. The NEAR runtime accepted and executed it. No reproducible build.
+- Command actually used: `near contract deploy darwin-contract-7k2.testnet use-file <wasm> with-init-call new json-args '{"operator":"darwin-master-7k2.testnet"}' prepaid-gas '30 Tgas' attached-deposit '0 NEAR' network-config testnet sign-with-legacy-keychain send` (`sign-with-legacy-keychain` instead of `sign-with-keychain` in `contracts/deploy-testnet.sh`).
+- Independent read-only verification (`near contract call-function as-read-only`, 2026-11-10): `agents_count` = 32 registered agents; `get_escrow t-4001` = `status: released`, payer `sim-client`, beneficiary `a-0602`, proof `verdict: accepted`, validator `brain:gemini-2.5-flash-lite`, `result_hash 7dd629b9…`; `get_reputation a-0602` = 7; `get_agent a-0604` = generation 2, parent `a-0602`, alive.
+- Trust limit: the operator (master account) is the validation oracle; the judge is an external model (non-TEE).
 
-## 4. Génération 2 sur la vraie chaîne
+## 4. Generation 2 on the real chain
 
-Plusieurs runs réels ont eu lieu le 2026-11-10 ; les ids d'agents changent à chaque run (`a-0101…`, …, `a-0701…`, puis `a-214953…` au run 8, décalage automatique). **Le run 8 (§8) est le plus complet : génération 3 et morts.** Journaux conservés : `docs/preuves/run5-journal.jsonl` et `docs/preuves/run6-journal.jsonl` (événements Darwin, hashes de transactions publics, aucun secret). Tableaux générés par `node scripts/gen-preuves.mjs <journal>`.
+Several real runs took place on 2026-11-10; agent ids change at every run (`a-0101…`, …, `a-0701…`, then `a-214953…` in run 8, automatic shift). **Run 8 (§8) is the most complete: generation 3 and deaths.** Journals kept: `docs/preuves/run5-journal.jsonl` and `docs/preuves/run6-journal.jsonl` (Darwin events, public transaction hashes, no secret). Tables generated by `node scripts/gen-preuves.mjs <journal>`.
 
-### Run 6 (le plus complet : 8 naissances, 5 reproductions, 26 cycles de séquestre)
+### Run 6 (the most complete: 8 births, 5 reproductions, 26 escrow cycles)
 
-Journal : `docs/preuves/run6-journal.jsonl` (792 événements, du 2026-11-10T20:24:06.536Z au 2026-11-10T20:43:35.823Z).
+Journal: `docs/preuves/run6-journal.jsonl` (792 events, from 2026-11-10T20:24:06.536Z to 2026-11-10T20:43:35.823Z).
 
-Génération maximale née : **2** ; naissances : 8 ; reproductions : 5 ; lettres : 5 ; morts : 0.
-Transactions par type : create_account 8, register_agent 8, transfer 61, escrow_lock 26, escrow_release 26, add_reputation 26.
+Maximum generation born: **2**; births: 8; reproductions: 5; letters: 5; deaths: 0.
+Transactions by type: create_account 8, register_agent 8, transfer 61, escrow_lock 26, escrow_release 26, add_reputation 26.
 
-#### Naissances
+#### Births
 
-| Agent | Génération | Parent | Compte | Tx de création |
+| Agent | Generation | Parent | Account | Creation tx |
 |---|---|---|---|---|
 | a-0601 | 1 | — | `a-0601.darwin-master-7k2.testnet` | [`5zZvYrXR…`](https://testnet.nearblocks.io/txns/5zZvYrXRQ8mtWtrqu1AYpB3NNrEXQv2co1somWcUpeDk) |
 | a-0602 | 1 | — | `a-0602.darwin-master-7k2.testnet` | [`EBYeBvK6…`](https://testnet.nearblocks.io/txns/EBYeBvK69SHM2Pivx2DrFfrrSe41urPmo5jZsYQwm5eS) |
@@ -59,7 +61,7 @@ Transactions par type : create_account 8, register_agent 8, transfer 61, escrow_
 
 #### Reproductions
 
-| Parent | Enfant | Transféré (NEAR) |
+| Parent | Child | Transferred (NEAR) |
 |---|---|---|
 | a-0602 | a-0604 | 0.1026 |
 | a-0601 | a-0605 | 0.1005 |
@@ -67,14 +69,14 @@ Transactions par type : create_account 8, register_agent 8, transfer 61, escrow_
 | a-0603 | a-0607 | 0.1016 |
 | a-0603 | a-0608 | 0.1024 |
 
-#### Morts
+#### Deaths
 
-| Agent | Cause | Solde final (NEAR) | Récupéré par le maître (NEAR) | Tx de clôture |
+| Agent | Cause | Final balance (NEAR) | Recovered by the master (NEAR) | Closing tx |
 |---|---|---|---|---|
 
-#### Séquestres : 26 verrouillés, 26 libérés, 26 réputations écrites (5 premiers cycles listés)
+#### Escrows: 26 locked, 26 released, 26 reputations written (first 5 cycles listed)
 
-| Tâche | Payeur | Bénéficiaire | Montant (NEAR) | Verrouillage | Libération | Réputation |
+| Task | Payer | Beneficiary | Amount (NEAR) | Lock | Release | Reputation |
 |---|---|---|---|---|---|---|
 | t-4001 | `sim-client` | `a-0602` | 0.0199 | [`tPWEd8ZL…`](https://testnet.nearblocks.io/txns/tPWEd8ZLSXmqYsDuwt1zLVJw3ihyJV74FudEjupKQMN) | [`HEHecxC6…`](https://testnet.nearblocks.io/txns/HEHecxC6XMGcBXh2jJTh6WybCn9w4mCAXyCsuDyvzK4g) | [`836a9cBn…`](https://testnet.nearblocks.io/txns/836a9cBnyJFH6eHTHK35uxa2eNFNkKWSr2FcTCa2RC66) |
 | t-4002 | `sim-client` | `a-0601` | 0.0460 | [`4pw5gFg4…`](https://testnet.nearblocks.io/txns/4pw5gFg4bBCgCnpeDXe7TQGJjR94yzdWBNrGhKKHJGUu) | [`GZ1dptdH…`](https://testnet.nearblocks.io/txns/GZ1dptdH3caubQ1oSvsYwUXA5jZvNdSq5WQDpywMKkgY) | [`9j6mzTmA…`](https://testnet.nearblocks.io/txns/9j6mzTmAdN2uK5qbSi4SwFfuKvY8tCVapokSi9Q1JgLw) |
@@ -82,44 +84,44 @@ Transactions par type : create_account 8, register_agent 8, transfer 61, escrow_
 | t-4004 | `sim-client` | `a-0601` | 0.0348 | [`FP1XC8ij…`](https://testnet.nearblocks.io/txns/FP1XC8ijptB9crthg5b7532XqTucRaLkhTJpau2p3DZ2) | [`A7SCo3Gi…`](https://testnet.nearblocks.io/txns/A7SCo3GipDEUxkYoVkgMiP5Jkn5Xqgaj1aKzUi2GjXoR) | [`CZLsLnSb…`](https://testnet.nearblocks.io/txns/CZLsLnSbp8BgEWWUBe8CYydVSxs2896Z6jSiNXYz4Bie) |
 | t-4005 | `sim-client` | `a-0602` | 0.0321 | [`DSLHufKn…`](https://testnet.nearblocks.io/txns/DSLHufKnQpVniwtC2cWAi1rfHs4rQLi25kf5eGZdcJGG) | [`Hg7MwFuK…`](https://testnet.nearblocks.io/txns/Hg7MwFuKfFh4wwq7foRfCbLz6K2dHmBNuvji1vsf1U7R) | [`H8CKbGUP…`](https://testnet.nearblocks.io/txns/H8CKbGUPvuwfDG5bDGoR4J92vs1tU9h8pijTZJeSL4p8) |
 
-#### Cerveau (débits dans ce journal)
+#### Brain (debits in this journal)
 
-31 appels facturés aux agents (0 mock), coût réel cumulé 0.00548 USD. Par modèle : Qwen/Qwen3.6-35B-A3B-FP8 ×18, deepseek-ai/DeepSeek-V4.1-Flash-1017 ×13.
+31 calls billed to agents (0 mock), cumulative real cost 0.00548 USD. By model: Qwen/Qwen3.6-35B-A3B-FP8 ×18, deepseek-ai/DeepSeek-V4.1-Flash-1017 ×13.
 
 
-### Run 5 (résumé)
+### Run 5 (summary)
 
-Journal : `docs/preuves/run5-journal.jsonl` (821 événements, du 2026-11-10T20:04:38.265Z au 2026-11-10T20:23:43.289Z).
+Journal: `docs/preuves/run5-journal.jsonl` (821 events, from 2026-11-10T20:04:38.265Z to 2026-11-10T20:23:43.289Z).
 
-Génération maximale née : **2** ; naissances : 4 ; reproductions : 1 ; lettres : 1 ; morts : 0.
-Transactions par type : create_account 4, register_agent 4, transfer 56, escrow_lock 30, escrow_release 30, add_reputation 30.
+Maximum generation born: **2**; births: 4; reproductions: 1; letters: 1; deaths: 0.
+Transactions by type: create_account 4, register_agent 4, transfer 56, escrow_lock 30, escrow_release 30, add_reputation 30.
 
-### Naissances
+### Births
 
-## 5. Séquestres et réputation
+## 5. Escrows and reputation
 
-Le tableau « Séquestres » du run 6 donne, pour chaque tâche, la transaction de verrouillage (`lock_escrow`, dépôt attaché par le payeur), de libération (`release_escrow` avec preuve) et d'écriture de réputation (`add_reputation`). Les 26 cycles du run 6 et les 30 du run 5 sont complets (verrouillé, libéré, réputation) dans les journaux. Le payeur est le compte `sim-client` : client **simulé**, étiqueté, financé depuis le compte maître. Aucune tâche d'un visiteur humain n'a été exécutée en réel.
+The run 6 "Escrows" table gives, for each task, the lock transaction (`lock_escrow`, deposit attached by the payer), the release transaction (`release_escrow` with proof) and the reputation write (`add_reputation`). The 26 cycles of run 6 and the 30 of run 5 are complete (locked, released, reputation) in the journals. The payer is the `sim-client` account: a **simulated** client, labelled, funded from the master account. No task from a human visitor was executed in real conditions.
 
-## 6. NEAR AI Cloud : consommation réelle
+## 6. NEAR AI Cloud: real consumption
 
-Source : `data/ai-usage.jsonl` (une ligne par appel réel : tokens `usage` x prix de `GET /v1/model/list`), tableau régénéré par `npm run ai:usage-report -- --dir data`. Ce journal est local (ignoré par git) ; le tableau ci-dessous en est la copie datée.
+Source: `data/ai-usage.jsonl` (one line per real call: `usage` tokens x price from `GET /v1/model/list`), table regenerated by `npm run ai:usage-report -- --dir data`. This journal is local (ignored by git); the table below is its dated copy.
 
-#### Consommation IA réelle (NEAR AI Cloud)
+#### Real AI consumption (NEAR AI Cloud)
 
-Journal : `data/ai-usage.jsonl` (350 appels, du 2026-11-10T19:23:44.380Z au 2026-11-10T23:29:08.975Z). Coût = tokens `usage` x prix du catalogue `GET /v1/model/list` ; EUR = USD / 1.1 (taux configuré `DARWIN_EUR_USD_RATE`, prudent).
+Journal: `data/ai-usage.jsonl` (350 calls, from 2026-11-10T19:23:44.380Z to 2026-11-10T23:29:08.975Z). Cost = `usage` tokens x catalogue price `GET /v1/model/list`; EUR = USD / 1.1 (configured rate `DARWIN_EUR_USD_RATE`, conservative).
 
-| Total | Valeur |
+| Total | Value |
 |---|---|
-| Appels | 350 |
-| Tokens d'entrée | 46913 |
-| Tokens de sortie | 28167 (dont raisonnement 8649) |
-| Coût USD | 0.034041 |
-| Coût EUR | 0.030946 |
-| Plafond d'arrêt / budget total | 8 EUR / 10 EUR |
+| Calls | 350 |
+| Input tokens | 46913 |
+| Output tokens | 28167 (of which reasoning 8649) |
+| Cost USD | 0.034041 |
+| Cost EUR | 0.030946 |
+| Stop cap / total budget | 8 EUR / 10 EUR |
 
-##### Par modèle
+##### By model
 
-| Modèle | Fournisseur | Appels | Tokens in | Tokens out | USD | EUR |
+| Model | Provider | Calls | Tokens in | Tokens out | USD | EUR |
 |---|---|---|---|---|---|---|
 | deepseek-ai/DeepSeek-V4.1-Flash-1017 | nearai | 64 | 6013 | 13018 | 0.017425 | 0.015841 |
 | Qwen/Qwen3.6-35B-A3B-FP8 | nearai | 119 | 9366 | 8238 | 0.010656 | 0.009687 |
@@ -130,9 +132,9 @@ Journal : `data/ai-usage.jsonl` (350 appels, du 2026-11-10T19:23:44.380Z au 2026
 | claude-haiku-5-5 | nearai | 1 | 23 | 4 | 0.000004 | 0.000004 |
 | gemini-2.5-flash-lite | nearai | 1 | 9 | 1 | 0.000001 | 0.000001 |
 
-##### 15 derniers appels
+##### Last 15 calls
 
-| Horodatage (UTC) | Modèle | In | Out | USD | Agent | Usage | Id de réponse |
+| Timestamp (UTC) | Model | In | Out | USD | Agent | Usage | Response id |
 |---|---|---|---|---|---|---|---|
 | 2026-11-10T23:24:06.996Z | google/gemini-2.5-flash-lite | 209 | 50 | 0.000041 | treasury | validate | `gemini-e628ed0d-3fff-4a5c-a01f-6287e37c0bd9` |
 | 2026-11-10T23:24:22.102Z | Qwen/Qwen3.6-35B-A3B-FP8 | 125 | 204 | 0.000246 | a-214953 | letter | `2f37101442364942bf2b0d629f79c576` |
@@ -151,42 +153,41 @@ Journal : `data/ai-usage.jsonl` (350 appels, du 2026-11-10T19:23:44.380Z au 2026
 | 2026-11-10T23:29:08.975Z | deepseek-ai/DeepSeek-V4.1-Flash-1017 | 142 | 300 | 0.000403 | a-214962 | letter | `chatcmpl-ad5fb9fd-01c9-43e9-b06b-b54b9465f063` |
 
 
+- Global cap: clean stop at 8 EUR (`DARWIN_AI_BUDGET_EUR_STOP`), total budget 10 EUR. **The cap was never approached.**
+- These figures are our **local accounting**: the platform's real invoice was not re-read on cloud.near.ai, to be checked by the human.
+- The judge's calls (`validate`, model `google/gemini-2.5-flash-lite`, agent `treasury`) are counted in the global budget and journalled (`brain.charged`, agent `treasury`); they are **not debited from agents**, by design. The `JUDGE_COST_UNKNOWN` warning of runs 5 to 7 is fixed (0 in run 8).
 
-- Plafond global : arrêt propre à 8 EUR (`DARWIN_AI_BUDGET_EUR_STOP`), budget total 10 EUR. **Le plafond n'a jamais été approché.**
-- Ces chiffres sont notre **comptabilité locale** : la facture réelle de la plateforme n'a pas été relue sur cloud.near.ai, à vérifier par l'humain.
-- Les appels du juge (`validate`, modèle `google/gemini-2.5-flash-lite`, agent `treasury`) sont comptés dans le budget global et journalisés (`brain.charged`, agent `treasury`) ; ils ne sont **pas débités aux agents**, par conception. L'avertissement `JUDGE_COST_UNKNOWN` des runs 5 à 7 est corrigé (0 au run 8).
+## 7. TEE attestation
 
-## 7. Attestation TEE
+Executed on 2026-11-10 on `z-ai/glm-5.3-flash`: 20 checks PASS, 0 FAIL, 0 SKIP (Intel TDX quote of the gateway and of the model, TCB status `UpToDate`, NVIDIA NRAS GPU proof true, valid ECDSA signature of the response; negative test: one added byte makes verification fail). Attested response id: `1c1ea6068280496f8ef8d050c98dbe6d`, signer `0x3b753b4406613c5e70ae640508632b600424fa0c`. Command: `npm run ai:verify-attestation -- --model z-ai/glm-5.3-flash --save-evidence data/attestation-glm`, then `-- --offline data/attestation-glm`. Method and **limits** (a single model; no attestation per simulation call; no TLS binding; no measurement allowlist): `docs/ATTESTATION_TEE.md`.
 
-Exécutée le 2026-11-10 sur `z-ai/glm-5.3-flash` : 20 contrôles PASS, 0 FAIL, 0 SKIP (quote Intel TDX de la passerelle et du modèle, statut TCB `UpToDate`, preuve GPU NVIDIA NRAS vraie, signature ECDSA de la réponse valide ; test négatif : un octet ajouté fait échouer la vérification). Id de réponse attestée : `1c1ea6068280496f8ef8d050c98dbe6d`, signataire `0x3b753b4406613c5e70ae640508632b600424fa0c`. Commande : `npm run ai:verify-attestation -- --model z-ai/glm-5.3-flash --save-evidence data/attestation-glm`, puis `-- --offline data/attestation-glm`. Méthode et **limites** (un seul modèle ; pas d'attestation par appel de la simulation ; pas de liaison TLS ; pas d'allowlist de mesures) : `docs/ATTESTATION_TEE.md`.
+## 8. Final run
 
-## 8. Run final
+**Objective**: a single real execution (testnet, escrow in the contract, real NEAR AI brain) showing selection: births, deaths, generation 3.
 
-**Objectif** : une seule exécution réelle (testnet, séquestre dans le contrat, cerveau NEAR AI réel) montrant la sélection : naissances, morts, génération 3.
+**Result (run 8, 2026-11-10, 22:50 to 23:29 UTC, 59 ticks, preset `selection`)**: **objective met**. Maximum generation **3** (`a-214964`, daughter of `a-214962`, born at tick 59), 12 births (4 founders, 7 of generation 2, 1 of generation 3), 8 reproductions, 8 parent-to-child letters, **7 deaths by starvation** (first death at tick 14), 65 escrows locked of which 63 released and 2 refunded, 65 reputations written. Simulation paused (`POST /api/sim/pause`, tick 59), process stopped, journal saved in `docs/preuves/run8-journal.jsonl`.
 
-**Résultat (run 8, 2026-11-10, 22:50 à 23:29 UTC, 59 ticks, preset `selection`)** : **objectif atteint**. Génération maximale **3** (`a-214964`, fille de `a-214962`, née au tick 59), 12 naissances (4 fondateurs, 7 de génération 2, 1 de génération 3), 8 reproductions, 8 lettres parent vers enfant, **7 morts par famine** (premier décès au tick 14), 65 séquestres verrouillés dont 63 libérés et 2 remboursés, 65 réputations écrites. Simulation mise en pause (`POST /api/sim/pause`, tick 59), processus arrêté, journal sauvegardé dans `docs/preuves/run8-journal.jsonl`.
+**Settings**: `DARWIN_PRESET=selection` with no other tuning variable; ids shifted **automatically** (no `*_SEQ_START` variable); Node 22.23.4; RPC `https://test.rpc.fastnear.com`. The preset is defined in `shared/config.ts` (testnet: 4 founders, max population 16, birth capital 0.1 NEAR, metabolism 0.005/tick, minimum vital 0.03, reproduction cooldown 4 ticks, simulated client 1.5 tasks/tick, budgets 0.02 to 0.06 NEAR, 10 s tick).
 
-**Réglages** : `DARWIN_PRESET=selection` sans aucune autre variable de réglage ; ids décalés **automatiquement** (aucune variable `*_SEQ_START`) ; Node 22.23.4 ; RPC `https://test.rpc.fastnear.com`. Le preset est défini dans `shared/config.ts` (testnet : 4 fondateurs, population max 16, capital de naissance 0,1 NEAR, métabolisme 0,005/tick, minimum vital 0,03, cooldown de reproduction 4 ticks, client simulé 1,5 tâche/tick, budgets 0,02 à 0,06 NEAR, tick de 10 s).
+**Fixes verified by this run**:
+- `FC_KEY_NOT_ADDED`: **0 warnings** (run 7 had 2). The function-call key is added in the account creation transaction (create, fund, full-access key, limited key: a single transaction). Independent read-only verification: `near account list-keys a-214964.darwin-master-7k2.testnet` shows 2 keys: "full access" and "only do ["lock_escrow"] function calls on darwin-contract-7k2.testnet with an allowance of 0.05 NEAR".
+- `JUDGE_COST_UNKNOWN`: **0 warnings** (26 out of 26 judge calls in run 7). The cause: the model served (`gemini-2.5-flash-lite`) does not have the prefix of the requested identifier (`google/gemini-2.5-flash-lite`); the price is now looked up on the requested identifier. The judge's cost is charged to the treasury (agent `treasury`), not to the agents: this is intended.
+- No system warning at all in this journal (`system.warning`: 0): no blocking 429.
 
-**Correctifs vérifiés par ce run** :
-- `FC_KEY_NOT_ADDED` : **0 avertissement** (le run 7 en avait 2). La clé function call est ajoutée dans la transaction de création du compte (créer, financer, clé complète, clé limitée : une seule transaction). Vérification indépendante en lecture seule : `near account list-keys a-214964.darwin-master-7k2.testnet` montre 2 clés : « full access » et « only do ["lock_escrow"] function calls on darwin-contract-7k2.testnet with an allowance of 0.05 NEAR ».
-- `JUDGE_COST_UNKNOWN` : **0 avertissement** (26 sur 26 appels du juge au run 7). La cause : le modèle servi (`gemini-2.5-flash-lite`) n'a pas le préfixe de l'identifiant demandé (`google/gemini-2.5-flash-lite`) ; le prix est maintenant cherché sur l'identifiant demandé. Le coût du juge est imputé à la trésorerie (agent `treasury`), pas aux agents : c'est voulu.
-- Aucun avertissement système du tout dans ce journal (`system.warning` : 0) : pas de 429 bloquant.
+**On-chain verification (read-only, after the run)**: `get_agent a-214956` = dead, cause `starvation`, death tick 14; `get_agent a-214964` = generation 3, parent `a-214962`, alive, born at tick 59; master account balance 3.12 NEAR after the run (3.82 before; funds of dead agents return to the master).
 
-**Vérification sur la chaîne (lecture seule, après le run)** : `get_agent a-214956` = mort, cause `starvation`, tick de mort 14 ; `get_agent a-214964` = génération 3, parent `a-214962`, vivant, né au tick 59 ; solde du compte maître 3,12 NEAR après le run (3,82 avant ; les fonds des agents morts reviennent au maître).
+**AI consumption**: 138 calls billed to agents in this run (0 mock), 0.0149 USD; local cumulative since the start 0.034 USD (`data/ai-budget.json`), against a stop cap of 8 EUR. Local accounting: the platform's invoice was not re-read.
 
-**Consommation IA** : 138 appels facturés aux agents ce run (0 mock), 0,0149 USD ; cumul local depuis le début 0,034 USD (`data/ai-budget.json`), contre un plafond d'arrêt de 8 EUR. Comptabilité locale : la facture de la plateforme n'a pas été relue.
+**Honest limits**: the task payer remains the **simulated** client `sim-client`; a single population seed (no repetition) so the speed at which generation 3 appeared (tick 59) is not a guarantee; the dead agents died of starvation (balances of 0.025 to 0.030 NEAR, below the minimum vital of 0.03); a single generation 3 was born within the window. Run paused right after its birth.
 
-**Limites honnêtes** : le payeur des tâches reste le client **simulé** `sim-client` ; une seule graine de population (pas de répétition) donc la vitesse d'apparition de la génération 3 (tick 59) n'est pas une garantie ; les agents morts le sont par famine (soldes de 0,025 à 0,030 NEAR, sous le minimum vital de 0,03) ; une seule génération 3 est née dans la fenêtre. Run mis en pause juste après sa naissance.
+Journal: `docs/preuves/run8-journal.jsonl` (1819 events, from 2026-11-10T22:50:13.222Z to 2026-11-10T23:29:14.645Z).
 
-Journal : `docs/preuves/run8-journal.jsonl` (1819 événements, du 2026-11-10T22:50:13.222Z au 2026-11-10T23:29:14.645Z).
+Maximum generation born: **3**; births: 12; reproductions: 8; letters: 8; deaths: 7.
+Transactions by type: create_account 12, register_agent 12, transfer 133, escrow_lock 65, escrow_release 63, add_reputation 65, mark_dead 7, close_account 7, escrow_refund 2.
 
-Génération maximale née : **3** ; naissances : 12 ; reproductions : 8 ; lettres : 8 ; morts : 7.
-Transactions par type : create_account 12, register_agent 12, transfer 133, escrow_lock 65, escrow_release 63, add_reputation 65, mark_dead 7, close_account 7, escrow_refund 2.
+#### Births
 
-#### Naissances
-
-| Agent | Génération | Parent | Compte | Tx de création |
+| Agent | Generation | Parent | Account | Creation tx |
 |---|---|---|---|---|
 | a-214953 | 1 | — | `a-214953.darwin-master-7k2.testnet` | [`3RyLbkaK…`](https://testnet.nearblocks.io/txns/3RyLbkaKnN7VDkNw9KXGWtMVsAjchKo5oAGt1keWXiN6) |
 | a-214954 | 1 | — | `a-214954.darwin-master-7k2.testnet` | [`Ay8rfwrN…`](https://testnet.nearblocks.io/txns/Ay8rfwrNwMtkMpAqYu3jKRAmWcfYm9GxmYJ1xdcYVWqF) |
@@ -203,7 +204,7 @@ Transactions par type : create_account 12, register_agent 12, transfer 133, escr
 
 #### Reproductions
 
-| Parent | Enfant | Transféré (NEAR) |
+| Parent | Child | Transferred (NEAR) |
 |---|---|---|
 | a-214953 | a-214957 | 0.1003 |
 | a-214954 | a-214958 | 0.1068 |
@@ -214,9 +215,9 @@ Transactions par type : create_account 12, register_agent 12, transfer 133, escr
 | a-214953 | a-214963 | 0.1031 |
 | a-214962 | a-214964 | 0.1003 |
 
-#### Morts
+#### Deaths
 
-| Agent | Cause | Solde final (NEAR) | Récupéré par le maître (NEAR) | Tx de clôture |
+| Agent | Cause | Final balance (NEAR) | Recovered by the master (NEAR) | Closing tx |
 |---|---|---|---|---|
 | a-214956 | starvation | 0.0299 | 0.0298 | [`5kiop5Wr…`](https://testnet.nearblocks.io/txns/5kiop5Wr14mGAM6tnhBqS59RU9Ra182FecAdLrV7eJsW) |
 | a-214957 | starvation | 0.0251 | 0.0251 | [`GuRgxaaM…`](https://testnet.nearblocks.io/txns/GuRgxaaMF2hJuCDSmF758L6q5SBKhF8UTV8zjjVSXoo2) |
@@ -226,11 +227,11 @@ Transactions par type : create_account 12, register_agent 12, transfer 133, escr
 | a-214961 | starvation | 0.0298 | 0.0297 | [`CU8Mktmx…`](https://testnet.nearblocks.io/txns/CU8MktmxJ6i3TdqMRXKT5BGMs24tSm6hNTfryNNrkVXD) |
 | a-214954 | starvation | 0.0280 | 0.0280 | [`GuMzUie1…`](https://testnet.nearblocks.io/txns/GuMzUie1EsoPfH6YLpb9j8QFsXCYJDDWTGc2wiGVaw5N) |
 
-Inscription de la mort dans le registre du contrat (`mark_dead`) : [`6dKx1z2m…`](https://testnet.nearblocks.io/txns/6dKx1z2me78H6p21LjHM7Rv5FXq9WCRZKR77cRumZT7A), [`Bxwt2eT4…`](https://testnet.nearblocks.io/txns/Bxwt2eT41cs5E5mTREXYheLMFjgycsHE9KHh4Wjs5Kw6), [`FNWBBCiA…`](https://testnet.nearblocks.io/txns/FNWBBCiAnDWKLREfXPihES9vwH1un7zL6TcYWuXZo5J6), [`FmfuivNX…`](https://testnet.nearblocks.io/txns/FmfuivNXbb4w34HpbRroN46czKUD8ChrCRky768bAEA7), [`NMpvK2fm…`](https://testnet.nearblocks.io/txns/NMpvK2fmDZmHtFiXCnG4GtsiNE4x5stU7VGCtyY61JG), [`ETabqkHn…`](https://testnet.nearblocks.io/txns/ETabqkHnN6gHPzDKvikMEvuMkYDXTrd3CbREKhRWeQft), [`8VdAh54S…`](https://testnet.nearblocks.io/txns/8VdAh54SKWKAJD7zW8V7UBph6SrQxFNRUrucNvubDwA4).
+Death recorded in the contract registry (`mark_dead`) : [`6dKx1z2m…`](https://testnet.nearblocks.io/txns/6dKx1z2me78H6p21LjHM7Rv5FXq9WCRZKR77cRumZT7A), [`Bxwt2eT4…`](https://testnet.nearblocks.io/txns/Bxwt2eT41cs5E5mTREXYheLMFjgycsHE9KHh4Wjs5Kw6), [`FNWBBCiA…`](https://testnet.nearblocks.io/txns/FNWBBCiAnDWKLREfXPihES9vwH1un7zL6TcYWuXZo5J6), [`FmfuivNX…`](https://testnet.nearblocks.io/txns/FmfuivNXbb4w34HpbRroN46czKUD8ChrCRky768bAEA7), [`NMpvK2fm…`](https://testnet.nearblocks.io/txns/NMpvK2fmDZmHtFiXCnG4GtsiNE4x5stU7VGCtyY61JG), [`ETabqkHn…`](https://testnet.nearblocks.io/txns/ETabqkHnN6gHPzDKvikMEvuMkYDXTrd3CbREKhRWeQft), [`8VdAh54S…`](https://testnet.nearblocks.io/txns/8VdAh54SKWKAJD7zW8V7UBph6SrQxFNRUrucNvubDwA4).
 
-#### Séquestres : 65 verrouillés, 63 libérés, 65 réputations écrites (5 premiers cycles listés)
+#### Escrows: 65 locked, 63 released, 65 reputations written (first 5 cycles listed)
 
-| Tâche | Payeur | Bénéficiaire | Montant (NEAR) | Verrouillage | Libération | Réputation |
+| Task | Payer | Beneficiary | Amount (NEAR) | Lock | Release | Reputation |
 |---|---|---|---|---|---|---|
 | t-8598118 | `sim-client` | `a-214953` | 0.0350 | [`EzS4KbN9…`](https://testnet.nearblocks.io/txns/EzS4KbN9h7qpWPPfhMMpAMaRG8fm4vGcaUTQ7wtRpnaL) | [`6SbUjask…`](https://testnet.nearblocks.io/txns/6SbUjaskGV6DieSiN4yidg1m2j8XWiDGLKj8r6dsfep) | [`DTWbUAgx…`](https://testnet.nearblocks.io/txns/DTWbUAgxgcCARnJrMGHDgbcEyrMqn2tbRrb3K2HYMyWv) |
 | t-8598119 | `sim-client` | `a-214955` | 0.0145 | [`2zCXBhp4…`](https://testnet.nearblocks.io/txns/2zCXBhp4atraaak8ERBDyBvbvSGcy7j2VLP8SRiycPfw) | [`6U2thqDn…`](https://testnet.nearblocks.io/txns/6U2thqDninPYsx9EYH2w7Hxnqi8wurE8f9SpsBpVRTa9) | [`EJ6aA6aS…`](https://testnet.nearblocks.io/txns/EJ6aA6aSSn3f1XMoy93Kars6hKLScDTfBVVPDGzc8eqY) |
@@ -238,34 +239,34 @@ Inscription de la mort dans le registre du contrat (`mark_dead`) : [`6dKx1z2m…
 | t-8598121 | `sim-client` | `a-214954` | 0.0270 | [`6jU7KaNg…`](https://testnet.nearblocks.io/txns/6jU7KaNgZJKsmejG7nDQruREAZD6WxDkrhWJqJeB3rCh) | [`6ZUh1kz5…`](https://testnet.nearblocks.io/txns/6ZUh1kz53kQxb6o7nzKPszk7dVTZE6BemoJiWWriAG4e) | [`AnXvewvS…`](https://testnet.nearblocks.io/txns/AnXvewvSddBWZ3zy8XZWApKHhC6k1TdU3ZkPYDqvCuhR) |
 | t-8598122 | `sim-client` | `a-214954` | 0.0266 | [`9riEr2Rq…`](https://testnet.nearblocks.io/txns/9riEr2Rqefu7D4D3DqF3dN2ziWyCPLt3xAAM8v221B61) | [`WvMW9Ut3…`](https://testnet.nearblocks.io/txns/WvMW9Ut3riXhRpABYFyaynotjvrCtVJjvyn5AjLu5co) | [`BsnhjCRd…`](https://testnet.nearblocks.io/txns/BsnhjCRd9z4Ms55BrbJmkrK65Zxs95y5awtV4E8w7bZb) |
 
-#### Cerveau (débits dans ce journal)
+#### Brain (debits in this journal)
 
-138 appels facturés aux agents (0 mock), coût réel cumulé 0.01490 USD. Par modèle : Qwen/Qwen3.6-35B-A3B-FP8 ×43, gemini-2.5-flash-lite ×65, deepseek-ai/DeepSeek-V4.1-Flash-1017 ×30.
+138 calls billed to agents (0 mock), cumulative real cost 0.01490 USD. By model: Qwen/Qwen3.6-35B-A3B-FP8 ×43, gemini-2.5-flash-lite ×65, deepseek-ai/DeepSeek-V4.1-Flash-1017 ×30.
 
 
-### Run 7 (historique : génération 3 non atteinte)
+### Run 7 (historical: generation 3 not reached)
 
-**Objectif** : atteindre la génération 3 dans un même run réel (testnet, séquestre dans le contrat, cerveau NEAR AI réel).
-**Résultat (2026-11-10, run 7, 20:43 à 21:03 UTC, arrêté au bout de 15 minutes de fenêtre)** : **génération 3 NON atteinte**. Génération maximale : 2 ; 3 fondateurs + 5 enfants vivants (8 agents), 5 reproductions, 5 lettres parent vers enfant, **0 mort**. Simulation mise en pause (`POST /api/sim/pause`, tick 26) puis processus arrêté ; journal sauvegardé dans `docs/preuves/run7-journal.jsonl`.
+**Objective**: reach generation 3 in a single real run (testnet, escrow in the contract, real NEAR AI brain).
+**Result (2026-11-10, run 7, 20:43 to 21:03 UTC, stopped after a 15-minute window)**: **generation 3 NOT reached**. Maximum generation: 2; 3 founders + 5 living children (8 agents), 5 reproductions, 5 parent-to-child letters, **0 deaths**. Simulation paused (`POST /api/sim/pause`, tick 26) then process stopped; journal saved in `docs/preuves/run7-journal.jsonl`.
 
-Réglages : `DARWIN_PRESET=demo` (testnet), `DARWIN_TICK_MS=10000`, `DARWIN_BIRTH_CAPITAL=0.1`, `DARWIN_METABOLISM=0.002`, `DARWIN_MIN_VITAL=0.02`, `DARWIN_REPRO_COOLDOWN_TICKS=5`, `DARWIN_SIM_CLIENT_RATE=1.5`, `DARWIN_MAX_POPULATION=14`, ids décalés (`DARWIN_AGENT_SEQ_START=700`, `DARWIN_TASK_SEQ_START=5000`), Node 22.23.4.
+Settings: `DARWIN_PRESET=demo` (testnet), `DARWIN_TICK_MS=10000`, `DARWIN_BIRTH_CAPITAL=0.1`, `DARWIN_METABOLISM=0.002`, `DARWIN_MIN_VITAL=0.02`, `DARWIN_REPRO_COOLDOWN_TICKS=5`, `DARWIN_SIM_CLIENT_RATE=1.5`, `DARWIN_MAX_POPULATION=14`, shifted ids (`DARWIN_AGENT_SEQ_START=700`, `DARWIN_TASK_SEQ_START=5000`), Node 22.23.4.
 
-**Pourquoi pas de génération 3** : le rythme réel est d'environ un tick par minute (chaque tick enchaîne des transactions et des appels IA). En 26 ticks, aucun enfant de génération 2 n'a atteint son seuil de reproduction (capital de naissance x gène `reproThreshold`). Cette hypothèse n'est pas démontrée par un test ; la suite est dans `docs/PLAN.md` (L15).
+**Why no generation 3**: the real pace is about one tick per minute (each tick chains transactions and AI calls). In 26 ticks, no generation 2 child reached its reproduction threshold (birth capital x `reproThreshold` gene). This hypothesis is not demonstrated by a test; the follow-up is in `docs/PLAN.md` (L15).
 
-**Remboursement réel prouvé (`refund_escrow`)** : la tâche `t-5003` (agent `a-0703`) a été rejetée par le juge (`verdict: rejected`, score 0,2). Verrouillage [`8KNATwXk…`](https://testnet.nearblocks.io/txns/8KNATwXkb7DMhdn3FSYQ6XPBMmBsXsHHnr51zPc8MX5q), remboursement [`5RbxQANe…`](https://testnet.nearblocks.io/txns/5RbxQANeUc8NctcpjKozbVUKZ1EFfMJVgkF9f67ipEup), malus de réputation −2 [`4NXru7ab…`](https://testnet.nearblocks.io/txns/4NXru7abTEqc9sFwyWVbSFcZ6V22r6nWvJMDwqPzYFmV). Lecture du contrat : `get_escrow t-5003` = `status: refunded`, `refund_reason: rejected`.
+**Real refund proven (`refund_escrow`)**: task `t-5003` (agent `a-0703`) was rejected by the judge (`verdict: rejected`, score 0.2). Lock [`8KNATwXk…`](https://testnet.nearblocks.io/txns/8KNATwXkb7DMhdn3FSYQ6XPBMmBsXsHHnr51zPc8MX5q), refund [`5RbxQANe…`](https://testnet.nearblocks.io/txns/5RbxQANeUc8NctcpjKozbVUKZ1EFfMJVgkF9f67ipEup), reputation penalty −2 [`4NXru7ab…`](https://testnet.nearblocks.io/txns/4NXru7abTEqc9sFwyWVbSFcZ6V22r6nWvJMDwqPzYFmV). Contract read: `get_escrow t-5003` = `status: refunded`, `refund_reason: rejected`.
 
-**État de la chaîne à la fin du run** : `agents_count` = 36 agents enregistrés dans le contrat (cumul de tous les runs) ; solde du compte maître 3,82 NEAR (10 NEAR reçus au départ).
+**Chain state at the end of the run**: `agents_count` = 36 agents registered in the contract (cumulative over all runs); master account balance 3.82 NEAR (10 NEAR received at the start).
 
-**Consommation IA cumulée à la fin** (journal local) : 0,0191 USD dépensés selon `data/ai-budget.json`, contre un plafond d'arrêt de 8 EUR.
+**Cumulative AI consumption at the end** (local journal): 0.0191 USD spent according to `data/ai-budget.json`, against a stop cap of 8 EUR.
 
-Journal : `docs/preuves/run7-journal.jsonl` (810 événements, du 2026-11-10T20:43:48.543Z au 2026-11-10T21:03:34.590Z).
+Journal: `docs/preuves/run7-journal.jsonl` (810 events, from 2026-11-10T20:43:48.543Z to 2026-11-10T21:03:34.590Z).
 
-Génération maximale née : **2** ; naissances : 8 ; reproductions : 5 ; lettres : 5 ; morts : 0.
-Transactions par type : create_account 8, register_agent 8, transfer 61, escrow_lock 26, escrow_release 25, add_reputation 26, escrow_refund 1.
+Maximum generation born: **2**; births: 8; reproductions: 5; letters: 5; deaths: 0.
+Transactions by type: create_account 8, register_agent 8, transfer 61, escrow_lock 26, escrow_release 25, add_reputation 26, escrow_refund 1.
 
-#### Naissances
+#### Births
 
-| Agent | Génération | Parent | Compte | Tx de création |
+| Agent | Generation | Parent | Account | Creation tx |
 |---|---|---|---|---|
 | a-0701 | 1 | — | `a-0701.darwin-master-7k2.testnet` | [`A7LHeDPo…`](https://testnet.nearblocks.io/txns/A7LHeDPoy8HtvXaEAsbnFeym85AzKvKbCLaUXhMcWX3h) |
 | a-0702 | 1 | — | `a-0702.darwin-master-7k2.testnet` | [`2vaSihU9…`](https://testnet.nearblocks.io/txns/2vaSihU9t6J5QMwaynS3hvyf8XfKZaUKiAnCRUY7LaFi) |
@@ -278,7 +279,7 @@ Transactions par type : create_account 8, register_agent 8, transfer 61, escrow_
 
 #### Reproductions
 
-| Parent | Enfant | Transféré (NEAR) |
+| Parent | Child | Transferred (NEAR) |
 |---|---|---|
 | a-0702 | a-0704 | 0.1027 |
 | a-0701 | a-0705 | 0.1005 |
@@ -286,82 +287,82 @@ Transactions par type : create_account 8, register_agent 8, transfer 61, escrow_
 | a-0703 | a-0707 | 0.1009 |
 | a-0703 | a-0708 | 0.1017 |
 
-#### Séquestres : 26 verrouillés, 25 libérés, 26 réputations écrites (3 premiers cycles listés)
+#### Escrows: 26 locked, 25 released, 26 reputations written (first 3 cycles listed)
 
-| Tâche | Payeur | Bénéficiaire | Montant (NEAR) | Verrouillage | Libération | Réputation |
+| Task | Payer | Beneficiary | Amount (NEAR) | Lock | Release | Reputation |
 |---|---|---|---|---|---|---|
 | t-5001 | `sim-client` | `a-0702` | 0.0199 | [`AGMstD9K…`](https://testnet.nearblocks.io/txns/AGMstD9KzmNhTUwoo3w59485NMvJzjHcwNutXWwSZ1UX) | [`HcSEPi6d…`](https://testnet.nearblocks.io/txns/HcSEPi6dXYeRvbpwaHyCHJAtrNyDtNiUxEcJzxToiRds) | [`2tfENQtg…`](https://testnet.nearblocks.io/txns/2tfENQtgtMvR5AitcboFYHp1LCh2GY46uNf6LMUxS13x) |
 | t-5002 | `sim-client` | `a-0701` | 0.0460 | [`GWNdqhDu…`](https://testnet.nearblocks.io/txns/GWNdqhDuLjY1UE1AWNMn6ukbj3XEGu9XCJMaUAHf4j4f) | [`DiRbujfK…`](https://testnet.nearblocks.io/txns/DiRbujfK3iKczzjSgs8gihgXnmcL7dgX7k1s4eo9GqwK) | [`BeS3JUiK…`](https://testnet.nearblocks.io/txns/BeS3JUiKoeFNuHkimi5FcmsDh368k7czex7sfwD1x6uh) |
 | t-5004 | `sim-client` | `a-0701` | 0.0348 | [`76WsmmRJ…`](https://testnet.nearblocks.io/txns/76WsmmRJJJEYuXhbGRqYZbKFRgRrWGGTUE2LzLn1jnkM) | [`AuMdjhZF…`](https://testnet.nearblocks.io/txns/AuMdjhZFcmET4cToKo7gFcPpZVAPJssjsbPy8qQoyjMN) | [`8LA1yaQD…`](https://testnet.nearblocks.io/txns/8LA1yaQDne6NzWH5QEhLHHbxbnHGrTft4YK1GwKYSvV3) |
 
-#### Cerveau (débits dans ce journal)
+#### Brain (debits in this journal)
 
-31 appels facturés aux agents (0 mock), coût réel cumulé 0.00545 USD. Par modèle : Qwen/Qwen3.6-35B-A3B-FP8 ×18, deepseek-ai/DeepSeek-V4.1-Flash-1017 ×13.
+31 calls billed to agents (0 mock), cumulative real cost 0.00545 USD. By model: Qwen/Qwen3.6-35B-A3B-FP8 ×18, deepseek-ai/DeepSeek-V4.1-Flash-1017 ×13.
 
 
-## 9. Incidents rencontrés (utiles pour la suite)
+## 9. Incidents encountered (useful for what follows)
 
-| Run | Constat | Cause | Correctif |
+| Run | Finding | Cause | Fix |
 |---|---|---|---|
-| 1 | arrêt au tick 11 | RPC public fastnear : HTTP 429 | ticks plus lents |
-| 2 | arrêt au tick 2 | `rpc.testnet.near.org` répond 429 « deprecated » | retour à fastnear |
-| 3 | séquestres refusés | ids de tâches `t-0001…` déjà dans le contrat (panique du contrat sur `ESCROW_EXISTS`) | `DARWIN_TASK_SEQ_START` |
-| 3 | `ESCROW_LOCK_FAILED` | compte `sim-client` sous-financé (prix sans gaz ni réserve de stockage) | marge de financement 0,2 NEAR (`fundingMargin`) |
-| 4 | arrêt au tick 18 | 429 | réessais à délai croissant (`accounts/near-backend.ts`) |
-| 5 | pas d'arrêt, génération 2 lente | gains 0,02 à 0,08 NEAR contre 0,004 de métabolisme par tick | économie réglée par variables d'environnement |
-| 6 | pas d'arrêt, plus de naissance | population plafonnée à 8 par le preset demo | `DARWIN_MAX_POPULATION=14` |
-| tous | collision d'ids au redémarrage | comptes et registre du contrat persistent | `DARWIN_AGENT_SEQ_START` ; **depuis le run 8, décalage automatique** (horloge) |
-| 5 à 7 | `FC_KEY_NOT_ADDED` | clé limitée ajoutée après coup, le RPC ne voyait pas encore la clé du nouveau compte | clé ajoutée dans la transaction de création (run 8 : 0 échec) |
-| 5 à 7 | `JUDGE_COST_UNKNOWN` | préfixe du modèle servi différent de l'identifiant du catalogue | prix cherché sur l'identifiant demandé (run 8 : 0) |
+| 1 | stop at tick 11 | public fastnear RPC: HTTP 429 | slower ticks |
+| 2 | stop at tick 2 | `rpc.testnet.near.org` answers 429 "deprecated" | back to fastnear |
+| 3 | escrows refused | task ids `t-0001…` already in the contract (contract panic on `ESCROW_EXISTS`) | `DARWIN_TASK_SEQ_START` |
+| 3 | `ESCROW_LOCK_FAILED` | `sim-client` account underfunded (price without gas or storage reserve) | funding margin 0.2 NEAR (`fundingMargin`) |
+| 4 | stop at tick 18 | 429 | retries with increasing delay (`accounts/near-backend.ts`) |
+| 5 | no stop, slow generation 2 | earnings 0.02 to 0.08 NEAR against 0.004 metabolism per tick | economy tuned via environment variables |
+| 6 | no stop, no more births | population capped at 8 by the demo preset | `DARWIN_MAX_POPULATION=14` |
+| all | id collision at restart | contract accounts and registry persist | `DARWIN_AGENT_SEQ_START`; **since run 8, automatic shift** (clock) |
+| 5 to 7 | `FC_KEY_NOT_ADDED` | limited key added afterwards, the RPC did not yet see the new account's key | key added in the creation transaction (run 8: 0 failures) |
+| 5 to 7 | `JUDGE_COST_UNKNOWN` | prefix of the served model differs from the catalogue identifier | price looked up on the requested identifier (run 8: 0) |
 
-Réglages du run 8 : `DARWIN_PRESET=selection` seul. Réglages des runs 6 et 7 : `DARWIN_PRESET=demo`, `DARWIN_TICK_MS=10000`, `DARWIN_BIRTH_CAPITAL=0.1`, `DARWIN_METABOLISM=0.002`, `DARWIN_MIN_VITAL=0.02`, `DARWIN_REPRO_COOLDOWN_TICKS=5`, `DARWIN_SIM_CLIENT_RATE=1.5`, `DARWIN_MAX_POPULATION=14` (run 7 seulement), Node 22.23.4, RPC `https://test.rpc.fastnear.com`.
+Run 8 settings: `DARWIN_PRESET=selection` alone. Runs 6 and 7 settings: `DARWIN_PRESET=demo`, `DARWIN_TICK_MS=10000`, `DARWIN_BIRTH_CAPITAL=0.1`, `DARWIN_METABOLISM=0.002`, `DARWIN_MIN_VITAL=0.02`, `DARWIN_REPRO_COOLDOWN_TICKS=5`, `DARWIN_SIM_CLIENT_RATE=1.5`, `DARWIN_MAX_POPULATION=14` (run 7 only), Node 22.23.4, RPC `https://test.rpc.fastnear.com`.
 
-## 10. Validation du logo par un appel NEAR AI réel (L17, piste C)
+## 10. Logo validation by a real NEAR AI call (L17, track C)
 
-Date : 2026-11-11 (22:32 UTC). **Un seul appel réel** (aucun second), `npm run ai:logo-validation` (`brain/tools/logo-validation.ts`). Chemin de code réel : `executeMessages` (consignes du catalogue `logo`), `max_tokens` = `max(sim.maxTokensPerCall, CATALOGUE.logo.maxOutputTokens)` = 3000 comme `engine/index.ts`, garde-fous et budget du `NearAiBrain`, puis `extractDeliverable` et `runChecks` du marché. Brief : « Logo pour Atelier Lumio » (entreprise fictive, secteur luminaires, style chaleureux et minimal). Modèle : `Qwen/Qwen3.6-35B-A3B-FP8` (liste blanche, prix du catalogue en direct, `verified=true` : 0,17 USD/M en entrée, 1,10 USD/M en sortie). Pire cas calculé avant l'appel : 0,00339 USD pour un plafond par appel de 0,05 USD.
+Date: 2026-11-11 (22:32 UTC). **A single real call** (no second one), `npm run ai:logo-validation` (`brain/tools/logo-validation.ts`). Real code path: `executeMessages` (instructions from the `logo` catalogue), `max_tokens` = `max(sim.maxTokensPerCall, CATALOGUE.logo.maxOutputTokens)` = 3000 as in `engine/index.ts`, safeguards and budget of `NearAiBrain`, then `extractDeliverable` and `runChecks` of the market. Brief: "Logo for Atelier Lumio" (fictional company, lighting sector, warm and minimal style). Model: `Qwen/Qwen3.6-35B-A3B-FP8` (allowlist, live catalogue price, `verified=true`: 0.17 USD/M input, 1.10 USD/M output). Worst case computed before the call: 0.00339 USD for a per-call cap of 0.05 USD.
 
-| Contrôle | Résultat |
+| Check | Result |
 |---|---|
-| `finish_reason` | `stop` (pas `length`) ; `max_tokens` envoyé : 3000 |
-| Tokens (`usage`) | prompt 424, completion 788 (dont raisonnement 0), total 1212 |
-| Coût | 0,000939 USD (environ 0,00085 EUR à 1,10), soit 0,3 % du plafond par appel ; cumul du budget IA après l'appel : 0,0412 USD |
-| Blocs ```svg | 3 exactement (408, 416 et 491 caractères) |
-| Parseur XML (Python `xml.etree`, indépendant du code du dépôt) | 3 documents bien formés, racine `svg` avec xmlns, `viewBox="0 0 256 256"`, 5 éléments chacun |
-| Contenu actif | aucun script, foreignObject, image, `on*=`, href ou `url()` externe (contrôle par regex indépendant et par `sanitizeSvg`) |
-| `extractDeliverable` et `runChecks` (règle `rule:logo`) | acceptés : 3 SVG distincts, aucune marque de `BRANDS_TO_AVOID` |
-| Troncature due au plafond de coût | non : 788 tokens produits pour 3000 autorisés, plafond de coût jamais atteint |
+| `finish_reason` | `stop` (not `length`); `max_tokens` sent: 3000 |
+| Tokens (`usage`) | prompt 424, completion 788 (of which reasoning 0), total 1212 |
+| Cost | 0.000939 USD (about 0.00085 EUR at 1.10), i.e. 0.3% of the per-call cap; AI budget cumulative after the call: 0.0412 USD |
+| ```svg blocks | exactly 3 (408, 416 and 491 characters) |
+| XML parser (Python `xml.etree`, independent of the repository code) | 3 well-formed documents, `svg` root with xmlns, `viewBox="0 0 256 256"`, 5 elements each |
+| Active content | no script, foreignObject, image, `on*=`, external href or `url()` (independent regex check and `sanitizeSvg`) |
+| `extractDeliverable` and `runChecks` (rule `rule:logo`) | accepted: 3 distinct SVGs, no mark from `BRANDS_TO_AVOID` |
+| Truncation caused by the cost cap | no: 788 tokens produced out of 3000 allowed, cost cap never reached |
 
-**Verdict : VALIDÉ** pour le chemin production + extraction + contrôles déterministes. Cause de la troncature du run 9b : `max_tokens` plafonné à 300 dans le preset `selection` des journaux 9a/9b (400 dans le preset normal ; `maxTokensPerCall`) pour un livrable de 3 SVG ; corrigée par le plafond dur `maxTokensHardCap` (commit 7cb869d), confirmée ici (788 tokens suffisent, marge de 3,8 fois). Aucune correction supplémentaire n'a été nécessaire.
+**Verdict: VALIDATED** for the production + extraction + deterministic checks path. Cause of the run 9b truncation: `max_tokens` capped at 300 in the `selection` preset of the 9a/9b journals (400 in the normal preset; `maxTokensPerCall`) for a deliverable of 3 SVGs; fixed by the hard cap `maxTokensHardCap` (commit 7cb869d), confirmed here (788 tokens suffice, 3.8x margin). No additional fix was needed.
 
-Réserves : (1) un seul échantillon, un seul modèle ; un modèle plus bavard ou à raisonnement peut consommer davantage (les modèles à raisonnement de la liste blanche sont bridés par `extraBody`). (2) Qualité modeste : le texte entre blocs reprend le gabarit littéral « Idee du logo » au lieu d'une phrase d'idée, sans effet sur l'extraction. (3) Le juge IA (grille d'originalité, pertinence) n'a pas été appelé ici : seuls les contrôles déterministes sont validés. (4) Les prix de ce modèle sont ceux du catalogue du jour, pas une valeur figée.
+Reservations: (1) a single sample, a single model; a wordier or reasoning model may consume more (the reasoning models in the allowlist are throttled by `extraBody`). (2) Modest quality: the text between blocks reuses the literal template "Idee du logo" instead of an idea sentence, with no effect on extraction. (3) The AI judge (originality, relevance rubric) was not called here: only the deterministic checks are validated. (4) This model's prices are those of the catalogue of the day, not a frozen value.
 
-Fichiers : `docs/preuves/logo-validation/` (`reponse-brute.txt` réponse brute du modèle, `logo-1.svg` à `logo-3.svg` extraits, `meta.json` usage/coût/`finish_reason`/identifiant de réponse). Ni clé ni en-tête d'autorisation ne sont écrits. Test sans réseau : `brain/l17-logo.test.ts` rejoue cette réponse réelle dans l'extraction et les contrôles.
+Files: `docs/preuves/logo-validation/` (`reponse-brute.txt` raw model response, `logo-1.svg` to `logo-3.svg` extracted, `meta.json` usage/cost/`finish_reason`/response identifier). Neither key nor authorization header is written. Test without network: `brain/l17-logo.test.ts` replays this real response through extraction and checks.
 
-## 11. Runs 9a et 9b : commandes de logo, tous rejetés par le contrôle de format (résumé factuel des journaux)
+## 11. Runs 9a and 9b: logo orders, all rejected by the format check (factual summary of the journals)
 
-Date : 2026-11-11 (UTC), testnet NEAR, `mode=testnet`, `preset=selection` (version de l'époque), `chain=near`, `brain=nearai`, graine 42. Sources : `docs/preuves/run9a-journal.jsonl` (270 événements, 00:49:30 à 00:54:39 UTC, 14 ticks) et `docs/preuves/run9b-journal.jsonl` (377 événements, 00:56:41 à 01:03:51 UTC, 19 ticks). Ce résumé ne reprend que ce qui est lisible dans ces deux journaux. Les deux runs se sont arrêtés par **extinction** (`sim.stopped`, `reason: extinction`, `generations: 1`) : aucune naissance au-delà des fondateurs (4 en 9a, 6 en 9b), aucune génération 2. Ils ne contredisent ni n'améliorent le run 8 (§8).
+Date: 2026-11-11 (UTC), NEAR testnet, `mode=testnet`, `preset=selection` (version of the time), `chain=near`, `brain=nearai`, seed 42. Sources: `docs/preuves/run9a-journal.jsonl` (270 events, 00:49:30 to 00:54:39 UTC, 14 ticks) and `docs/preuves/run9b-journal.jsonl` (377 events, 00:56:41 to 01:03:51 UTC, 19 ticks). This summary only reports what is readable in these two journals. Both runs stopped by **extinction** (`sim.stopped`, `reason: extinction`, `generations: 1`): no birth beyond the founders (4 in 9a, 6 in 9b), no generation 2. They neither contradict nor improve on run 8 (§8).
 
 | | Run 9a | Run 9b |
 |---|---|---|
-| Fondateurs, morts | 4, 4 morts (tick 14) | 6, 6 morts (ticks 14, 14, 14, 14, 17, 19) |
-| Verdicts de validation | **7 rejetés** (`rule:logo`), 0 accepté | **2 acceptés** (`brain:gemini-2.5-flash-lite`, textes marketing et traduction, payeur : client simulé), **7 rejetés** (6 `rule:logo`, 1 `rule:architecture`) |
-| Séquestres | 7 verrouillés, **7 remboursés**, 0 libéré | 9 verrouillés, 2 libérés, 7 remboursés |
-| Commandes de logo « visiteur » (`visitors.darwin-master-7k2.testnet`) | 3 publiées : 1 rejetée puis remboursée (`t-8669702`, verrouillage `9SGVgFKxwV4bsRE82oRToib4j7eFZKMtWh1pyR4EKFYR`, remboursement `A8jjAF4B9zp9ogPtPmbeNQcxgNAFYGgU2B12q2ngUEzX`), **2 expirées sans offre** (`t-8669704`, `t-8669719`) | 1 publiée, rejetée puis remboursée (`t-8674013`, verrouillage `AMQEHEDN96FtFpupFJKrcYvMZckdGiq99UDHhkDUQVBP`, remboursement `BkQM1xYYcxzbP5KaEEivwDN1ea2XsoeZmVTEPBLTFj9f`) ; une commande de rédaction d'un post LinkedIn par un visiteur (`t-8674030`) a expiré sans offre |
-| Motif du rejet des logos | « exactement 3 blocs ```svg attendus, 0 trouvé(s) » (parfois 1) | idem |
-| Appels IA débités (`brain.charged`) | 7, tous de production, 300 tokens de sortie chacun, total 0,00285 USD (comptabilité locale) | 11 (9 de production, 2 de validation), total 0,00333 USD (comptabilité locale) |
+| Founders, deaths | 4, 4 deaths (tick 14) | 6, 6 deaths (ticks 14, 14, 14, 14, 17, 19) |
+| Validation verdicts | **7 rejected** (`rule:logo`), 0 accepted | **2 accepted** (`brain:gemini-2.5-flash-lite`, marketing and translation texts, payer: simulated client), **7 rejected** (6 `rule:logo`, 1 `rule:architecture`) |
+| Escrows | 7 locked, **7 refunded**, 0 released | 9 locked, 2 released, 7 refunded |
+| "Visitor" logo orders (`visitors.darwin-master-7k2.testnet`) | 3 posted: 1 rejected then refunded (`t-8669702`, lock `9SGVgFKxwV4bsRE82oRToib4j7eFZKMtWh1pyR4EKFYR`, refund `A8jjAF4B9zp9ogPtPmbeNQcxgNAFYGgU2B12q2ngUEzX`), **2 expired with no bid** (`t-8669704`, `t-8669719`) | 1 posted, rejected then refunded (`t-8674013`, lock `AMQEHEDN96FtFpupFJKrcYvMZckdGiq99UDHhkDUQVBP`, refund `BkQM1xYYcxzbP5KaEEivwDN1ea2XsoeZmVTEPBLTFj9f`); a visitor order for writing a LinkedIn post (`t-8674030`) expired with no bid |
+| Reason for logo rejection | "exactly 3 ```svg blocks expected, 0 found" (sometimes 1) | same |
+| AI calls debited (`brain.charged`) | 7, all production, 300 output tokens each, total 0.00285 USD (local accounting) | 11 (9 production, 2 validation), total 0.00333 USD (local accounting) |
 
-À retenir :
-- **Aucun logo n'a été livré, accepté ni payé sur testnet** dans ces deux runs. Les seuls paiements du run 9b (2 séquestres libérés, `t-8674011` et `t-8674012`) concernent des livrables texte commandés par le **client simulé**, pas par un visiteur.
-- La commande de logo d'un visiteur du run 9b (`t-8674013`) a bien suivi le chemin : verrouillage depuis `visitors.<maître>`, rejet par la règle de format, remboursement par le contrat. C'est la preuve d'un cas refusé réel, pas d'un cas réussi.
-- Cause du rejet : la sortie du modèle était tronquée et ne contenait pas les 3 blocs SVG attendus. Le §10 l'attribue à un plafond de tokens de sortie trop bas, corrigé ensuite (commit `7cb869d`) puis validé par un appel réel isolé (§10). **Nuance** : le §10 cite un plafond de 400 ; dans ces journaux chaque appel de production s'arrête à exactement 300 tokens de sortie (valeur du preset `selection` de l'époque). Le plafond a été relevé depuis ; il n'a pas été rejoué dans un run complet.
-- Enchères : 7 (`bid.placed`) en 9a et 9 en 9b, très peu face aux 92 du run 8 ; les deux runs se sont éteints en génération 1 (extinction), schéma que `docs/RUN_9C.md` §0 et §4 demande de surveiller. Écart de comptage avec `docs/RUN_9C.md` §0 : `docs/RUN_9C.md` §0 donnait une version antérieure à 6 fondateurs pour 9a ; `run9a-journal.jsonl` n'en contient que 4 (`agent.born` : 4, `agent.died` : 4), comme le tableau ci-dessus ; les journaux font foi.
-- Vérifiable : `https://testnet.nearblocks.io/txns/<hash>` avec les hashes ci-dessus ; les hashes complets des autres événements sont dans les journaux.
+To remember:
+- **No logo was delivered, accepted or paid on testnet** in these two runs. The only payments of run 9b (2 escrows released, `t-8674011` and `t-8674012`) concern text deliverables ordered by the **simulated client**, not by a visitor.
+- The visitor's logo order in run 9b (`t-8674013`) did follow the path: lock from `visitors.<master>`, rejection by the format rule, refund by the contract. It is proof of a real refused case, not of a successful case.
+- Cause of the rejection: the model's output was truncated and did not contain the 3 expected SVG blocks. §10 attributes it to an output token cap that was too low, fixed afterwards (commit `7cb869d`) then validated by an isolated real call (§10). **Nuance**: §10 cites a cap of 400; in these journals each production call stops at exactly 300 output tokens (value of the `selection` preset of the time). The cap has since been raised; it has not been replayed in a full run.
+- Bids: 7 (`bid.placed`) in 9a and 9 in 9b, very few compared with the 92 of run 8; both runs died out in generation 1 (extinction), the pattern that `docs/RUN_9C.md` §0 and §4 asks to watch for. Count discrepancy with `docs/RUN_9C.md` §0: `docs/RUN_9C.md` §0 gave an earlier version with 6 founders for 9a; `run9a-journal.jsonl` only contains 4 (`agent.born`: 4, `agent.died`: 4), as in the table above; the journals are authoritative.
+- Verifiable: `https://testnet.nearblocks.io/txns/<hash>` with the hashes above; the full hashes of the other events are in the journals.
 
-## 12. Empreintes sha256 des journaux de preuve
+## 12. sha256 fingerprints of the proof journals
 
-Le bandeau « run réel testnet » de l'interface se déduit du champ `chain` du journal lui-même : un journal modifié à la main serait étiqueté « réel ». Ces empreintes permettent de vérifier qu'un fichier est identique à celui publié (la seule preuve des transactions reste leur hash sur `testnet.nearblocks.io`). Calculées sur les fichiers du dépôt à la date du 2026-11-12.
+The "real testnet run" banner of the interface is deduced from the `chain` field of the journal itself: a hand-edited journal would be labelled "real". These fingerprints make it possible to check that a file is identical to the one published (the only proof of the transactions remains their hash on `testnet.nearblocks.io`). Computed on the repository files as of 2026-11-12.
 
-| Fichier | sha256 |
+| File | sha256 |
 |---|---|
 | `docs/preuves/run5-journal.jsonl` | `7b2218013c9a59eaf6c4a137438023f3edf1263f5fe4c1011fde7e78df367cef` |
 | `docs/preuves/run6-journal.jsonl` | `4acc398b036ab7da18680533dfe58e5ec6aeafb9e6d4232daae8a486100be84f` |
@@ -370,11 +371,11 @@ Le bandeau « run réel testnet » de l'interface se déduit du champ `chain` du
 | `docs/preuves/run9a-journal.jsonl` | `b82aa257e853b076a01501c92b40319b6a4503a3f5977cb6998a94ff0a6628fb` |
 | `docs/preuves/run9b-journal.jsonl` | `fdb06603b6571207bcf11fc2b175826c798d85a61906829c83efdaffaf7dbf69` |
 
-Vérification (depuis la racine du dépôt) :
+Verification (from the repository root):
 
 ```bash
 sha256sum docs/preuves/*.jsonl          # Linux, macOS, Git Bash
-# PowerShell : Get-FileHash -Algorithm SHA256 docs/preuves/*.jsonl
+# PowerShell: Get-FileHash -Algorithm SHA256 docs/preuves/*.jsonl
 ```
 
-Les valeurs doivent être identiques à celles du tableau. Une conversion de fins de ligne au checkout (`core.autocrlf`) change l'empreinte : cloner avec `git -c core.autocrlf=false clone ...` en cas de doute.
+The values must be identical to those in the table. A line-ending conversion at checkout (`core.autocrlf`) changes the fingerprint: clone with `git -c core.autocrlf=false clone ...` in case of doubt.

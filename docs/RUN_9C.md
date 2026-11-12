@@ -1,103 +1,109 @@
-# Run 9c — run vitrine réel (testnet)
+# Run 9c — real showcase run (testnet)
 
-> Préparé le 2026-11-12. Lancé **par l'humain**, dans un terminal séparé, sans observateur en arrière-plan.
-> Objectifs : (1) valider en réel le preset `selection` recalibré (D-043, calibré en mock seulement) ; (2) produire le journal vitrine du replay : pitchs d'enchère et contenus de livrables enregistrés (D-045), au moins une commande de visiteur menée jusqu'au paiement.
-> Aucun feu vert mainnet n'est impliqué. Tout est testnet.
+> Prepared on 2026-11-12. Launched **by the human**, in a separate terminal, with no background observer.
+> Goals: (1) validate in real conditions the recalibrated `selection` preset (D-043, calibrated in mock only); (2) produce the showcase replay journal: bid pitches and deliverable contents recorded (D-045), at least one visitor order taken through to payment.
+> No mainnet green light is involved. Everything is testnet.
 
-## 0. Ce que l'on sait des runs précédents (pour ne pas se raconter d'histoires)
+## 0. What we know from previous runs (so as not to tell ourselves stories)
 
-| Run | Preset | Résultat |
+| Run | Preset | Result |
 |---|---|---|
-| 8 | `selection` (4 fondateurs, capital 0,1, métabolisme 0,005, client 1,5/tick) | Génération 3, 12 naissances, 7 morts, 65 séquestres, 92 enchères, 138 appels IA (0,0149 USD), 59 ticks (39 min) |
-| 9a | 4 fondateurs (journal : 4 naissances), métiers L16 | Extinction en génération 1 (4 naissances, 4 morts au tick 14), 7 enchères seulement, logos rejetés |
-| 9b | 6 fondateurs, 6 métiers | Extinction en génération 1 (6 morts au tick 19), 9 enchères seulement, 7 rejets (logos) |
+| 8 | `selection` (4 founders, capital 0.1, metabolism 0.005, client 1.5/tick) | Generation 3, 12 births, 7 deaths, 65 escrows, 92 bids, 138 AI calls (0.0149 USD), 59 ticks (39 min) |
+| 9a | 4 founders (journal: 4 births), L16 professions | Extinction in generation 1 (4 births, 4 deaths at tick 14), only 7 bids, logos rejected |
+| 9b | 6 founders, 6 professions | Extinction in generation 1 (6 deaths at tick 19), only 9 bids, 7 rejections (logos) |
 
-Depuis 9b : plafond dur de `max_tokens` pour les livrables (7cb869d), calibrage mock D-043 (capital 0,12, métabolisme 0,0035, client 2/tick), pitch d'enchère en réel (D-045, **un appel IA par enchère**). Le logo a été validé par un appel réel isolé (docs/PREUVES_TESTNET.md §10), pas en run complet.
-**Risque principal : une nouvelle extinction en génération 1** (peu d'offres, revenus trop faibles). Le mock donne 92 % de réussite ; le réel est plus dur (latence, rejets du juge).
+Since 9b: hard `max_tokens` cap for deliverables (7cb869d), mock calibration D-043 (capital 0.12, metabolism 0.0035, client 2/tick), bid pitch in real conditions (D-045, **one AI call per bid**). The logo was validated by an isolated real call (docs/PREUVES_TESTNET.md §10), not in a full run.
+**Main risk: another extinction in generation 1** (few bids, income too low). The mock gives a 92% success rate; reality is harder (latency, judge rejections).
 
-## 1. Avant de lancer (checklist)
+## 1. Before launching (checklist)
 
-1. Code final fusionné dans `main` (revues sécurité et gardien faites), puis :
+1. Final code merged into `main` (security and guardian reviews done), then:
    ```powershell
-   cd <dépôt>
+   cd <repository>
    git checkout main
    npm ci
-   npm test        # doit être vert
+   npm test        # must be green
    ```
-2. `.env` : `.env` réel présent avec la **nouvelle** clé maître (rotation du 2026-11-11), `NEARAI_API_KEY` valide, `NEAR_RPC_URL` (un ou plusieurs fournisseurs, séparés par des virgules, pour limiter les 429). `INTENTS_ENABLED=false`.
-3. **Solde du compte maître** `darwin-master-7k2.testnet` : 1,909 NEAR au 2026-11-12 (après le test de recette). Besoin estimé ci-dessous : **recharger pour avoir au moins 8 NEAR**.
+2. `.env`: real `.env` present with the **new** master key (rotation of 2026-11-11), valid `NEARAI_API_KEY`, `NEAR_RPC_URL` (one or more providers, comma-separated, to limit 429s). `INTENTS_ENABLED=false`.
+3. **Master account balance** `darwin-master-7k2.testnet`: 1.909 NEAR on 2026-11-12 (after the acceptance test). Estimated need below: **top up to have at least 8 NEAR**.
    ```powershell
    curl.exe -s -X POST https://test.rpc.fastnear.com -H "Content-Type: application/json" -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"query\",\"params\":{\"request_type\":\"view_account\",\"finality\":\"final\",\"account_id\":\"darwin-master-7k2.testnet\"}}'
    ```
-   Le champ `amount` est en yoctoNEAR (1 NEAR = 10^24). Recharge via le robinet testnet habituel (celui des runs précédents, qui avait donné 10 NEAR).
-4. Sauvegarde : le démarrage renomme `data/journal.jsonl`, `state.json` et `lineage.json` en `*.prev` (et **écrase** l'ancien `journal.prev`). Copie d'abord :
+   The `amount` field is in yoctoNEAR (1 NEAR = 10^24). Top up via the usual testnet faucet (the one from previous runs, which gave 10 NEAR).
+4. Backup: startup renames `data/journal.jsonl`, `state.json` and `lineage.json` to `*.prev` (and **overwrites** the old `journal.prev`). Copy first:
    ```powershell
    Copy-Item -Recurse data "data-sauvegarde-$(Get-Date -Format yyyyMMdd-HHmm)"
    ```
-5. Budget IA : `data/ai-budget.json` cumul ≈ 0,05 USD, plafond d'arrêt 8 EUR : large.
-6. Fermer les autres serveurs Darwin (port 3000 libre).
+5. AI budget: `data/ai-budget.json` cumulative ≈ 0.05 USD, stop cap 8 EUR: ample.
+6. Close the other Darwin servers (port 3000 free).
 
-## 2. Commande exacte
+## 2. Exact command
 
-Dans un terminal PowerShell séparé :
+In a separate PowerShell terminal:
 ```powershell
-cd <dépôt>
+cd <repository>
 $env:DARWIN_PRESET = "selection"
-$env:DARWIN_ADMIN_TOKEN = "<chaine-aleatoire-de-24-caracteres-ou-plus>"   # facultatif, sert à mettre en pause proprement
+$env:DARWIN_ADMIN_TOKEN = "<random-string-of-24-characters-or-more>"   # optional, used to pause cleanly
 npm run start:testnet
 ```
-Aucune autre variable de réglage (comme au run 8). Les ids sont décalés automatiquement. La page est sur http://127.0.0.1:3000 (vérifier que l'en-tête affiche **TESTNET NEAR**, pas MOCK ni REJEU). Un tick dure environ 1 minute réelle.
+No other tuning variable (as in run 8). Ids are shifted automatically. The page is at http://127.0.0.1:3000 (check that the header shows **TESTNET NEAR**, not MOCK or REPLAY). A tick lasts about 1 real minute.
 
-Parcours conseillé pendant le run :
-- **Ticks 1 à 8** : laisser naître les 6 fondateurs. Vérifier la page Mission (cartes) et la page Preuves (liens nearblocks).
-- **Vers le tick 8-10, si ≥ 5 agents sont vivants** : passer une commande de visiteur depuis la barre de la page Mission. D'abord un **marketing ou une traduction** (métiers déjà prouvés en réel), budget 1 NEAR. Puis, quand le premier est payé, **un logo** (c'est lui qui prouve le plafond de tokens corrigé). Le métier doit avoir un agent vivant, sinon la commande expire.
-- **Arrêt** quand : génération 3 atteinte **et** au moins une mort **et** au moins une commande de visiteur payée ; ou à 90 minutes maximum ; ou arrêt anticipé (ci-dessous).
+Recommended course during the run:
+- **Ticks 1 to 8**: let the 6 founders be born. Check the Mission page (cards) and the Proofs page (nearblocks links).
+- **Around tick 8-10, if >= 5 agents are alive**: place a visitor order from the bar on the Mission page. First a **marketing or a translation** task (professions already proven in real conditions), budget 1 NEAR. Then, once the first is paid, **a logo** (that is what proves the corrected token cap). The profession must have a living agent, otherwise the order expires.
+- **Stop** when: generation 3 reached **and** at least one death **and** at least one visitor order paid; or at 90 minutes at most; or early stop (below).
 
-## 3. Estimation des coûts
+## 3. Cost estimate
 
-**IA (NEAR AI Cloud).** Run 8 : 138 appels, 0,0149 USD. Chaque enchère en réel ajoute un appel de ~120 tokens de sortie (mesuré à la recette : 13 appels = 0,0046 USD, soit ~0,0004 USD l'appel). Pour 150 à 300 enchères : 0,06 à 0,12 USD. Total attendu du run : **0,1 à 0,25 USD**, soit moins de 0,25 EUR contre 8 EUR de plafond. Le coût IA n'est pas un sujet ; la surveillance porte sur la **santé économique des agents** (le pitch est débité de chaque agent, y compris les perdants).
+**AI (NEAR AI Cloud).** Run 8: 138 calls, 0.0149 USD. Each real bid adds a call of ~120 output tokens (measured at acceptance: 13 calls = 0.0046 USD, i.e. ~0.0004 USD per call). For 150 to 300 bids: 0.06 to 0.12 USD. Expected total for the run: **0.1 to 0.25 USD**, i.e. less than 0.25 EUR against an 8 EUR cap. AI cost is not an issue; monitoring focuses on the **economic health of the agents** (the pitch is debited from each agent, including the losers).
 
-**NEAR (testnet, sans valeur).** Run 8 : sorties brutes du compte maître ≈ 2,9 NEAR (1,23 pour les comptes, 1,70 pour financer le client simulé), dont ~0,2 revenait par clôture de compte. Pour 9c : fondateurs 6 × 0,12 = 0,72 ; jusqu'à 18 agents ; client simulé à 2 tâches/tick au lieu de 1,5 (+33 %) ; durée jusqu'à 90 ticks ; commandes de visiteur ≤ 1 NEAR chacune. **Estimation brute : 5 à 7 NEAR.** Solde actuel 1,909 → **recharger de 6 NEAR au moins** (cible ≥ 8). Si le solde passe sous 1 NEAR en cours de run, pause et arrêt.
+**NEAR (testnet, no value).** Run 8: gross outflows from the master account ≈ 2.9 NEAR (1.23 for accounts, 1.70 to fund the simulated client), of which ~0.2 came back via account closing. For 9c: founders 6 × 0.12 = 0.72; up to 18 agents; simulated client at 2 tasks/tick instead of 1.5 (+33%); duration up to 90 ticks; visitor orders <= 1 NEAR each. **Gross estimate: 5 to 7 NEAR.** Current balance 1.909 -> **top up by at least 6 NEAR** (target >= 8). If the balance falls below 1 NEAR during the run, pause and stop.
 
-## 4. Ce qu'il faut surveiller (et quoi faire)
+## 4. What to monitor (and what to do)
 
-| Signal | Où | Seuil / action |
+| Signal | Where | Threshold / action |
 |---|---|---|
-| Extinction précoce | Page Mission / Lignées | ≥ 3 morts sur 6 avant le tick 20 sans aucune reproduction = le schéma des runs 9a/9b → pause, garder le journal, revenir au replay du run 8 pour la vidéo |
-| Offres | fil de la page Mission, `bid.placed` | doit y avoir plusieurs offres par tâche (run 8 : ~0,8 offre/tâche). 9a/9b n'en avaient presque pas |
-| Pitchs | `bid.placed.bid.pitch` | présents sur (presque) toutes les offres ; surveiller `PITCH_FALLBACK` (ok si rare) |
-| Logos | `task.validated`, `deliverable.produced` | `finish_reason` non tronqué ; un rejet `rule:logo` répété = problème de modèle, noter lequel |
-| Livrables | `deliverable.produced.files[].content` | tous les fichiers portent `content` (sinon le replay ne sert pas le livrable) ; `truncated` rare |
-| 429 RPC | `system.warning`, console du terminal | des réessais sont normaux ; des échecs en série = changer `NEAR_RPC_URL` |
-| `BRAIN_EMPTY_TEXT` | `system.warning` | vu une fois sur `openai/gpt-5-nano` (réponse vide, `finish_reason=length`) ; si fréquent, noter le modèle |
-| Budget IA | `data/ai-budget.json` | doit rester à quelques centimes |
-| Solde maître | RPC (commande §1.3) | pause si < 1 NEAR |
-| Commande visiteur | fil Mission | séquestre → livrable → verdict → « payé ✓ » avec lien ; un rejet suivi d'un remboursement reste une preuve valable, à dire comme telle |
-| Mémoire / taille | gestionnaire de tâches, taille de `data/journal.jsonl` | les contenus de livrables grossissent le journal (≤ 64 ko par livrable) |
+| Early extinction | Mission page / Lineages | >= 3 deaths out of 6 before tick 20 with no reproduction at all = the pattern of runs 9a/9b -> pause, keep the journal, fall back to the run 8 replay for the video |
+| Bids | Mission page feed, `bid.placed` | there should be several bids per task (run 8: ~0.8 bid/task). 9a/9b had almost none |
+| Pitches | `bid.placed.bid.pitch` | present on (almost) all bids; watch for `PITCH_FALLBACK` (ok if rare) |
+| Logos | `task.validated`, `deliverable.produced` | `finish_reason` not truncated; a repeated `rule:logo` rejection = model problem, note which one |
+| Deliverables | `deliverable.produced.files[].content` | all files carry `content` (otherwise the replay does not serve the deliverable); `truncated` rare |
+| RPC 429 | `system.warning`, terminal console | retries are normal; serial failures = change `NEAR_RPC_URL` |
+| `BRAIN_EMPTY_TEXT` | `system.warning` | seen once on `openai/gpt-5-nano` (empty response, `finish_reason=length`); if frequent, note the model |
+| AI budget | `data/ai-budget.json` | must stay at a few cents |
+| Master balance | RPC (command §1.3) | pause if < 1 NEAR |
+| Visitor order | Mission feed | escrow -> deliverable -> verdict -> "paid ✓" with link; a rejection followed by a refund remains a valid proof, to be described as such |
+| Memory / size | task manager, size of `data/journal.jsonl` | deliverable contents grow the journal (<= 64 KB per deliverable) |
 
-## 5. Arrêt et récupération du journal
+## 5. Stopping and recovering the journal
 
 ```powershell
-curl.exe -X POST http://127.0.0.1:3000/api/sim/pause -H "Authorization: Bearer <votre-jeton>"
+curl.exe -X POST http://127.0.0.1:3000/api/sim/pause -H "Authorization: Bearer <your-token>"
 ```
-(sans jeton défini, la même commande sans l'en-tête). Puis `Ctrl+C` dans le terminal du run. **Avant tout autre démarrage** :
+(without a token defined, the same command without the header). Then `Ctrl+C` in the run's terminal. **Before any other startup**:
 ```powershell
 Copy-Item data\journal.jsonl docs\preuves\run9c-journal.jsonl
 ```
-Vérifier qu'il ne contient ni clé ni jeton : `npm run scan-secrets -- --no-history`.
+Check that it contains no key or token: `npm run scan-secrets -- --no-history`.
 
-Rejeu du journal vitrine :
+Replay of the showcase journal:
 ```powershell
 $env:DARWIN_REPLAY_FILE = "docs/preuves/run9c-journal.jsonl"
 npm run replay
 ```
 
-## 6. Après le run (à faire faire à l'équipe)
+## 6. After the run (to be done by the team)
 
-1. `node scripts/gen-preuves.mjs docs/preuves/run9c-journal.jsonl` puis compléter `docs/PREUVES_TESTNET.md` : section run 9c avec réglages, résultat exact (même en cas d'échec), hashes des transactions, coût IA (`data/ai-budget.json`), solde maître avant/après.
-2. Brancher le journal sur le replay (`DARWIN_REPLAY_FILE`), vérifier la page Mission en rejeu : pitchs et livrables s'affichent, bandeau « Rejeu » présent.
-3. Aligner README, FORMULAIRE, VIDEO_SCRIPT et POST_X sur ce qui a **réellement** tourné. Si le run n'a pas atteint la génération 3, ne rien promettre : la vidéo s'appuie sur le run 8 (génération 3 prouvée) et le journal 9c n'est cité que pour ce qu'il prouve.
+1. `node scripts/gen-preuves.mjs docs/preuves/run9c-journal.jsonl` then complete `docs/PREUVES_TESTNET.md`: run 9c section with settings, exact result (even in case of failure), transaction hashes, AI cost (`data/ai-budget.json`), master balance before/after.
+2. Connect the journal to the replay (`DARWIN_REPLAY_FILE`), check the Mission page in replay: pitches and deliverables are displayed, "Replay" banner present.
+3. Align README, FORMULAIRE, VIDEO_SCRIPT and POST_X with what **actually** ran. If the run did not reach generation 3, promise nothing: the video relies on run 8 (generation 3 proven) and the 9c journal is only cited for what it proves.
 
-## 7. Repli
+## 7. Fallback
 
-Si 9c échoue (extinction, panne RPC, budget) avant 12:00 UTC le 13 novembre : on garde le replay du run 8 comme démo, les mentions du run 9c sont retirées de la vidéo et du post, et le logo reste « prochaine étape » dans le README (il n'est validé que par l'appel réel isolé de la piste C).
+If 9c fails (extinction, RPC outage, budget) before 12:00 UTC on 13 November: keep the run 8 replay as the demo, remove the run 9c mentions from the video and the post, and the logo stays "next step" in the README (it is only validated by the isolated real call of track C).
+
+## 8. Result of run 9c
+
+<!-- RUN9C-RESULT:BEGIN -->
+Result of run 9c: TO BE FILLED IN
+<!-- RUN9C-RESULT:END -->

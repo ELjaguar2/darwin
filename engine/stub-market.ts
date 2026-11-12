@@ -1,7 +1,7 @@
-// Stub de Market pour les tests du moteur (L6 en fournit l'implémentation réelle). Minimal mais fidèle au contrat :
-// enchères au meilleur prix, séquestre verrouillé à l'attribution (montant = prix gagnant), validation par règle
-// déterministe (jamais l'agent payé), libération uniquement avec preuve `accepted`, réputation, échéances.
-// Ne pas utiliser en production.
+// Market stub for the engine tests (L6 provides the real implementation). Minimal but faithful to the contract:
+// best-price bidding, escrow locked at award time (amount = winning price), validation by a deterministic rule
+// (never the paid agent), release only with an `accepted` proof, reputation, deadlines.
+// Do not use in production.
 import {
   parseNear, sha256Hex, toYocto, type Bid, type Chain, type Deps, type Market, type Profession, type Requester, type Task, type Validation,
 } from "../shared/index.ts";
@@ -31,7 +31,7 @@ export class StubMarket implements Market {
   private async payerOf(r: Requester): Promise<string> {
     if (r.kind === "agent") {
       const rec = await this.chain.getAgentRecord(r.agentId);
-      if (!rec) throw new Error(`agent inconnu ${r.agentId}`);
+      if (!rec) throw new Error(`unknown agent ${r.agentId}`);
       return rec.accountId;
     }
     if (!this.simAccount) {
@@ -59,7 +59,7 @@ export class StubMarket implements Market {
 
   async placeBid(input: { taskId: string; agentId: string; price: string; etaTicks: number; pitch?: string }): Promise<Bid> {
     const t = this.tasks.get(input.taskId);
-    if (!t || t.status !== "posted") throw new Error(`tâche non ouverte ${input.taskId}`);
+    if (!t || t.status !== "posted") throw new Error(`task not open ${input.taskId}`);
     const bid: Bid = { id: `b-${String(++this.nBid).padStart(5, "0")}`, ...input, tick: this.tick };
     this.bids.set(bid.id, bid);
     t.bidIds.push(bid.id);
@@ -69,7 +69,7 @@ export class StubMarket implements Market {
 
   private async expire(t: Task, reason: "no_bids" | "deadline") {
     if (t.escrowId) {
-      // La chaîne n'accepte que `rejected` ou `expired` (règles du contrat) : `no_bids` et `deadline` sont des expirations.
+      // The chain only accepts `rejected` or `expired` (contract rules): `no_bids` and `deadline` are expirations.
       const tx = await this.chain.refundEscrow({ taskId: t.id, reason: "expired" });
       const e = await this.chain.getEscrow(t.id);
       this.deps.journal.emit({ type: "escrow.refunded", data: { taskId: t.id, payer: e!.payer, amount: e!.amount, tx: tx.hash } });
@@ -110,7 +110,7 @@ export class StubMarket implements Market {
 
   async submitResult(input: { taskId: string; agentId: string; text: string }): Promise<{ task: Task; validation: Validation }> {
     const t = this.tasks.get(input.taskId);
-    if (!t || t.status !== "awarded" || t.winnerId !== input.agentId) throw new Error(`soumission refusée ${input.taskId}`);
+    if (!t || t.status !== "awarded" || t.winnerId !== input.agentId) throw new Error(`submission refused ${input.taskId}`);
     const resultHash = sha256Hex(input.text + t.id);
     t.result = { text: input.text, resultHash, submittedTick: this.tick };
     t.status = "submitted";
@@ -118,7 +118,7 @@ export class StubMarket implements Market {
     const accepted = parseInt(sha256Hex(`${t.id}|${input.agentId}|${input.text}`).slice(0, 2), 16) % 10 !== 0; // ~90 %
     const validation: Validation = {
       verdict: accepted ? "accepted" : "rejected", score: accepted ? 0.8 : 0.2, validator: "rule:stub",
-      reason: accepted ? "règle déterministe : accepté" : "règle déterministe : refusé", resultHash, tick: this.tick,
+      reason: accepted ? "deterministic rule: accepted" : "deterministic rule: rejected", resultHash, tick: this.tick,
     };
     t.validation = validation;
     this.deps.journal.emit({ type: "task.validated", data: { taskId: t.id, validation } });

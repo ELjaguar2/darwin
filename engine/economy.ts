@@ -1,7 +1,7 @@
-// Économie des agents : débits (métabolisme, coût IA), règlement groupé, synchronisation avec la chaîne.
+// Agent economy: debits (metabolism, AI cost), batched settlement, chain synchronisation.
 //
-// Solde logique = solde on-chain - dettes en attente. Le solde on-chain est relu à chaque tick : le gaz payé par
-// les sous-comptes (NearChain) y est donc déjà inclus. `minVital` doit rester > gaz du balayage de mort (voir README).
+// Logical balance = on-chain balance - pending debts. The on-chain balance is re-read on every tick: the gas paid by
+// the sub-accounts (NearChain) is therefore already included. `minVital` must stay > gas of the death sweep (see README).
 import { costUsd, costYocto, formatNear, type Agent, type BrainResponse, type ModelInfo, type TxReceipt } from "../shared/index.ts";
 import { bal, type Ctx } from "./context.ts";
 
@@ -21,7 +21,7 @@ export function emitTx(ctx: Ctx, r: TxReceipt, from?: string, to?: string, amoun
 
 const masterId = (ctx: Ctx) => ctx.deps.chain.info().masterId;
 
-/** Débite `amount` (plafonné au solde logique) vers le compte maître. Renvoie le montant réellement débité. */
+/** Debits `amount` (capped at the logical balance) to the master account. Returns the amount actually debited. */
 export async function debit(ctx: Ctx, a: Agent, amount: bigint, reason: string): Promise<{ charged: bigint; tx?: string }> {
   const charged = amount < bal(a) ? amount : bal(a);
   if (charged <= 0n) return { charged: 0n };
@@ -38,18 +38,18 @@ export async function debit(ctx: Ctx, a: Agent, amount: bigint, reason: string):
   return { charged, tx };
 }
 
-/** Règle les dettes en attente d'un agent (transfert groupé). */
+/** Settles an agent's pending debts (batched transfer). */
 export async function flushAgent(ctx: Ctx, a: Agent): Promise<void> {
   const p = ctx.pending.get(a.id) ?? 0n;
   if (p <= 0n) return;
   const onChain = BigInt(await ctx.deps.chain.getBalance(a.accountId));
   const amount = p < onChain ? p : onChain;
   if (amount > 0n) {
-    // La dette n'est effacée qu'après un transfert réussi : en cas d'échec elle reste due (l'exception remonte).
+    // The debt is only cleared after a successful transfer: on failure it stays due (the exception propagates).
     const r = await ctx.deps.chain.transfer({ from: a.accountId, to: masterId(ctx), amount: amount.toString(), memo: "settle" });
     emitTx(ctx, r, a.accountId, masterId(ctx), amount);
   }
-  // Reliquat éventuel (solde on-chain inférieur à la dette) : l'agent est à sec, le solde ne peut pas payer plus.
+  // Possible remainder (on-chain balance below the debt): the agent is broke, the balance cannot pay more.
   ctx.pending.set(a.id, 0n);
 }
 export async function flushAll(ctx: Ctx, force = false): Promise<void> {
@@ -58,7 +58,7 @@ export async function flushAll(ctx: Ctx, force = false): Promise<void> {
   for (const a of ctx.agents.values()) if (a.status === "alive") await flushAgent(ctx, a);
 }
 
-/** Relit les soldes on-chain ; tout écart non causé par le moteur (paiement de tâche, gaz) est journalisé. */
+/** Re-reads on-chain balances; any difference not caused by the engine (task payment, gas) is journaled. */
 export async function syncBalances(ctx: Ctx): Promise<void> {
   for (const a of ctx.agents.values()) {
     if (a.status !== "alive") continue;
@@ -74,17 +74,17 @@ export async function syncBalances(ctx: Ctx): Promise<void> {
   }
 }
 
-/** Prix du modèle ; modèle inconnu ou non vérifié : repli sur le modèle par défaut vérifié (jamais de coût nul). */
+/** Price of the model; unknown or unverified model: fall back to the verified default model (never a zero cost). */
 export function resolveModel(ctx: Ctx, a: Agent): ModelInfo {
   const m = ctx.models.find((x) => x.id === a.genome.model && x.verified);
   if (m) return m;
-  warnOnce(ctx, "UNKNOWN_MODEL", `Modèle ${a.genome.model} non vérifié : repli sur ${ctx.defaultModel}`);
+  warnOnce(ctx, "UNKNOWN_MODEL", `Model ${a.genome.model} not verified: falling back to ${ctx.defaultModel}`);
   const d = ctx.models.find((x) => x.id === ctx.defaultModel);
-  if (!d) throw new Error("aucun modèle vérifié disponible");
+  if (!d) throw new Error("no verified model available");
   return d;
 }
 
-/** Débite le coût d'un appel IA et journalise `brain.charged`. */
+/** Debits the cost of an AI call and journals `brain.charged`. */
 export async function chargeBrain(ctx: Ctx, a: Agent, purpose: string, resp: BrainResponse, price: ModelInfo): Promise<bigint> {
   const rate = ctx.deps.config.sim.nearUsdRate;
   const cost = costYocto(resp.usage, price, rate);

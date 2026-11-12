@@ -1,6 +1,6 @@
-// Budget IA global persistant + journal de consommation réelle (data/ai-usage.jsonl).
-// Le cumul survit au redémarrage (data/ai-budget.json). Une fois le plafond d'arrêt atteint, `reserve` lève BrainError BUDGET_EXHAUSTED
-// et `onExhausted` est appelé UNE fois (le backend arrête alors la simulation proprement). Aucune clé n'est jamais écrite ici.
+// Persistent global AI budget + real consumption journal (data/ai-usage.jsonl).
+// The total survives a restart (data/ai-budget.json). Once the stop cap is reached, `reserve` throws BrainError BUDGET_EXHAUSTED
+// and `onExhausted` is called ONCE (the backend then stops the simulation cleanly). No key is ever written here.
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { BrainError } from "../shared/index.ts";
@@ -8,7 +8,7 @@ import { BrainError } from "../shared/index.ts";
 export interface UsageRecord {
   ts: string;
   provider: "nearai" | "fallback";
-  /** id demandé (clé du catalogue) ; `servedModel` = nom renvoyé par le fournisseur. */
+  /** requested id (catalogue key); `servedModel` = name returned by the provider. */
   model: string;
   servedModel?: string;
   promptTokens: number;
@@ -24,11 +24,11 @@ export interface UsageRecord {
 
 export interface AiBudgetOptions {
   dir: string;
-  /** Plafond d'arrêt en EUR (DARWIN_AI_BUDGET_EUR_STOP). */
+  /** Stop cap in EUR (DARWIN_AI_BUDGET_EUR_STOP). */
   stopEur: number;
-  /** Budget total en EUR (information et contrôle de cohérence). */
+  /** Total budget in EUR (information and consistency check). */
   totalEur: number;
-  /** USD pour 1 EUR. */
+  /** USD per 1 EUR. */
   eurUsdRate: number;
   onExhausted?: (info: { spentEur: number; stopEur: number }) => void;
 }
@@ -44,8 +44,8 @@ export class AiBudget {
   readonly usagePath: string;
 
   constructor(private readonly o: AiBudgetOptions) {
-    if (!(o.eurUsdRate > 0)) throw new Error("eurUsdRate doit être > 0");
-    if (!(o.stopEur > 0) || o.stopEur > o.totalEur) throw new Error("budget IA incohérent (0 < stop <= total)");
+    if (!(o.eurUsdRate > 0)) throw new Error("eurUsdRate must be > 0");
+    if (!(o.stopEur > 0) || o.stopEur > o.totalEur) throw new Error("inconsistent AI budget (0 < stop <= total)");
     this.budgetPath = join(o.dir, BUDGET_FILE);
     this.usagePath = join(o.dir, USAGE_FILE);
     mkdirSync(o.dir, { recursive: true });
@@ -55,7 +55,7 @@ export class AiBudget {
         if (typeof j?.spentUsd === "number" && Number.isFinite(j.spentUsd) && j.spentUsd >= 0) this.spentUsd = j.spentUsd;
         else throw new Error("format");
       } catch {
-        // Fichier corrompu : on reconstruit depuis le journal d'usage (jamais repartir de zéro en silence).
+        // Corrupted file: rebuild from the usage journal (never silently restart from zero).
         this.spentUsd = this.sumFromLog();
       }
     } else if (existsSync(this.usagePath)) this.spentUsd = this.sumFromLog();
@@ -69,7 +69,7 @@ export class AiBudget {
         try {
           const c = JSON.parse(line)?.costUsd;
           if (typeof c === "number" && Number.isFinite(c)) t += c;
-        } catch { /* ligne tronquée ignorée */ }
+        } catch { /* truncated line ignored */ }
       }
       return t;
     } catch {
@@ -85,7 +85,7 @@ export class AiBudget {
   }
   exhausted(): boolean { return this.spentUsd + this.pendingUsd >= this.stopUsd; }
 
-  /** Réserve le pire cas d'un appel ; refuse (BUDGET_EXHAUSTED) si le plafond d'arrêt serait franchi. */
+  /** Reserves the worst case of a call; refuses (BUDGET_EXHAUSTED) if the stop cap would be crossed. */
   reserve(worstUsd: number): void {
     if (this.spentUsd + this.pendingUsd + worstUsd > this.stopUsd) {
       if (!this.notified) {
@@ -94,13 +94,13 @@ export class AiBudget {
       }
       throw new BrainError(
         "BUDGET_EXHAUSTED",
-        `Budget IA atteint (${this.spentEur().toFixed(4)} EUR dépensés, arrêt à ${this.o.stopEur} EUR) : appel refusé`,
+        `AI budget reached (${this.spentEur().toFixed(4)} EUR spent, stop at ${this.o.stopEur} EUR): call refused`,
       );
     }
     this.pendingUsd += worstUsd;
   }
 
-  /** Libère la réservation et enregistre le coût réel (persistant + journal d'usage). */
+  /** Releases the reservation and records the real cost (persistent + usage journal). */
   settle(worstUsd: number, rec?: Omit<UsageRecord, "ts" | "costEur" | "eurUsdRate">): void {
     this.pendingUsd = Math.max(0, this.pendingUsd - worstUsd);
     if (!rec) return;
@@ -112,7 +112,7 @@ export class AiBudget {
       writeFileSync(tmp, JSON.stringify({ spentUsd: this.spentUsd, updatedAt: full.ts }));
       renameSync(tmp, this.budgetPath);
     } catch {
-      // Le cumul en mémoire reste valide ; l'échec d'écriture ne doit pas faire perdre la réponse déjà payée.
+      // The in-memory total remains valid; a write failure must not lose the response already paid for.
     }
     if (this.exhausted() && !this.notified) {
       this.notified = true;
@@ -123,13 +123,13 @@ export class AiBudget {
 
 export function ensureDir(p: string) { mkdirSync(dirname(p), { recursive: true }); }
 
-/** Relit le journal d'usage (rapport). Les lignes illisibles sont ignorées. */
+/** Re-reads the usage journal (report). Unreadable lines are ignored. */
 export function readUsage(path: string): UsageRecord[] {
   if (!existsSync(path)) return [];
   const out: UsageRecord[] = [];
   for (const line of readFileSync(path, "utf8").split("\n")) {
     if (!line.trim()) continue;
-    try { out.push(JSON.parse(line) as UsageRecord); } catch { /* ignorée */ }
+    try { out.push(JSON.parse(line) as UsageRecord); } catch { /* ignored */ }
   }
   return out;
 }

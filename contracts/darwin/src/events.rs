@@ -1,4 +1,4 @@
-//! Evenements NEP-297 (JSON) emis pour chaque ecriture.
+//! NEP-297 (JSON) events emitted for every write.
 use near_sdk::{env, serde_json::Value};
 
 pub const STANDARD: &str = "darwin";

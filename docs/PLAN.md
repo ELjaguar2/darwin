@@ -1,5 +1,9 @@
 # PLAN — lots
 
+> **English summary.** Work-package plan (L0 to L15) with owner, dependencies and status for each package: specs, architecture, accounts, contracts, engine, brain, market, backend, frontend, intents, security review, writing, QA, real brain (L13), real testnet (L14) and RPC reliability / `selection` preset (L15).
+> **State:** L0 to L15 are validated or merged; real run 8 proved generation 3 and deaths. Later packages (L16 to L19) are tracked in `docs/STATUS.md` and `docs/DECISIONS.md`.
+> The rest of this file is kept in its original French (internal working document, translated on demand).
+
 Statuts : à faire / en cours / en revue / validé / fusionné (dans main)
 
 | Lot | Contenu | Propriétaire | Dépend de | Statut |

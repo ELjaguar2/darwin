@@ -1,16 +1,16 @@
-// Lecture des prix NEAR AI Cloud : GET {baseUrl}/models (public, sans clé), repli documenté.
-// Format réel observé le 2026-11-09 (https://cloud-api.near.ai/v1/models) :
+// Reading NEAR AI Cloud prices: GET {baseUrl}/models (public, no key), documented fallback.
+// Real format observed on 2026-11-09 (https://cloud-api.near.ai/v1/models) :
 //   { object:"list", data:[{ id, context_length, max_output_length, is_ready?, supported_features:[..],
 //     output_modalities:["text"], pricing:{ input:<USD/M tok>, output:<USD/M tok>, prompt:"<USD/tok>", completion:"<USD/tok>", input_cache_read } }] }
-// `pricing.input/output` sont en USD par million de tokens ; `prompt/completion` en USD par token (chaînes).
-// La doc officielle (docs.near.ai/cloud/models.md) ne donne pas les noms de champs : le format ci-dessus vient de la réponse réelle.
+// `pricing.input/output` are in USD per million tokens; `prompt/completion` in USD per token (strings).
+// The official doc (docs.near.ai/cloud/models.md) does not give the field names: the format above comes from the real response.
 import { assertValidPrice, type ModelInfo } from "../shared/index.ts";
 
 export interface ParsedModels {
   models: ModelInfo[];
-  /** Ids ignorés avec la raison (prix absent/invalide/nul, non textuel, non prêt). */
+  /** Ids ignored with the reason (missing/invalid/zero price, non-text, not ready). */
   skipped: { id: string; reason: string }[];
-  /** Ids qui acceptent le raisonnement (leurs tokens de raisonnement sont facturés, R1). */
+  /** Ids that accept reasoning (their reasoning tokens are billed, R1). */
   reasoning: Set<string>;
 }
 
@@ -22,7 +22,7 @@ const num = (x: unknown): number | undefined => {
 export function parseModelsResponse(body: unknown): ParsedModels {
   const out: ParsedModels = { models: [], skipped: [], reasoning: new Set() };
   const data = (body as { data?: unknown })?.data;
-  if (!Array.isArray(data)) throw new Error("réponse /models inattendue : champ data absent");
+  if (!Array.isArray(data)) throw new Error("unexpected /models response: data field missing");
   for (const raw of data) {
     const m = raw as Record<string, any>;
     const id = typeof m?.id === "string" ? m.id : undefined;
@@ -39,8 +39,8 @@ export function parseModelsResponse(body: unknown): ParsedModels {
     }
     const mods: unknown = m.output_modalities ?? m.architecture?.outputModalities;
     if (Array.isArray(mods) && !mods.includes("text")) { out.skipped.push({ id, reason: "sortie non textuelle" }); continue; }
-    if (price.usdPerMTokIn === 0 && price.usdPerMTokOut === 0) { out.skipped.push({ id, reason: "prix nul (jamais de coût nul silencieux)" }); continue; }
-    if (price.usdPerMTokOut === 0) { out.skipped.push({ id, reason: "prix de sortie nul : pas un modèle de chat" }); continue; }
+    if (price.usdPerMTokIn === 0 && price.usdPerMTokOut === 0) { out.skipped.push({ id, reason: "zero price (never a silent zero cost)" }); continue; }
+    if (price.usdPerMTokOut === 0) { out.skipped.push({ id, reason: "zero output price: not a chat model" }); continue; }
     if (m.is_ready === false) { out.skipped.push({ id, reason: "is_ready=false" }); continue; }
     const feats: unknown = m.supported_features;
     if (Array.isArray(feats) && feats.includes("reasoning")) out.reasoning.add(id);
@@ -50,8 +50,8 @@ export function parseModelsResponse(body: unknown): ParsedModels {
 }
 
 /**
- * REPLI (utilisé seulement si GET /models échoue) : instantané du 2026-11-09 tiré de https://cloud-api.near.ai/v1/models.
- * Les modèles du repli sont `verified:false` et chaque usage émet un system.warning ; les prix peuvent être périmés.
+ * FALLBACK (used only if GET /models fails): snapshot of 2026-11-09 taken from https://cloud-api.near.ai/v1/models.
+ * Fallback models are `verified:false` and each use emits a system.warning; prices may be stale.
  */
 export const FALLBACK_SNAPSHOT_DATE = "2026-11-09";
 export const FALLBACK_MODELS: ModelInfo[] = [

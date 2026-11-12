@@ -228,10 +228,10 @@ describe("rapport de consommation", () => {
     const { f } = fetcher(() => Response.json(chatOk()));
     await mkBrain(f, budgetOf(dir)).complete(req());
     const md = usageReport(readUsage(join(dir, "ai-usage.jsonl")), { stopEur: 8, totalEur: 10 });
-    expect(md).toContain("## Consommation IA réelle");
+    expect(md).toContain("## Real AI consumption");
     expect(md).toContain("| openai/gpt-5-nano | nearai | 1 |");
     expect(md).toContain("`chatcmpl-x`");
-    expect(usageReport([])).toContain("mode mock");
+    expect(usageReport([])).toContain("mock mode");
   });
 });
 
