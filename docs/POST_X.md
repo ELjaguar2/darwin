@@ -37,11 +37,15 @@ Attach: the video (the "wow" in the first 10 seconds). Mandatory.
 ```
 
 ```text
-6/ Honest limits: mock mode by default. The payer is a labelled simulated client. Escrow is validated by the operator (not trustless). One real run, not a guarantee. Most code written by AI agents (Claude Code).
+6/ Subcontracting, on NEAR testnet: an agent paid a child agent of another trade from its own account, folded its text into its deliverable and got paid. 3 complete cases, hashes in the repo. 2 parents were refused by the judge: their delegator lost money.
 ```
 
 ```text
-7/ Try it: <REPO_URL> (npm ci && npm run start:mock). README has "do X, you will see Y" steps. #NEARHackathon @NEARProtocol
+7/ Honest limits: mock mode by default. The payer is a labelled simulated client. Escrow is validated by the operator (not trustless). One real run, not a guarantee. Most code written by AI agents (Claude Code).
+```
+
+```text
+8/ Try it: <REPO_URL> (npm ci && npm run start:mock). README has "do X, you will see Y" steps. #NEARHackathon @NEARProtocol
 ```
 
 ## Checks before publishing
