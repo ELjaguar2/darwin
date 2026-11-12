@@ -5,6 +5,7 @@ import { store, core, api, on, txUrl, aliveAgents, labelOfJob } from "./core.js"
 import { h, formatNear, formatNearSmall, nearNumber, big, nearInput, parseNearToYocto, shortHash, errorMessages, requesterBadge, badgeText } from "./format.js";
 import { jobOf, icon, avatar, firstName } from "./jobs.js";
 import { buildChatDeliverable } from "./chat-deliverable.js";
+import { subs } from "./subcontract.js";
 
 const JOB_IDS = ["logo", "finance", "architecture", "marketing", "translation", "legal"];
 const RULES = [
@@ -83,6 +84,12 @@ export function renderStrip() {
 let stripTimer = 0;
 const scheduleStrip = () => { if (!stripTimer) stripTimer = setTimeout(() => { stripTimer = 0; renderStrip(); }, 120); };
 
+function delegating(agentId) {
+  const c = cards.get(agentId);
+  if (!c) return;
+  c.btn.classList.add("delegating");
+  setTimeout(() => c.btn.classList.remove("delegating"), 3600);
+}
 function speak(agentId) {
   const c = cards.get(agentId);
   if (!c) return;
@@ -170,6 +177,7 @@ function msgNode(th, m) {
       return h("div", { class: "msg req" }, h("div", { class: "bub" },
         h("div", { class: "who" }, h("span", { class: `rtag ${tag.cls}`, title: tag.title }, tag.text), h("span", { class: `jchip ${job.cls}` }, icon(job.icon, 12), labelOf(t.profession)), h("span", { class: "budget" }, money(t.budget, 3))),
         h("div", { class: "ttl" }, t.title),
+        subs.isChild(t.id) ? delegatedBy(t.id) : null,
         t.prompt && t.prompt !== t.title ? h("div", { class: "prm" }, String(t.prompt).slice(0, 400)) : null));
     }
     case "bid": return bubble(m.agentId, h("div", null, h("span", { class: "price" }, money(m.price, 3)), h("span", { class: "pitch" }, m.pitch)), "bid");
@@ -182,10 +190,31 @@ function msgNode(th, m) {
       h("div", null, h("b", { class: "vd" }, m.ok ? "Accepted ✓" : "Rejected ✗"), Number.isFinite(m.score) ? ` · score ${Math.round(m.score * 100)}%` : "", m.reason ? h("div", { class: "why" }, String(m.reason).slice(0, 260)) : null)));
     case "paid": return h("div", { class: "msg sys paid" }, h("span", { class: "pill-sys paid" }, h("b", null, "paid ✓"), ` ${money(m.amount, 3)} → ${m.name}`), txChip(m.tx, "Escrow payment"));
     case "refund": return h("div", { class: "msg sys bad" }, h("span", { class: "pill-sys bad" }, `refunded · ${money(m.amount, 3)} returned to the client`), txChip(m.tx, "Refund"));
-    case "expired": return h("div", { class: "msg sys bad" }, h("span", { class: "pill-sys bad" }, `expired · ${{ no_bids: "no bids", deadline: "deadline passed", unfunded: "client without funds", winner_dead: "the winner died" }[m.reason] ?? m.reason ?? ""}`));
-    case "sub": return h("div", { class: "msg sys" }, h("span", { class: "pill-sys" }, `${m.name} subcontracts part of the work`));
+    case "expired": return h("div", { class: "msg sys bad" }, h("span", { class: "pill-sys bad" }, subs.isChild(th.id) && m.reason === "no_bids" ? "sub-task expired, no bidder" : `${subs.isChild(th.id) ? "sub-task " : ""}expired · ${{ no_bids: "no bids", deadline: "deadline passed", unfunded: "client without funds", winner_dead: "the winner died" }[m.reason] ?? m.reason ?? ""}`));
+    case "sub": return subNode(m);
     default: return h("div");
   }
+}
+
+/** Sentence of the delegation (L21). Optional parts (budget, commission) are left out when unknown. */
+export function delegationText(name, profLabel, rec) {
+  return `${name} delegates a ${profLabel ?? "sub-"}${profLabel ? " " : ""}sub-task to the market${rec?.budget != null ? ` for ${money(rec.budget, 3)}` : ""}${rec?.commission != null ? ` and keeps ${money(rec.commission, 3)} commission` : ""}`;
+}
+const SUB_STATE = { open: ["sub-task open for bids", ""], awarded: ["sub-task awarded", ""], paid: ["sub-task paid ✓", "ok"], expired: ["sub-task expired, no bidder", "ko"], refunded: ["sub-task refunded", "ko"] };
+function subNode(m) {
+  const rec = subs.record(m.childId);
+  const a = store.agents.get(m.byAgentId);
+  const prof = rec?.profession ? labelOf(rec.profession) : null;
+  const st = SUB_STATE[rec?.status ?? "open"];
+  const why = rec?.status === "expired" && rec.expiredReason && rec.expiredReason !== "no_bids" ? `sub-task expired · ${rec.expiredReason.replace(/_/g, " ")}` : st[0];
+  return h("div", { class: "msg sys sub-deleg" }, h("span", { class: "pill-sys deleg" }, "⇄ ", delegationText(firstName(a) || String(m.byAgentId), prof, rec)),
+    h("span", { class: `sub-state ${st[1]}` }, why), rec?.releaseTx ? txChip(rec.releaseTx, "Sub-task payment") : rec?.lockTx ? txChip(rec.lockTx, "Sub-task escrow") : null);
+}
+function delegatedBy(childId) {
+  const rec = subs.record(childId);
+  const a = rec ? store.agents.get(rec.byAgentId) : null;
+  const par = rec ? threads.get(rec.parentTaskId)?.task ?? store.tasks.get(rec.parentTaskId) : null;
+  return h("div", { class: "sub-from" }, `↳ sub-task delegated by ${a ? firstName(a) : "an agent"}${par?.title ? ` from “${String(par.title).slice(0, 70)}”` : ""}`);
 }
 
 function summaryLine(th) {
@@ -207,7 +236,7 @@ function renderThread(th) {
     m.shown = true;
     body.append(n);
   }
-  th.el.className = `thread${th.done ? " done" : ""}${mine.has(th.id) ? " mine" : ""}${th.isOpen ? " open" : ""}`;
+  th.el.className = `thread${subs.isChild(th.id) ? " sub" : ""}${th.done ? " done" : ""}${mine.has(th.id) ? " mine" : ""}${th.isOpen ? " open" : ""}`;
   th.el.replaceChildren(summaryLine(th), th.isOpen ? body : h("span"));
   if (th.fresh) { th.fresh = false; th.el.classList.add("pop"); }
 }
@@ -312,11 +341,19 @@ export function ingest(ev, { silent = false } = {}) {
       break;
     }
     case "subcontract.created": {
-      enqueue((s) => { const th = threads.get(d.parentTaskId); if (th) push(th, { kind: "sub", name: firstName(store.agents.get(d.byAgentId)) }, s); }, silent);
+      enqueue((s) => {
+        const th = threads.get(d.parentTaskId);
+        if (th) push(th, { kind: "sub", childId: d.childTaskId, byAgentId: d.byAgentId }, s);
+        const ch = threads.get(d.childTaskId); if (ch) renderThread(ch); // adds the "delegated by" line
+        if (!s) delegating(d.byAgentId);
+      }, silent);
       break;
     }
     default: break;
   }
+  // a sub-task thread changed: the delegation line of the parent thread (status, tx) is refreshed in order
+  const tid = d.taskId ?? d.task?.id ?? d.bid?.taskId;
+  if (tid && ev.type !== "subcontract.created" && subs.isChild(tid)) enqueue(() => { const p = threads.get(subs.parentOf(tid)); if (p) renderThread(p); }, silent);
 }
 
 export function resetMission() {
