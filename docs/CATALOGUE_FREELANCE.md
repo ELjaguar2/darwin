@@ -5,7 +5,7 @@ Owner: architect. Lot L16 (6 freelance professions). Research carried out on **2
 This document is the basis for Darwin's task budgets for the 6 professions of `shared/types.ts` (`PROFESSIONS`):
 `logo`, `finance`, `architecture`, `marketing`, `translation`, `legal`.
 
-The catalogue in code (`shared/catalogue.ts`) is the single source for titles, deliverable descriptions, scoring rubrics and production instructions; since L19 all of them are in English and every production and judge prompt contains "Always answer in English.". Protocol identifiers (profession ids, deliverable file names such as `analyse.md`, `texte.md`, `traduction.md`, `checklist.md`) are deliberately not translated.
+The catalogue in code (`shared/catalogue.ts`) is the single source for titles, deliverable descriptions, scoring rubrics and production instructions; since L19 all of them are in English and every production and judge prompt contains "Always answer in English.". Deliverable file names are English (`analysis.md`, `text.md`, `translation.md`, `checklist.md`); journals recorded before 2026-11-12 may carry the former French names (`analyse.md`, `texte.md`, `traduction.md`), which the backend still serves.
 
 ## General caveat (applies to the whole page)
 
