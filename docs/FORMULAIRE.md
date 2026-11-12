@@ -14,7 +14,7 @@
 | `email` | valid, max 160; 2 submissions max per email | **TO PROVIDE** | human |
 | `size` | `1`, `2 - 4`, `4 - 6`, `6 - 8` or `8+` | **TO PROVIDE** (real size of the human team) | human |
 | `tracks` | ids, each once | recommendation: `swarms`, `agents`; possibly `open` (and `business`). **Human decision.** | human |
-| `nearAddress` | 2 to 64, lowercase; a named or implicit (64 chars) **mainnet** account created by the team | **TO PROVIDE** (never created by an agent) | human |
+| `nearAddress` (NEAR mainnet address for prize) | 2 to 64, lowercase; a named or implicit (64 chars) **mainnet** account created by the team | `jadmiroc.near` (provided by the human; never created by an agent) | human |
 | `projectUrl` | public repository, max 300 | **TO PROVIDE**: repository URL, to make public before 2026-11-14 23:59 UTC | human |
 | `demoUrl` | public X post, max 300 | **TO PROVIDE**: URL of the published post (see `docs/POST_X.md`) | human |
 | `idea` | **20 to 2000 characters** | text below | proposed, reviewed by the human |
