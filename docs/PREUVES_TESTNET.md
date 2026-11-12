@@ -2,7 +2,7 @@
 
 > Runs before 2026-11-12 were generated in French (agent letters, pitches, deliverables); journals under docs/preuves are historical traces and are not modified.
 >
-> Updated 2026-11-12: §8 = run 8 of 2026-11-10 (generation 3 and deaths), §10 = logo validation of 2026-11-11, §11 = summary of runs 9a and 9b of 2026-11-11, §12 = sha256 fingerprints of the proof journals, §13 = English output validation of 2026-11-12. Rule: only what appears here with a transaction identifier, a journal or a reproducible command is **proven**. Everything else is stated as not proven. Explorer: `https://testnet.nearblocks.io/txns/<hash>` (nearblocks, testnet). No mainnet spending, nothing is published. This file is generated from `docs/preuves/PREUVES_TEMPLATE.md` and the journals by `node scripts/assemble-preuves.mjs` (the generator scripts emit some table headers in French; the committed English file was translated by hand).
+> Updated 2026-11-12: §8 = run 8 of 2026-11-10 (generation 3 and deaths), §10 = logo validation of 2026-11-11, §11 = summary of runs 9a and 9b of 2026-11-11, §12 = sha256 fingerprints of the proof journals, §13 = English output validation of 2026-11-12, §14 = run 10, real subcontracting, of 2026-11-12. Rule: only what appears here with a transaction identifier, a journal or a reproducible command is **proven**. Everything else is stated as not proven. Explorer: `https://testnet.nearblocks.io/txns/<hash>` (nearblocks, testnet). No mainnet spending, nothing is published. This file is generated from `docs/preuves/PREUVES_TEMPLATE.md` and the journals by `node scripts/assemble-preuves.mjs` (the generator scripts emit some table headers in French; the committed English file was translated by hand).
 
 ## 1. Honest summary
 
@@ -18,6 +18,7 @@
 | Death of an agent on testnet | **Proven**: 7 deaths by starvation in run 8, `mark_dead` and account closing with transactions (§8) |
 | `refund_escrow` on testnet | **Proven** (§8, §11): task `t-5003` rejected by the judge, `rejected` refund by the contract, reputation penalty −2; visitor logo orders refunded the same way in run 9b (§11) |
 | Agents' function-call keys | **Proven in run 8**: key added in the creation transaction, 0 warnings, 2 keys verified on the chain (failed in runs 5 to 7, fixed) |
+| Agent-to-agent subcontracting | **Proven at run 8** (child escrows locked by the delegating agent's account, children paid, result **not** integrated) **and at run 10** (child delivered, judged, paid, **integrated into the parent's deliverable**, parent accepted and paid by the simulated client: 3 complete cases, commission earned 0.0576 NEAR; 2 refused logo parents where the delegator lost the child price; 1 in-house fallback; §14). One 21-minute run, simulated client only |
 | NEAR Intents, mainnet | **Never executed** (no spending) |
 
 ## 2. Master account
@@ -370,6 +371,7 @@ The "real testnet run" banner of the interface is deduced from the `chain` field
 | `docs/preuves/run8-journal.jsonl` | `9647d982663bc2493a2ecf562d17837ef7ad1d32b9169bbf704afcedf3ba2110` |
 | `docs/preuves/run9a-journal.jsonl` | `b82aa257e853b076a01501c92b40319b6a4503a3f5977cb6998a94ff0a6628fb` |
 | `docs/preuves/run9b-journal.jsonl` | `fdb06603b6571207bcf11fc2b175826c798d85a61906829c83efdaffaf7dbf69` |
+| `docs/preuves/run10-subcontracting-journal.jsonl` | `42fc7d54d83f9db54e05fab0adbee5d6a1af14b11e589eb249e6f525d88a9f20` |
 
 Verification (from the repository root):
 
@@ -395,3 +397,57 @@ Total: 0.00015 USD (worst case computed before the calls: 0.00063 USD).
 Excerpts: letter "My dearest Blaise, Welcome to the world! Even with 0.5 NEAR to start, and having already completed 7 tasks ..."; pitch "Your cozy neighborhood escape awaits! Come savor our new cappuccino today."; deliverable "A cozy corner of your neighborhood. Discover your new favorite spot at our charming local cafe. ..."
 
 Notes: (1) the generic heuristic `looksEnglish` requires 2 English function words, which a one-sentence pitch may not contain; the pitch is therefore judged with `englishVerdict(text, short)` (1 function word, zero French word, no accent) plus the engine's own `pitchLanguageOk`. (2) Only the default model was tested; a genome may carry another model (gene), which this validation does not cover. (3) The judge (`validateMessages`) was not called (outside the budget); its prompt carries the English rule (`brain/l19-english.test.ts`).
+
+## 14. Run 10 — real subcontracting (2026-11-12)
+
+Goal: prove on NEAR testnet, with the real AI, that an agent can delegate part of a mission to an agent of another profession, pay it from its own account, **integrate the child's deliverable into its own** and be paid by the client (decision D-048, procedure `docs/RUN_SUBCONTRACT.md`). Source: `docs/preuves/run10-subcontracting-journal.jsonl` (1090 events, sha256 in §12). The table below is generated from the journal by `node scripts/subcontract-proof.mjs docs/preuves/run10-subcontracting-journal.jsonl` (read-only), which also checks automatically, for every integrated subcontract, that the payer of the child escrow lock is the account of the delegating agent (18 of 18 checks passed).
+
+### Settings and results
+
+| Item | Value (from the journal unless stated) |
+|---|---|
+| Launch, pause | Started 2026-11-12 14:08:38 UTC (first event 14:08:39), paused at tick 21 at 14:29:29 UTC: about **21 minutes** of simulation |
+| Mode | `sim.started`: `mode=testnet`, `preset=selection`, seed 42, `chain=near`, `brain=nearai`; branch `lot/L21-integration`; Node 22.17.1 (a version warning at startup, normal run) |
+| Population | 9 births (6 founders, then 2 in generation 2 and 1 in generation 3), 3 reproductions (`agent.reproduced`, 3 `letter.written`), **0 deaths** |
+| Market | 44 tasks posted (38 from the simulated client, 6 sub-tasks posted by agents, **0 visitor order**), 42 bids, 40 escrows locked, 32 released, 7 refunded; 39 verdicts (33 accepted, 6 rejected) |
+| NEAR AI Cloud | 124 calls debited (`brain.charged`, none mock), total **0.029 USD** by our local accounting (platform invoice not re-read) |
+| Master account | about 10.14 then 8.88 NEAR, measured by the project lead through the RPC (not recorded in the journal) |
+| Warnings | 8 `BRAIN_EMPTY_TEXT` (model reasoning exhausted the output budget), 1 `EXECUTION_FAILED` (NEAR AI timeout of 60 s on `t-10013220`) |
+| Subcontracting events | 6 `subcontract.created`, 5 `subcontract.integrated`, 1 `subcontract.fallback` (`no_bids`) |
+
+### The six subcontracts (generated table, amounts in NEAR)
+
+| Parent -> child | Professions | Delegating agent | Agent paid | Parent price | Child price | Commission planned | Commission earned | Classification, parent verdict |
+|---|---|---|---|---|---|---|---|---|
+| `t-10013202` -> `t-10013206` | architecture -> finance | Lina (`a-250332`) | Kepler (`a-250331`) | 0.0606 | 0.0360 | 0.0246 | **0.0246** | **complete** (parent accepted and paid), accepted 1.00 |
+| `t-10013212` -> `t-10013215` | legal -> marketing | Orion (`a-250335`) | Mendel (`a-250333`) | 0.0450 | 0.0240 | 0.0210 | **0.0210** | **complete**, accepted 1.00 |
+| `t-10013233` -> `t-10013236` | marketing -> translation | Pasteur (`a-250336`) | Nora (`a-250334`) | 0.0240 | 0.0120 | 0.0120 | **0.0120** | **complete**, accepted 1.00 |
+| `t-10013204` -> `t-10013207` | logo -> marketing | Jules (`a-250330`) | Mendel (`a-250333`) | 0.0450 | 0.0240 | 0.0210 | 0 | integrated but parent rejected (no commission, delegator lost the child price), rejected 0.00, parent refunded to the client |
+| `t-10013217` -> `t-10013222` | logo -> marketing | Jules (`a-250330`) | Pasteur (`a-250336`) | 0.0450 | 0.0240 | 0.0210 | 0 | integrated but parent rejected (same), rejected 0.35, parent refunded |
+| `t-10013221` -> `t-10013223` | logo -> marketing | Jules (`a-250330`) | none | 0.0450 | none | 0 | 0 | fallback (`no_bids`, in-house, no commission); accepted 0.60, paid |
+
+Commission actually earned: **0.0576 NEAR** in total (0.0246 + 0.0210 + 0.0120), only on parents accepted and paid. Paid to child agents: **0.1200 NEAR** (5 children: 0.036 + 0.024 + 0.024 + 0.024 + 0.012). The "planned" commission of the two refused parents is the `commission` field of their `subcontract.integrated` event (parent price minus child price): it was never collected.
+
+### Transactions (open `https://testnet.nearblocks.io/txns/<hash>`)
+
+| Parent | Child escrow lock (payer = the delegating agent's account, `kind` escrow lock) | Child release (payee = child agent) | Parent release (payee = delegating agent) |
+|---|---|---|---|
+| `t-10013202` (complete) | `DGHrebeg5unrzVX1MUtoh5mCR9kTwaojXfL71BLzKqKr` (payer `a-250332`) | `H963jPSg1iSEebXrT4E77Jok2Q7YdCHrtaN9GptmrGqD` | `CcB5xsLwPfGHZb3dvet3t4HFDGammn4M2paSK8Kdbe13` |
+| `t-10013212` (complete) | `J9PHjfwPSAvHAGMYwt9gDVqCxwqWwM71VU6zhJRpUFaw` (payer `a-250335`) | `HfrDpvh8WiuSJTzk3gn98DCt2RYN5WpwrD92Ek84RA3N` | `ExNGxULfixSmmzFhgcbordvTWXh7wfrcMVJXVugPtrSp` |
+| `t-10013233` (complete) | `A5YKzx8fR4Ac8y4QLYP5fbyRFfHgA5eEsKi2NZFztbbF` (payer `a-250336`) | `BqxbPxwj9XxCrbxyX2itwnZ9aHBCNHsJdWHku5U1iBh1` | `64ZeiECd9ztBns9StK67ps7h6dqGL3AA5Mb1iJpkWHJo` |
+| `t-10013204` (parent rejected) | `DbPiXJtuXt9QSvfyhz63WMvMNYKTNy626uqGKwBhsPgv` (payer `a-250330`) | `H21BGGwCoMuoG3y4Tei52j9WhchRJzEvS9Z3So9unWyU` | none (parent refund to the client `35sy5DN619gUfTFU9cqBkj6aToxxqGr2yqv7y761rRVe`) |
+| `t-10013217` (parent rejected) | `Eyv427JtZyGQkLX84cvUf1opDbnuU2sx4qEHpXEaQwT4` (payer `a-250330`) | `FMus6RnRYV8BL2gKVTBLd2iGmwXMzcd98eqPVf6DFe5a` | none (parent refunded) |
+| `t-10013221` (fallback) | none (sub-task `t-10013223` expired with no bid) | none | `HrpDeK9tuq9eaSQpzUbeKgLZJ6r2VWRWbWa8UzfCHsaa` |
+
+In the five integrated cases the parent's `deliverable.produced` event contains a section `## Subcontracted to <first name> (<profession>)` followed by the child's text: Kepler (finance) in `architecture.md` of `t-10013202`, Mendel (marketing) twice, Nora (translation) and Pasteur (marketing) once each (for the logo parents it is the file `subcontracted.md`, next to `logo-1.svg` to `logo-3.svg`). The plan B parent `t-10013221` has a `subcontracted.md` with `## Done in-house (subcontract failed: no_bids)`.
+
+### Honest limits
+
+- **One run, about 21 minutes, no death**: it proves the subcontracting path, not the long-term selection. Three reproductions, generation 3 reached, nothing more is claimed about survival.
+- **All parent missions came from the simulated client** (`sim-client.<master>`); no visitor order in this run. The economy remains subsidised.
+- **The child is not negotiated**: its brief is built from templates (`engine/subcontract-plan.ts`), and the child's price is its normal auction price.
+- **Unexplained refusal of the logo parents**: `t-10013204` (score 0.00, reason "only one logo" while the deliverable contains 3 SVG files; cause not established) and `t-10013217` (score 0.35, generic quality). In both cases the child was paid and **the delegating agent lost the child price (0.024 NEAR each) with no commission**: delegating can lose money when the parent is refused.
+- Commission = price paid by the client minus price escrowed for the child. **Gas fees are ignored** (not measured), as are the AI costs of the agents.
+- The AI judge is a single model (`gemini-2.5-flash-lite`) and judges the complete text of the parent; its scores are not independently audited.
+- Verifiable: every hash above on `testnet.nearblocks.io`; the journal is replayable with `DARWIN_REPLAY_FILE=docs/preuves/run10-subcontracting-journal.jsonl npm run replay` (labelled replay, not live).
+- Run 8 (§8) had already shown the payment of child escrows without integration: 11 `subcontract.created`, of which 3 child escrows were locked from the delegating agent's account and released (older journal, fewer fields recorded).
