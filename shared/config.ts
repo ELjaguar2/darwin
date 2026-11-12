@@ -27,6 +27,8 @@ export interface SimParams {
   visitorBidWindowTicks?: number; // bidding window of a visitor order (default: bidWindowTicks)
   visitorTaskDeadlineTicks?: number; // delivery deadline of a visitor order (default: taskDeadlineTicks)
   priceScale: number; // multiplier of catalogue prices (mock: "comfortable" units x40; testnet: 1 = real catalogue prices)
+  /** L21 subcontracting. Probability of subcontracting = baseProb + coopProb x cooperation (default 0 + 0.5 x cooperation); the agent keeps at least minCommission (fraction of the price won). */
+  subcontract?: { baseProb: number; coopProb: number; minCommission: number };
   visitorHourlyCap: bigint; // spending cap per hour (real clock) of the `visitors` account; beyond it, POST /api/tasks = 429 (D-025)
 }
 
@@ -85,6 +87,7 @@ export const PRESETS: Record<"mock" | "testnet", Record<Preset, SimParams>> = {
       simClientRatePerTick: 2, taskBudgetMin: N("0.02"), taskBudgetMax: N("0.1"),
       bidWindowTicks: 1, taskDeadlineTicks: 4, mutationRate: 0.4, mutationSd: 0.2,
       nearUsdRate: 3, maxTokensPerCall: 300, settleEveryTicks: 4, visitorHourlyCap: N("0.5"), priceScale: 1, visitorBidWindowTicks: 3, visitorTaskDeadlineTicks: 6,
+      subcontract: { baseProb: 0.15, coopProb: 0.6, minCommission: 0.15 }, // L21 (D-048)
     },
   },
 };

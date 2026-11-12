@@ -103,6 +103,8 @@ function shapeError(type: string, d: Record<string, any>): string | undefined {
       const bad = ["budget", "parentPrice", "commission"].find((k) => d[k] !== undefined && !isStr(d[k])); // optional since L21
       return miss(needStr("parentTaskId", "childTaskId")) ?? (bad ? `"${bad}" invalid` : undefined);
     }
+    case "subcontract.integrated": return miss(needStr("parentTaskId", "childTaskId", "childAgentId", "childPrice", "parentPrice", "commission"));
+    case "subcontract.fallback": return miss(needStr("parentTaskId", "commission"));
     default: return undefined;
   }
 }
