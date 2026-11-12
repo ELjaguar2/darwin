@@ -3,7 +3,7 @@
 > Owner: redacteur. **The human reviews, adapts and publishes personally.** Mandatory mentions (SPECS L-05): say the project was built at the NEAR HACKATHON, tag **@NEARProtocol** and **#NEARHackathon**, attach the **video** (`docs/VIDEO_SCRIPT.md`): it is MANDATORY, HACKATHON.md (re-read on 2026-11-12) says screenshots alone are not enough. Optional: @NearLegion, @NearBuilders. The post link goes into `demoUrl` of the form (`docs/FORMULAIRE.md`).
 > Replace `<REPO_URL>` with the public repository URL before publishing. Each tweet is at most 280 characters (a URL counts for 23); counts checked by script, then re-check in the X editor.
 > The video must stay under 2 min 20 (likely limit for a free X account); see `docs/VIDEO_SCRIPT.md`.
-> Updated 2026-11-12 from `docs/PREUVES_TESTNET.md` (run 8 and run 9c). Facts used: run 8 (historical, French): generation 3, 12 births, 7 deaths. Run 9c (English): generation 3, 16 births, 4 deaths, two missions paid on testnet (a marketing pitch and a logo).
+> Updated 2026-11-12 from `docs/PREUVES_TESTNET.md` (run 8, run 9c, run 10). Facts used: run 8 (historical, French): generation 3, 12 births, 7 deaths. Run 9c (English): generation 3, 16 births, 4 deaths, two missions paid on testnet (a marketing pitch and a logo). Run 10 (21 minutes, English): real subcontracting, 3 complete cases, 2 refused parents.
 > **Honesty rule for the missions**: they were typed into the interface by an automated browser on the developer's behalf, and paid by the operator's demo account. Do not write "a visitor ordered" or "a user paid". The post says "missions" and "client simulated"; the thread says how they were entered.
 
 ## Single post
@@ -34,20 +34,24 @@ Attach: the video (the "wow" in the first 10 seconds). Mandatory.
 ```
 
 ```text
-5/ On NEAR testnet, run for real: sub-accounts, function-call keys, a Rust escrow/registry contract, NEAR AI Cloud as the brain. Run of 12 Nov: generation 3, 16 births, 4 deaths, 78 escrows, 2 missions paid, a logo included. NEAR Intents: not run.
+5/ On NEAR testnet, run for real: sub-accounts, function-call keys, a Rust escrow/registry contract, NEAR AI Cloud as the brain. Run of 12 Nov: generation 3, 16 births, 4 deaths, 78 escrows, 2 missions paid. NEAR Intents: module present, disabled, not run (vision).
 ```
 
 ```text
-6/ Honest limits: most tasks come from a labelled simulated client. The 2 missions were typed by an automated browser, paid by our demo account. Subcontracting not awarded in that run. Escrow validated by the operator (not trustless). One run, not a guarantee.
+6/ Subcontracting, for real on testnet (a separate 21-minute run): an agent paid a child agent from its own account, folded its text into its deliverable and got paid. 3 complete cases, hashes in the repo. 2 parents were refused by the judge: their delegator lost money.
 ```
 
 ```text
-7/ Try it: <REPO_URL> (npm ci && npm run start:mock, or npm run replay for the recorded run). README has "do X, you will see Y" steps. Most code written by AI agents (Claude Code). #NEARHackathon @NEARProtocol
+7/ Honest limits: most tasks come from a labelled simulated client. The 2 missions were typed by an automated browser, paid by our demo account. Escrow validated by the operator (not trustless). One run each, not a guarantee. The subcontracting run had no death.
+```
+
+```text
+8/ Try it: <REPO_URL> (npm ci && npm run start:mock, or npm run replay for the recorded run). README has "do X, you will see Y" steps. Most code written by AI agents (Claude Code). #NEARHackathon @NEARProtocol
 ```
 
 ## Checks before publishing
 
-- The text must stay true: re-read `docs/PREUVES_TESTNET.md` section 14. If the video shows the replay, say so in the post or the first reply ("replay of a recorded run, not live").
+- The text must stay true: re-read `docs/PREUVES_TESTNET.md` sections 14 and 15. If the video shows the replay, say so in the post or the first reply ("replay of a recorded run, not live").
 - No promise of real gains: testnet NEAR has no value. Never write "the first".
 - Do not describe the two missions as ordered by a visitor or a customer.
 - Check that the repository is public and the X post is public, then copy its URL into the form.
