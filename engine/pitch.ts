@@ -7,7 +7,7 @@
 import { MAX_PITCH_CHARS, costYocto, formatNear, mockPitch, pitchLanguageOk, sanitizePitch, type Agent, type Task } from "../shared/index.ts";
 import { bidMessages } from "../brain/prompts.ts";
 import { bal, type Ctx } from "./context.ts";
-import { chargeBrain, resolveModel, warnOnce } from "./economy.ts";
+import { adviceOf, chargeBrain, resolveModel, warnOnce } from "./economy.ts";
 import { reserve } from "./policy.ts";
 
 export const PITCH_MAX_TOKENS = 120;
@@ -22,7 +22,7 @@ export async function makePitch(ctx: Ctx, a: Agent, task: Task, price: bigint): 
   if (brain.kind === "mock") return fallback;
   try {
     const model = resolveModel(ctx, a);
-    const messages = bidMessages(a.genome, { title: task.title, prompt: task.prompt, budgetNear: formatNear(task.budget, 4) }, formatNear(price, 4));
+    const messages = bidMessages(a.genome, { title: task.title, prompt: task.prompt, budgetNear: formatNear(task.budget, 4) }, formatNear(price, 4), adviceOf(ctx, a));
     const promptTokens = Math.ceil(messages.reduce((n, m) => n + m.content.length, 0) / 4);
     const worst = costYocto({ promptTokens, completionTokens: PITCH_MAX_TOKENS, reasoningTokens: 0, totalTokens: promptTokens + PITCH_MAX_TOKENS }, model, config.sim.nearUsdRate);
     if (bal(a) - worst < reserve(ctx, a)) return fallback; // too tight: we do not dip into the reserve for one sentence

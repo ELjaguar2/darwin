@@ -97,6 +97,9 @@ function onEvent(ev, { silent } = {}) {
   if (ev.type === "agent.born" && d.agent) {
     const p = d.parentId ? store.agents.get(d.parentId) : null;
     toast("birth", "✦", p ? `${firstName(d.agent)} is born from ${firstName(p)} · generation ${d.agent.generation}` : `${firstName(d.agent)} joins the simulation`, d.agent.id);
+  } else if (ev.type === "letter.received" && d.status === "received") {
+    const c = store.agents.get(d.childId), p = store.agents.get(d.parentId);
+    if (c && p) toast("sys", "✉", `${firstName(c)} is born with a letter from ${firstName(p)}`, d.childId);
   } else if (ev.type === "agent.died") {
     const a = store.agents.get(d.agentId);
     toast("death", "✝", `${firstName(a) || d.agentId} dies${d.cause === "starvation" ? ": ran out of money" : ""}`, d.agentId);
