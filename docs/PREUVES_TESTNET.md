@@ -2,7 +2,7 @@
 
 > Runs before 2026-11-12 were generated in French (agent letters, pitches, deliverables); journals under docs/preuves are historical traces and are not modified.
 >
-> Updated 2026-11-12: §8 = run 8 of 2026-11-10 (generation 3 and deaths), §10 = logo validation of 2026-11-11, §11 = summary of runs 9a and 9b of 2026-11-11, §12 = sha256 fingerprints of the proof journals, §13 = English output validation of 2026-11-12, §14 = run 9c of 2026-11-12 (generation 3 again, two visitor-path missions paid). Rule: only what appears here with a transaction identifier, a journal or a reproducible command is **proven**. Everything else is stated as not proven. Explorer: `https://testnet.nearblocks.io/txns/<hash>` (nearblocks, testnet). No mainnet spending, nothing is published. This file is generated from `docs/preuves/PREUVES_TEMPLATE.md` and the journals by `node scripts/assemble-preuves.mjs` (the generator scripts emit some table headers in French; the committed English file was translated by hand).
+> Updated 2026-11-12: §8 = run 8 of 2026-11-10 (generation 3 and deaths), §10 = logo validation of 2026-11-11, §11 = summary of runs 9a and 9b of 2026-11-11, §12 = sha256 fingerprints of the proof journals, §13 = English output validation of 2026-11-12, §14 = run 9c of 2026-11-12 (generation 3 again, two visitor-path missions paid), §15 = run 10 of 2026-11-12 (real subcontracting). Rule: only what appears here with a transaction identifier, a journal or a reproducible command is **proven**. Everything else is stated as not proven. Explorer: `https://testnet.nearblocks.io/txns/<hash>` (nearblocks, testnet). No mainnet spending, nothing is published. This file is generated from `docs/preuves/PREUVES_TEMPLATE.md` and the journals by `node scripts/assemble-preuves.mjs` (the generator scripts emit some table headers in French; the committed English file was translated by hand).
 
 ## 1. Honest summary
 
@@ -18,7 +18,7 @@
 | Death of an agent on testnet | **Proven**: 7 deaths by starvation in run 8 (§8) and 4 in run 9c (§14), `mark_dead` and account closing with transactions |
 | A task from the visitor path accepted and paid on testnet | **Proven in run 9c** (§14): 2 missions (marketing, logo), escrow locked then released, hashes given. **Limits**: both were typed into the interface by an automated browser on the developer's behalf (not by an external human visitor); the payer is the operator's demo account `visitors.<master>`, not the visitor |
 | A logo delivered, accepted and paid on testnet | **Proven in run 9c** (§14): task `t-9975887`, 3 SVGs, judge score 0.73, release `6FCjxzUN…`. One logo, one sample |
-| Subcontracting between agents on testnet | **Proven in run 8** (3 subcontracted tasks locked and released, payer = an agent account; journal `docs/preuves/run8-journal.jsonl`). **Not awarded in run 9c**: 18 created, no bid, 18 expired (§14) |
+| Subcontracting between agents on testnet | **Proven at run 8** (3 child escrows locked by the delegating agent's account and released; result not integrated) **and at run 10** (child delivered, judged, paid, **integrated into the parent's deliverable**, parent accepted and paid by the simulated client: 3 complete cases, commission earned 0.0576 NEAR; 2 refused logo parents where the delegator lost the child price; 1 in-house fallback; §15). **Not awarded in run 9c** (18 created, no bid: price-floor bug, fixed by L21, §14). One 21-minute run at run 10, simulated client only |
 | `refund_escrow` on testnet | **Proven** (§8, §11): task `t-5003` rejected by the judge, `rejected` refund by the contract, reputation penalty −2; visitor logo orders refunded the same way in run 9b (§11); 7 refunds after rejections in run 9c (§14) |
 | Agents' function-call keys | **Proven in run 8**: key added in the creation transaction, 0 warnings, 2 keys verified on the chain (failed in runs 5 to 7, fixed) |
 | NEAR Intents, mainnet | **Never executed** (no spending) |
@@ -317,7 +317,7 @@ Transactions by type: create_account 8, register_agent 8, transfer 61, escrow_lo
 | all | id collision at restart | contract accounts and registry persist | `DARWIN_AGENT_SEQ_START`; **since run 8, automatic shift** (clock) |
 | 5 to 7 | `FC_KEY_NOT_ADDED` | limited key added afterwards, the RPC did not yet see the new account's key | key added in the creation transaction (run 8: 0 failures) |
 | 5 to 7 | `JUDGE_COST_UNKNOWN` | prefix of the served model differs from the catalogue identifier | price looked up on the requested identifier (run 8: 0) |
-| 9c | 18 subcontracting tasks created, 0 awarded | no bid on the agents' child tasks (suspected price floor, to be confirmed) | not fixed in this journal; fix in preparation, not merged |
+| 9c | 18 subcontracting tasks created, 0 awarded | no bid on the agents' child tasks: the child budget was below the child profession's price floor (D-047) | fixed by L21 (D-047, D-048); real subcontracting proven in run 10 (§15) |
 | 9c | `BRAIN_EMPTY_TEXT` x24 | empty answers, `finish_reason=length` (reasoning tokens exhausted), mostly DeepSeek-V4.1-Flash and gpt-5-nano | not fixed; no effect on the two visitor missions' payments |
 
 Run 8 and run 9c settings: `DARWIN_PRESET=selection` alone (run 9c: see §14). Runs 6 and 7 settings: `DARWIN_PRESET=demo`, `DARWIN_TICK_MS=10000`, `DARWIN_BIRTH_CAPITAL=0.1`, `DARWIN_METABOLISM=0.002`, `DARWIN_MIN_VITAL=0.02`, `DARWIN_REPRO_COOLDOWN_TICKS=5`, `DARWIN_SIM_CLIENT_RATE=1.5`, `DARWIN_MAX_POPULATION=14` (run 7 only), Node 22.23.4, RPC `https://test.rpc.fastnear.com`.
@@ -376,6 +376,7 @@ The "real testnet run" banner of the interface is deduced from the `chain` field
 | `docs/preuves/run9a-journal.jsonl` | `b82aa257e853b076a01501c92b40319b6a4503a3f5977cb6998a94ff0a6628fb` |
 | `docs/preuves/run9b-journal.jsonl` | `fdb06603b6571207bcf11fc2b175826c798d85a61906829c83efdaffaf7dbf69` |
 | `docs/preuves/run9c-journal.jsonl` | `a54065a5399152fbe3f440a8dc699150da8e7e4636d075548efa42fa3c9af618` |
+| `docs/preuves/run10-subcontracting-journal.jsonl` | `42fc7d54d83f9db54e05fab0adbee5d6a1af14b11e589eb249e6f525d88a9f20` |
 
 Verification (from the repository root):
 
@@ -432,7 +433,7 @@ Notes: (1) the generic heuristic `looksEnglish` requires 2 English function word
 
 ### Limits of run 9c (honest)
 
-- **Subcontracting between agents: 18 created, 0 awarded.** The journal has 18 `subcontract.created` events; each child task (posted by an agent) received no bid and expired (`task.expired`, reason `no_bids`: 18 of the 26 expired tasks; the other 8 are simulated-client tasks that also got no bid). Run 8 had 11 subcontracting tasks, of which 3 were awarded and released. The team's diagnosis (price floor) is a hypothesis, a fix is in preparation and **not merged**.
+- **Subcontracting between agents: 18 created, 0 awarded.** The journal has 18 `subcontract.created` events; each child task (posted by an agent) received no bid and expired (`task.expired`, reason `no_bids`: 18 of the 26 expired tasks; the other 8 are simulated-client tasks that also got no bid). Run 8 had 11 subcontracting tasks, of which 3 were awarded and released. The cause was the L16 price floor (child budget below the child profession's floor, D-047); it was fixed by lot L21 and real subcontracting was proven in run 10 (§15).
 - **`BRAIN_EMPTY_TEXT` x24** (`system.warning`): empty answers with `finish_reason=length` (reasoning tokens exhausted), from `deepseek-ai/DeepSeek-V4.1-Flash-1017` (16), `openai/gpt-5-nano` (7) and `anthropic/claude-haiku-5-5` (1). No effect on the payments of the two visitor missions; the impact on the other tasks was not analysed.
 - **The payer of most tasks is the simulated client** (88 of 108 tasks posted, 76 of 78 escrows locked); 18 tasks were subcontracting (none awarded) and 2 were the visitor-path missions above.
 - **A single execution, a single seed**: generation 3 at tick 40 is an observation, not a guarantee. Dead agents died of starvation with balances of 0.028 to 0.030 NEAR (minimum vital 0.03).
@@ -505,3 +506,57 @@ Death recorded in the contract registry (`mark_dead`): [`Cfw4TRsP…`](https://t
 
 270 calls billed to the agents (0 mock), cumulative real cost 0.06560 USD. By model: gpt-5-nano-2025-08-07 ×91, Qwen/Qwen3.6-35B-A3B-FP8 ×66, gemini-2.5-flash-lite ×72, deepseek-ai/DeepSeek-V4.1-Flash-1017 ×28, claude-haiku-5-5 ×13.
 
+## 15. Run 10 — real subcontracting (2026-11-12)
+
+Goal: prove on NEAR testnet, with the real AI, that an agent can delegate part of a mission to an agent of another profession, pay it from its own account, **integrate the child's deliverable into its own** and be paid by the client (decision D-048, procedure `docs/RUN_SUBCONTRACT.md`). Source: `docs/preuves/run10-subcontracting-journal.jsonl` (1090 events, sha256 in §12). The table below is generated from the journal by `node scripts/subcontract-proof.mjs docs/preuves/run10-subcontracting-journal.jsonl` (read-only), which also checks automatically, for every integrated subcontract, that the payer of the child escrow lock is the account of the delegating agent (18 of 18 checks passed).
+
+### Settings and results
+
+| Item | Value (from the journal unless stated) |
+|---|---|
+| Launch, pause | Started 2026-11-12 14:08:38 UTC (first event 14:08:39), paused at tick 21 at 14:29:29 UTC: about **21 minutes** of simulation |
+| Mode | `sim.started`: `mode=testnet`, `preset=selection`, seed 42, `chain=near`, `brain=nearai`; branch `lot/L21-integration`; Node 22.17.1 (a version warning at startup, normal run) |
+| Population | 9 births (6 founders, then 2 in generation 2 and 1 in generation 3), 3 reproductions (`agent.reproduced`, 3 `letter.written`), **0 deaths** |
+| Market | 44 tasks posted (38 from the simulated client, 6 sub-tasks posted by agents, **0 visitor order**), 42 bids, 40 escrows locked, 32 released, 7 refunded; 39 verdicts (33 accepted, 6 rejected) |
+| NEAR AI Cloud | 124 calls debited (`brain.charged`, none mock), total **0.029 USD** by our local accounting (platform invoice not re-read) |
+| Master account | about 10.14 then 8.88 NEAR, measured by the project lead through the RPC (not recorded in the journal) |
+| Warnings | 8 `BRAIN_EMPTY_TEXT` (model reasoning exhausted the output budget), 1 `EXECUTION_FAILED` (NEAR AI timeout of 60 s on `t-10013220`) |
+| Subcontracting events | 6 `subcontract.created`, 5 `subcontract.integrated`, 1 `subcontract.fallback` (`no_bids`) |
+
+### The six subcontracts (generated table, amounts in NEAR)
+
+| Parent -> child | Professions | Delegating agent | Agent paid | Parent price | Child price | Commission planned | Commission earned | Classification, parent verdict |
+|---|---|---|---|---|---|---|---|---|
+| `t-10013202` -> `t-10013206` | architecture -> finance | Lina (`a-250332`) | Kepler (`a-250331`) | 0.0606 | 0.0360 | 0.0246 | **0.0246** | **complete** (parent accepted and paid), accepted 1.00 |
+| `t-10013212` -> `t-10013215` | legal -> marketing | Orion (`a-250335`) | Mendel (`a-250333`) | 0.0450 | 0.0240 | 0.0210 | **0.0210** | **complete**, accepted 1.00 |
+| `t-10013233` -> `t-10013236` | marketing -> translation | Pasteur (`a-250336`) | Nora (`a-250334`) | 0.0240 | 0.0120 | 0.0120 | **0.0120** | **complete**, accepted 1.00 |
+| `t-10013204` -> `t-10013207` | logo -> marketing | Jules (`a-250330`) | Mendel (`a-250333`) | 0.0450 | 0.0240 | 0.0210 | 0 | integrated but parent rejected (no commission, delegator lost the child price), rejected 0.00, parent refunded to the client |
+| `t-10013217` -> `t-10013222` | logo -> marketing | Jules (`a-250330`) | Pasteur (`a-250336`) | 0.0450 | 0.0240 | 0.0210 | 0 | integrated but parent rejected (same), rejected 0.35, parent refunded |
+| `t-10013221` -> `t-10013223` | logo -> marketing | Jules (`a-250330`) | none | 0.0450 | none | 0 | 0 | fallback (`no_bids`, in-house, no commission); accepted 0.60, paid |
+
+Commission actually earned: **0.0576 NEAR** in total (0.0246 + 0.0210 + 0.0120), only on parents accepted and paid. Paid to child agents: **0.1200 NEAR** (5 children: 0.036 + 0.024 + 0.024 + 0.024 + 0.012). The "planned" commission of the two refused parents is the `commission` field of their `subcontract.integrated` event (parent price minus child price): it was never collected.
+
+### Transactions (open `https://testnet.nearblocks.io/txns/<hash>`)
+
+| Parent | Child escrow lock (payer = the delegating agent's account, `kind` escrow lock) | Child release (payee = child agent) | Parent release (payee = delegating agent) |
+|---|---|---|---|
+| `t-10013202` (complete) | `DGHrebeg5unrzVX1MUtoh5mCR9kTwaojXfL71BLzKqKr` (payer `a-250332`) | `H963jPSg1iSEebXrT4E77Jok2Q7YdCHrtaN9GptmrGqD` | `CcB5xsLwPfGHZb3dvet3t4HFDGammn4M2paSK8Kdbe13` |
+| `t-10013212` (complete) | `J9PHjfwPSAvHAGMYwt9gDVqCxwqWwM71VU6zhJRpUFaw` (payer `a-250335`) | `HfrDpvh8WiuSJTzk3gn98DCt2RYN5WpwrD92Ek84RA3N` | `ExNGxULfixSmmzFhgcbordvTWXh7wfrcMVJXVugPtrSp` |
+| `t-10013233` (complete) | `A5YKzx8fR4Ac8y4QLYP5fbyRFfHgA5eEsKi2NZFztbbF` (payer `a-250336`) | `BqxbPxwj9XxCrbxyX2itwnZ9aHBCNHsJdWHku5U1iBh1` | `64ZeiECd9ztBns9StK67ps7h6dqGL3AA5Mb1iJpkWHJo` |
+| `t-10013204` (parent rejected) | `DbPiXJtuXt9QSvfyhz63WMvMNYKTNy626uqGKwBhsPgv` (payer `a-250330`) | `H21BGGwCoMuoG3y4Tei52j9WhchRJzEvS9Z3So9unWyU` | none (parent refund to the client `35sy5DN619gUfTFU9cqBkj6aToxxqGr2yqv7y761rRVe`) |
+| `t-10013217` (parent rejected) | `Eyv427JtZyGQkLX84cvUf1opDbnuU2sx4qEHpXEaQwT4` (payer `a-250330`) | `FMus6RnRYV8BL2gKVTBLd2iGmwXMzcd98eqPVf6DFe5a` | none (parent refunded) |
+| `t-10013221` (fallback) | none (sub-task `t-10013223` expired with no bid) | none | `HrpDeK9tuq9eaSQpzUbeKgLZJ6r2VWRWbWa8UzfCHsaa` |
+
+In the five integrated cases the parent's `deliverable.produced` event contains a section `## Subcontracted to <first name> (<profession>)` followed by the child's text: Kepler (finance) in `architecture.md` of `t-10013202`, Mendel (marketing) twice, Nora (translation) and Pasteur (marketing) once each (for the logo parents it is the file `subcontracted.md`, next to `logo-1.svg` to `logo-3.svg`). The plan B parent `t-10013221` has a `subcontracted.md` with `## Done in-house (subcontract failed: no_bids)`.
+
+### Honest limits
+
+- **One run, about 21 minutes, no death**: it proves the subcontracting path, not the long-term selection. Three reproductions, generation 3 reached, nothing more is claimed about survival.
+- **All parent missions came from the simulated client** (`sim-client.<master>`); no visitor order in this run. The economy remains subsidised.
+- **The child is not negotiated**: its brief is built from templates (`engine/subcontract-plan.ts`), and the child's price is its normal auction price.
+- **Unexplained refusal of the logo parents**: `t-10013204` (score 0.00, reason "only one logo" while the deliverable contains 3 SVG files; cause not established) and `t-10013217` (score 0.35, generic quality). In both cases the child was paid and **the delegating agent lost the child price (0.024 NEAR each) with no commission**: delegating can lose money when the parent is refused.
+- Commission = price paid by the client minus price escrowed for the child. **Gas fees are ignored** (not measured), as are the AI costs of the agents.
+- The AI judge is a single model (`gemini-2.5-flash-lite`) and judges the complete text of the parent; its scores are not independently audited.
+- Verifiable: every hash above on `testnet.nearblocks.io`; the journal is replayable with `DARWIN_REPLAY_FILE=docs/preuves/run10-subcontracting-journal.jsonl npm run replay` (labelled replay, not live).
+- Run 8 (§8) had already shown the payment of child escrows without integration: 11 `subcontract.created`, of which 3 child escrows were locked from the delegating agent's account and released (older journal, fewer fields recorded).
+- **Safety fixes applied after run 10, not exercised in a real run** (decision D-050, `docs/SECURITE.md` section 8): at most one running subcontract per agent; the parent's own part is checked by the market's deterministic rules before delegating (if it fails, no subcontract); escaping of lines starting with `#` in the child's text; validation of `subcontract.*` events in a replayed journal (a hostile journal is refused; the run 10 and run 8 journals still replay). The mock calibration of the `selection` preset after these fixes is 91 of 100 seeds (generation 3 and at least 1 death). None of this was observed in a testnet run: run 10 ran the code before these fixes.

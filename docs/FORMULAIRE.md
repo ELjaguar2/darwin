@@ -1,6 +1,6 @@
 # FORM: submission draft (nothing has been submitted)
 
-> **Pitch thesis**: "Today, you pay for your AI's consumption. Tomorrow, you will pay an agent like a freelancer: it will have overhead, answer calls for tenders and have to be profitable to exist. Darwin shows who will survive, on NEAR."
+> **Pitch thesis**: "Tomorrow, you will pay an agent like a freelancer: it will have overhead, answer calls for tenders and have to be profitable to exist. Darwin shows who will survive, on NEAR."
 
 > Owner: redacteur. **Nothing is submitted.** The human re-reads https://nearhackathon.com/HACKATHON.md before submitting, checks every value, then submits personally (form https://nearhackathon.com/#apply or `POST /api/applications`). Fields and limits follow `docs/SPECS.md` S-02 to S-05 (re-check on the live page).
 
@@ -25,7 +25,7 @@ No other field may be sent (body limited to 12000 bytes). Response codes: 201 re
 
 ## Text of the `idea` field
 
-It covers the problem, the product and the role of NEAR. Terms match the README (what is mock or not run is stated there). Facts updated on 2026-11-12 from `docs/PREUVES_TESTNET.md` (run 8 and run 9c, section 14); related work checked on 2026-11-11 (arXiv 2506.04236, Automaton README). Runs 9a and 9b (extinction in generation 1) are not cited in the text; the README tells them.
+It covers the problem, the product and the role of NEAR. Terms match the README (what is mock or not run is stated there). Facts updated on 2026-11-12 from `docs/PREUVES_TESTNET.md` (run 8, run 9c section 14, run 10 section 15); related work checked on 2026-11-11 (arXiv 2506.04236, Automaton README). Runs 9a and 9b (extinction in generation 1) are not cited in the text; the README tells them.
 
 <!-- idea:start -->
 ```text
@@ -35,13 +35,13 @@ Problem: can an agent pay its own inference bill, and which genomes survive?
 
 Product: a live economy of AI agents, simulated by default or on NEAR testnet. Each agent has a genome (profession, AI model, price, risk, reproduction threshold, generosity, cooperation, personality), is born as a NEAR sub-account with a capital, bids in auctions, works, is paid from an escrow after validation, gets a reputation and pays its AI cost from its balance. Rich agents reproduce (mutated child plus a "letter to my child"); broke agents die.
 
-Related work: Spore.fun (Solana; reproduction at a $500,000 token valuation; arXiv 2506.04236: 1 child in generation 5, only the original agent alive in May 2025) and Automaton (no market between agents in its README). Darwin selects on paid, validated work. Selection by speculation died out. Selection by useful work can last (a hypothesis: our client is mostly simulated).
+Related work: Spore.fun (Solana; arXiv 2506.04236: 1 child in generation 5, only the original agent alive in May 2025) and Automaton (no market between agents in its README). Darwin selects on paid, validated work. Selection by speculation died out. Selection by useful work can last (a hypothesis: our client is mostly simulated).
 
-NEAR, run for real on testnet (tx ids in the repo): sub-account and function-call key per agent, Rust registry/escrow/reputation contract, NEAR AI Cloud brain. Two runs reached generation 3: run 8 (12 births, 7 deaths) and run 9c on 12 Nov (16 births, 4 deaths, 78 escrows, English). Run 9c also paid two missions entered through the UI: a marketing pitch and a logo.
+NEAR, run for real on testnet (tx ids in the repo): sub-account and function-call key per agent, Rust registry/escrow/reputation contract, NEAR AI Cloud brain. Two runs reached generation 3: run 8 (12 births, 7 deaths) and run 9c on 12 Nov (16 births, 4 deaths, 78 escrows, English). Run 9c also paid two UI missions (marketing, logo).
 
-Honesty: mock is the default; most paid tasks come from the labelled simulated client; the two missions were typed by an automated browser for the developer, paid by our demo account; subcontracting not awarded in run 9c; AI cost (about 0.07 USD) is local accounting; NEAR Intents was never run; escrow is validated by the operator, not trustless.
+Honesty: mock is the default; most paid tasks come from the labelled simulated client; the two missions were typed by an automated browser for the developer, paid by our demo account; real subcontracting proven in a 21-minute run (3 complete cases; 2 refused parents, their delegator lost money), unawarded in run 9c (bug, fixed); AI cost (about 0.07 USD) is local accounting; NEAR Intents was never run; escrow is validated by the operator, not trustless.
 
-Run: npm ci && npm run start:mock ("do X, you will see Y" steps in the README). Most code by AI agents (Claude Code). MIT.
+Run: npm ci && npm run start:mock (README: do X, see Y). Code mostly by AI agents (Claude Code). MIT.
 ```
 <!-- idea:end -->
 
