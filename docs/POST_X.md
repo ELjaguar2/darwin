@@ -40,7 +40,7 @@ Joindre : la vidéo (le « wow » dans les 10 premières secondes).
 ```
 
 ```text
-7/ Try it: <REPO_URL> (npm install && npm run start:mock). README has "do X, you will see Y" steps. #NEARHackathon @NEARProtocol
+7/ Try it: <REPO_URL> (npm ci && npm run start:mock). README has "do X, you will see Y" steps. #NEARHackathon @NEARProtocol
 ```
 
 ## Points de vigilance avant de publier
