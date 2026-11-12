@@ -71,7 +71,12 @@ export class SubTracker {
     // amount actually escrowed for the child (can be below the budget): integrated price, else escrow.locked.amount, else awarded price, else released amount
     const price = integ?.childPrice ?? (dead || fb ? null : (lock?.amount ?? award?.price ?? rel?.amount ?? null));
     let commission = null, commissionKind = "unknown";
-    if (integ && integ.commission != null) { commission = integ.commission; commissionKind = "actual"; }
+    // the commission is earned only when the PARENT mission is paid; a rejected (refunded) parent earns nothing although the child was paid
+    const parentRefunded = this.ends.get(s.parentTaskId) === "refunded", parentPaid = this.releases.has(s.parentTaskId);
+    if (integ && integ.commission != null) {
+      if (parentRefunded) { commission = 0n; commissionKind = "void"; }
+      else { commission = integ.commission; commissionKind = parentPaid ? "actual" : "expected"; }
+    }
     else if (fb || dead) { commission = 0n; commissionKind = "none"; }
     else if (price != null && parentPrice != null && parentPrice >= price) { commission = parentPrice - price; commissionKind = this.modern ? "expected" : "actual"; }
     else if (childStatus === "open") {
@@ -83,7 +88,7 @@ export class SubTracker {
       profession: integ?.childProfession ?? s.opt.profession ?? child?.profession ?? null, budget, parentPrice, price, commission, commissionKind, status, childStatus,
       fallbackReason: fb?.reason ?? null, expiredReason: end?.startsWith("expired:") ? end.slice(8) : null,
       winnerId: integ?.childAgentId ?? award?.winnerId ?? null, payee: rel?.payee ?? null, paidAmount: rel?.amount ?? null,
-      lockTx: lock?.tx ?? null, lockPayer: lock?.payer ?? null, releaseTx: rel?.tx ?? null, parentReleaseTx: this.releases.get(s.parentTaskId)?.tx ?? null,
+      parentRejected: parentRefunded, lockTx: lock?.tx ?? null, lockPayer: lock?.payer ?? null, releaseTx: rel?.tx ?? null, parentReleaseTx: this.releases.get(s.parentTaskId)?.tx ?? null,
     };
   }
   records() { return [...this.subs.keys()].map((k) => this.record(k)); }

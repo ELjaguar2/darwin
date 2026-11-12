@@ -80,6 +80,16 @@ describe("SubTracker: real subcontracting", () => {
     expect([s.count, s.integrated, s.fallback, s.expired]).toEqual([1, 1, 0, 0]);
     expect([s.paidTotal, s.commission]).toEqual([30n * Y, 60n * Y]);
   });
+  it("integrated but parent REJECTED (refunded): child paid, no commission earned", () => {
+    const t = run([...base(),
+      mk(5, "task.awarded", { taskId: "C", winnerId: "a2", price: String(30n * Y) }),
+      mk(7, "escrow.released", { taskId: "C", payee: "a2.x", amount: String(30n * Y), tx: "REL" }),
+      mk(9, "subcontract.integrated", { parentTaskId: "P", childTaskId: "C", childAgentId: "a2", childProfession: "translation", childPrice: String(30n * Y), parentPrice: String(90n * Y), commission: String(60n * Y) }),
+      mk(10, "escrow.refunded", { taskId: "P", payer: "c", amount: String(90n * Y), tx: "RF" })]);
+    const r = t.record("C"), s = t.summary();
+    expect([r.commissionKind, r.commission, r.parentRejected]).toEqual(["void", 0n, true]);
+    expect([s.integrated, s.paidTotal, s.commission]).toEqual([1, 30n * Y, 0n]);
+  });
   it("awarded but not yet integrated (modern log): commission is expected, not summed", () => {
     const t = run([...base("C"), mk(5, "task.awarded", { taskId: "C", winnerId: "a2", price: String(30n * Y) }),
       mk(6, "subcontract.fallback", { parentTaskId: "P", childTaskId: "OTHER", reason: "deadline", commission: "0" })]);
@@ -107,6 +117,18 @@ describe("SubTracker: real subcontracting", () => {
     expect([r.status, r.expiredReason, r.commissionKind]).toEqual(["expired", "no_bids", "none"]);
     const s = t.summary();
     expect([s.count, s.expired, s.integrated, s.fallback, s.delegated, s.commission]).toEqual([1, 1, 0, 0, 0n, 0n]);
+  });
+  it("run10 journal: 5 integrated (3 parents paid, 2 rejected), 1 fallback, real commission 0.0246 + 0.021 + 0.012", () => {
+    const f = new URL("../../docs/preuves/run10-subcontracting-journal.jsonl", import.meta.url);
+    if (!fs.existsSync(f)) return;
+    const t = new SubTracker();
+    for (const l of fs.readFileSync(f, "utf8").trim().split("\n")) t.ingest(JSON.parse(l));
+    const s = t.summary();
+    expect([s.count, s.integrated, s.fallback, s.fallbackByReason.no_bids]).toEqual([6, 5, 1, 1]);
+    expect(s.records.filter((r) => r.commissionKind === "actual").length).toBe(3);
+    expect(s.records.filter((r) => r.commissionKind === "void").length).toBe(2);
+    expect(Number(s.commission) / 1e24).toBeCloseTo(0.0246 + 0.021 + 0.012, 3);
+    expect(Number(s.paidTotal) / 1e24).toBeCloseTo(0.12, 3);
   });
   it("run9c journal: only expired subcontracts, no money moved", () => {
     const f = new URL("../../docs/preuves/run9c-journal.jsonl", import.meta.url);
