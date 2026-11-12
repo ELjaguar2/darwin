@@ -18,7 +18,7 @@ const ok = (c, m) => { c ? pass++ : fail++; console.log((c ? "OK   " : "FAIL ") 
   const errs = [];
   const ctx = await b.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: "dark" });
   const p = await ctx.newPage();
-  p.on("console", (m) => { if (m.type() === "error" && !/status of 404/.test(m.text())) errs.push(m.text()); });
+  p.on("console", (m) => { if (m.type() === "error" && !/status of 40[04]/.test(m.text())) errs.push(m.text()); });
   p.on("pageerror", (e) => errs.push("PAGEERROR " + e.message));
   await p.goto(BASE + "/?debug");
   await p.waitForTimeout(Number(process.env.WAIT ?? 12000));
@@ -72,7 +72,41 @@ const ok = (c, m) => { c ? pass++ : fail++; console.log((c ? "OK   " : "FAIL ") 
     await p.fill("#mInput", "Draw a logo for my neighborhood bakery");
     ok((await p.textContent("#jobBtn")).includes("Logo"), "profession inferred from the text: Logo");
     const bud = Number(await p.inputValue("#budgetInput"));
-    ok(Math.abs(bud - 0.045) < 1e-9, "budget pre-filled to the catalogue minimum: " + bud);
+    const hint = await p.textContent("#budgetMin");
+    const hm = /^Minimum for Logo: ([\d.]+) NEAR$/.exec(hint.trim());
+    ok(!!hm && Math.abs(bud - Number(hm[1])) < 1e-9 && bud > 0, `budget pre-filled to the catalogue minimum (${bud}) and hint shown: "${hint.trim()}"`);
+    // L19: untouched budget accepted for each profession (marketing, logo, translation), through to "paid"
+    const cases = [["Write a short marketing slogan for a bookshop", "Marketing"], ["Draw a logo for my neighborhood bakery", "Logo"], ["Translate this paragraph into French: the shop opens at nine", "Translation"]];
+    for (const [txt, lab] of cases) {
+      const before = await p.$$eval("#feed .thread.mine", (n) => n.length);
+      const paid0 = await p.$$eval("#feed .thread.mine .pill-sys.paid", (n) => n.length);
+      await p.fill("#mInput", txt);
+      ok((await p.textContent("#jobBtn")).includes(lab), `L19 ${lab}: profession inferred`);
+      const h1 = (await p.textContent("#budgetMin")).trim(), v = Number(await p.inputValue("#budgetInput"));
+      ok(new RegExp(`^Minimum for ${lab}[^:]*: [0-9.]+ NEAR$`).test(h1) && v > 0 && Math.abs(v - Number(h1.match(/([0-9.]+) NEAR/)[1])) < 1e-9, `L19 ${lab}: budget ${v} = minimum, hint "${h1}"`);
+      const resp = p.waitForResponse((r) => r.url().endsWith("/api/tasks") && r.request().method() === "POST", { timeout: 8000 }).catch(() => null);
+      await p.press("#mInput", "Enter");
+      const rs = await resp;
+      ok(rs && rs.status() === 201, `L19 ${lab}: POST /api/tasks -> ${rs ? rs.status() : "none"} without touching the budget`);
+      await p.waitForFunction((n) => document.querySelectorAll("#feed .thread.mine").length > n, before, { timeout: 8000 }).catch(() => {});
+      const jobId = lab.toLowerCase();
+      const hasWorker = await p.evaluate(async (j) => { const r = await fetch("/api/agents?status=alive").then((x) => x.json()).catch(() => null); return !r || r.agents.some((a) => (a.genome?.profession ?? a.profession) === j); }, jobId);
+      if (!hasWorker) { console.log(`note: no living ${lab} agent in this run, "paid" not expected (the task expires server-side)`); continue; }
+      await p.waitForFunction((n) => document.querySelectorAll("#feed .thread.mine .pill-sys.paid").length > n, paid0, { timeout: 90000 }).catch(() => {});
+      const paidNow = (await p.$$eval("#feed .thread.mine .pill-sys.paid", (n) => n.length)) > paid0;
+      if (!paidNow) console.log("DBG threads:", JSON.stringify(await p.$$eval("#feed .thread.mine", (n) => n.map((x) => x.className + " | " + x.textContent.replace(/\s+/g, " ").slice(0, 300)))));
+      ok(paidNow, `L19 ${lab}: thread reaches "paid"`);
+      await p.waitForTimeout(500);
+    }
+    // L19: forced 400 -> message + one-click "Use the minimum"
+    await p.route("**/api/tasks", (r) => r.request().method() === "POST" ? r.fulfill({ status: 400, contentType: "application/json", body: JSON.stringify({ error: { code: "BAD_REQUEST", message: "minimum budget for marketing is 0.96 NEAR" } }) }) : r.continue(), { times: 1 });
+    await p.fill("#mInput", "Write a short marketing slogan for a bookshop");
+    await p.evaluate(() => document.getElementById("composer").requestSubmit());
+    await p.waitForSelector("#useMin", { timeout: 4000 }).catch(() => {});
+    ok(/rejected/i.test(await p.textContent("#mStatus")) || !!(await p.$("#useMin")), "L19: 400 shows the server message");
+    if (await p.$("#useMin")) { await p.click("#useMin"); ok(Number(await p.inputValue("#budgetInput")) > 0, "L19: Use the minimum sets " + (await p.inputValue("#budgetInput"))); ok(await p.isHidden("#mStatus"), "L19: message cleared"); }
+    else ok(false, "L19: \"Use the minimum\" button present after a 400");
+    await p.fill("#mInput", "Draw a logo for my neighborhood bakery");
     await p.click("#jobBtn");
     ok((await p.$$eval("#jobMenu button", (n) => n.length)) === 6, "profession menu: 6 choices");
     await p.click('#jobMenu button:has-text("Translation")');
@@ -80,10 +114,12 @@ const ok = (c, m) => { c ? pass++ : fail++; console.log((c ? "OK   " : "FAIL ") 
     await p.click("#jobBtn"); await p.click('#jobMenu button:has-text("Logo")');
     await p.fill("#budgetInput", "0.001"); await p.press("#mInput", "Enter");
     ok((await p.textContent("#mStatus")).toLowerCase().includes("budget too low"), "budget too low refused locally");
-    await p.fill("#budgetInput", "0.05");
+    await p.fill("#budgetInput", hm ? hm[1] : "0.05");
     await p.press("#mInput", "Enter");
     await p.waitForSelector("#feed .thread.mine", { timeout: 5000 }).catch(() => {});
+    if (process.env.DBG) console.log("DBG", await p.textContent("#mStatus"), await p.inputValue("#budgetInput"), await p.textContent("#jobBtn"));
     ok(!!(await p.$("#feed .thread.mine")), "after sending: the mission appears in the feed (\"you\" label)");
+    await p.waitForFunction(() => document.getElementById("mInput").value === "", null, { timeout: 4000 }).catch(() => {});
     ok((await p.inputValue("#mInput")) === "", "the bar is emptied after sending");
     await p.waitForSelector("#feed .thread.mine .pill-sys.paid", { timeout: 20000 }).catch(() => {});
     ok(!!(await p.$("#feed .thread.mine .pill-sys.paid")), "feed: \"paid ✓\" displayed");
@@ -92,7 +128,9 @@ const ok = (c, m) => { c ? pass++ : fail++; console.log((c ? "OK   " : "FAIL ") 
     const imgs = await p.$$eval("#feed .thread.mine .cd-logo img", (n) => n.map((x) => x.src.slice(0, 26)));
     ok(imgs.length === 3 && imgs.every((s) => s.startsWith("data:image/svg+xml")), "deliverable: 3 SVG logos as <img data:> (inert)");
     await p.waitForTimeout(1500);
-    await p.locator("#feed .thread.mine").screenshot({ path: path.join(out, "l17-mission-flux.png") });
+    await p.evaluate(() => { const t = [...document.querySelectorAll("#feed .thread.mine")].pop(); if (t) window.scrollTo(0, t.getBoundingClientRect().top + scrollY - 110); });
+    await p.waitForTimeout(400);
+    await p.screenshot({ path: path.join(out, "l17-mission-flux.png") });
   }
   ok((await p.evaluate(() => window.__pwned)) === undefined, "no deliverable script was executed");
   ok((await p.$$eval("#feed script, #feed svg script, #feed [onerror], #feed [onload]", (n) => n.length)) === 0, "no script or event handler in the feed");
@@ -146,7 +184,7 @@ const ok = (c, m) => { c ? pass++ : fail++; console.log((c ? "OK   " : "FAIL ") 
   const brainGen = await p.$$eval("#flowGen td.brain", (n) => n.map((x) => x.textContent.trim()));
   console.log("   brain:", brainTxt, "|", brainGen.join(","));
   ok(!/^0\.00 NEAR/.test(brainTxt) && !brainGen.includes("0.00"), "NB-3: \"Spent on AI brain\" without a misleading \"0.00\": " + brainTxt);
-  if (REPLAY || REAL) ok((await p.$$eval("#txs a.hash[href^='https://testnet.nearblocks.io/txns/']", (n) => n.length)) >= 1, "proof: nearblocks links");
+  if (REPLAY || /TESTNET/.test(mode)) ok((await p.$$eval("#txs a.hash[href^='https://testnet.nearblocks.io/txns/']", (n) => n.length)) >= 1, "proof: nearblocks links");
   ok(/TEE/.test(await p.textContent("#tee")), "proof: TEE attestation badge");
   ok((await p.$$eval("#tools li", (n) => n.length)) === 5, "proof: 5 NEAR building blocks");
   await p.screenshot({ path: path.join(out, "l17-preuves.png"), fullPage: true });
