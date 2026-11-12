@@ -1,8 +1,8 @@
 // Fake development backend for the frontend (lot L8). Node >= 18, no dependency.
 // Replays a plausible event log, conforming to the shared/events.ts catalogue, on the same routes
 // as docs/ARCHITECTURE.md section 9. CONTAINS NO PRODUCT LOGIC: it is a test data generator.
-// Test data is in English (it simulates agents that speak English). Protocol values (badge "simulé", "sous-traitance",
-// status codes, validator "rule:...") are kept as the real backend sends them: the frontend maps them to English labels.
+// Test data is in English (it simulates agents that speak English). Protocol values (badge "simulated", "subcontracting",
+// status codes, validator "rule:...") are kept as the real backend sends them (English since L19; the frontend still maps the legacy French values).
 //
 // Usage : node frontend/dev/fake-server.mjs [--port=3000] [--tick=400] [--seed=7] [--testnet] [--degraded]
 //                                           [--max-ticks=900] [--no-sim] [--task-status=503]
@@ -331,7 +331,7 @@ function normErr(code, body) {
   const retryable = code === 429 || code === 503;
   return { error: { code: code === 503 && FORCE_TASK_STATUS === 503 ? "VALIDATION_PENDING" : c, message: body?.message ?? body?.issues?.map((i) => i.message).join(" ; ") ?? "Error", retryable: retryable || undefined, issues: body?.issues } };
 }
-const badgeOf = (r) => (r.kind === "simulated" ? "simulé" : r.kind === "visitor" ? "Visiteur (financé par le compte de démo)" : "sous-traitance");
+const badgeOf = (r) => (r.kind === "simulated" ? "simulated" : r.kind === "visitor" ? "Visitor (funded by the demo account)" : "subcontracting");
 const withBadge = (t) => ({ ...t, badge: badgeOf(t.requester), validatedBy: t.validation?.validator });
 const send = (res, code, body, headers = {}) => { body = normErr(code, body); if (body && body.id && body.requester) body = withBadge(body); res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...headers }); res.end(JSON.stringify(body)); };
 

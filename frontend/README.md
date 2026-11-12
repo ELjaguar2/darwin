@@ -22,13 +22,13 @@ Accepted degradations: the real log does not always contain the pitch of a bid (
 
 ## Protocol values (API) and their English display
 
-The API keeps sending its protocol values (French for now); the frontend shows an English equivalent through a lookup table in `format.js` (`BADGE_LABEL`, `badgeText`) and falls back to the raw value when unknown. It does not depend on any `badgeLabel` field.
+The API badge values are English since L19; the frontend maps them (and the former French values, kept for old flows) to display labels through a lookup table in `format.js` (`BADGE_LABEL`, `badgeText`) and falls back to the raw value when unknown.
 
 | API value | Displayed |
 |---|---|
-| `badge: "simulé"` | simulated |
-| `badge: "sous-traitance"` | subcontract |
-| `badge: "Visiteur (financé par le compte de démo)"` | Visitor (funded by the demo account) |
+| `badge: "simulated"` (legacy `"simulé"`) | simulated |
+| `badge: "subcontracting"` (legacy `"sous-traitance"`) | subcontract |
+| `badge: "Visitor (funded by the demo account)"` (legacy `"Visiteur (financé par le compte de démo)"`) | Visitor (funded by the demo account) |
 | `requester.label: "visiteur"` | visitor |
 | task `status` (`posted`, `awarded`, `submitted`, `settled`, `rejected`, `expired`) | bidding, awarded, delivered, paid, refunded, expired |
 | `chain.tx` `kind` (`create_account`, `transfer`, ...) | Birth (account created), Transfer, Escrow locked, ... |

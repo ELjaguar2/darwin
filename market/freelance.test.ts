@@ -7,7 +7,7 @@ import {
 } from "../shared/index.ts";
 import { executeMessages } from "../brain/prompts.ts";
 import {
-  BADGE_LABELS, DeliverableError, SIMULATED_BADGE, SUBCONTRACT_BADGE, VISITOR_FUNDING_LABEL, badgeLabelOf, createMarket, createMarketEvents,
+  BADGE_LABELS, LEGACY_BADGES, DeliverableError, SIMULATED_BADGE, SUBCONTRACT_BADGE, VISITOR_FUNDING_LABEL, badgeLabelOf, createMarket, createMarketEvents,
   createSimulatedClient, extractDeliverable, judgeMessages, mermaidSyntaxProblem, parseJudgeVerdict, pickWeightedProfession, runChecks, sanitizeSvg, simBudget,
   simTemplate, targetLanguage,
 } from "./index.ts";
@@ -415,15 +415,20 @@ describe("L19: the market speaks English", () => {
     expect((t2.requester as { label: string }).label).toBe("Simulated client: robot");
     expect(t2.requester.kind).toBe("simulated");
   });
-  it("protocol badge values unchanged (French), English display labels alongside", () => {
-    expect(SIMULATED_BADGE).toBe("simulé");
-    expect(SUBCONTRACT_BADGE).toBe("sous-traitance");
-    expect(VISITOR_FUNDING_LABEL).toBe("Visiteur (financé par le compte de démo)");
+  it("badge values are English since L19 (backend and API consistent), legacy French values still mapped", () => {
+    expect(SIMULATED_BADGE).toBe("simulated");
+    expect(SUBCONTRACT_BADGE).toBe("subcontracting");
+    expect(VISITOR_FUNDING_LABEL).toBe("Visitor (funded by the demo account)");
     expect(badgeLabelOf(SIMULATED_BADGE)).toBe("simulated");
     expect(badgeLabelOf(SUBCONTRACT_BADGE)).toBe("subcontracting");
     expect(badgeLabelOf(VISITOR_FUNDING_LABEL)).toBe("Visitor (funded by the demo account)");
-    expect(badgeLabelOf("autre")).toBe("autre");
-    expect(Object.keys(BADGE_LABELS)).toHaveLength(3);
+    // legacy French values are still recognised
+    expect(badgeLabelOf("simulé")).toBe("simulated");
+    expect(badgeLabelOf("sous-traitance")).toBe("subcontracting");
+    expect(badgeLabelOf("Visiteur (financé par le compte de démo)")).toBe("Visitor (funded by the demo account)");
+    expect(LEGACY_BADGES["simulé"]).toBe(SIMULATED_BADGE);
+    expect(badgeLabelOf("other")).toBe("other");
+    expect(Object.keys(BADGE_LABELS)).toHaveLength(6);
   });
   it("judge verdict parser accepts reason= and the legacy raison=", () => {
     expect(parseJudgeVerdict("ACCEPTED score=0.8 reason=fits the order")).toEqual({ accepted: true, score: 0.8, reason: "fits the order" });
