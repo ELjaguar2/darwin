@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { MockBrain, MockChain, createJournal, createRng, loadConfig, EVENT_TYPES, GenomeSchema, type Deps, type DarwinEvent } from "../shared/index.ts";
+import { MockBrain, MockChain, createJournal, createRng, loadConfig, EVENT_TYPES, GenomeSchema, PROFESSIONS, type Deps, type DarwinEvent } from "../shared/index.ts";
 import { createEngine } from "./index.ts";
-import { mutateGenome, createFounderGenome } from "./genome.ts";
+import { mutateGenome, createFounderGenome, personalityWith } from "./genome.ts";
 import { StubMarket } from "./stub-market.ts";
 
 async function run(seed: number, env: Record<string, string> = {}) {
@@ -77,5 +77,45 @@ describe("génome", () => {
       }
     }
     expect(mutateGenome(parent, rng, 0, 0.5, ["mock/small"]).mutations).toEqual({});
+  });
+});
+
+describe("L16 : 6 métiers et spécialisation", () => {
+  it("les fondateurs couvrent les 6 métiers, avec une personnalité de freelance par métier", () => {
+    const rng = createRng(3);
+    const founders = PROFESSIONS.map((_, i) => createFounderGenome(rng, i, ["mock/small"]));
+    expect(new Set(founders.map((g) => g.profession))).toEqual(new Set(PROFESSIONS));
+    for (const g of founders) expect(g.personality.startsWith(personalityWith(g.profession))).toBe(true);
+    expect(new Set(PROFESSIONS.map((p) => personalityWith(p))).size).toBe(PROFESSIONS.length);
+  });
+
+  it("un changement de métier par mutation met à jour la personnalité", () => {
+    const rng = createRng(5);
+    const parent = createFounderGenome(rng, 0, ["mock/small"]);
+    let changed = 0;
+    for (let i = 0; i < 300; i++) {
+      const { genome } = mutateGenome(parent, rng, 1, 0.2, ["mock/small"]);
+      if (genome.profession !== parent.profession) {
+        changed++;
+        expect(genome.personality.startsWith(personalityWith(genome.profession))).toBe(true);
+      }
+    }
+    expect(changed).toBeGreaterThan(0);
+  });
+
+  it("population.snapshot : répartition des vivants par métier et par génération, toutes les 5 ticks", async () => {
+    const { engine, events } = await run(42);
+    const snaps = events.filter((e): e is DarwinEvent<"population.snapshot"> => e.type === "population.snapshot");
+    expect(snaps.length).toBeGreaterThan(0);
+    for (const s of snaps) expect(s.data.tick % 5).toBe(0);
+    expect(Object.keys(snaps[0]!.data.byProfession).sort()).toEqual([...PROFESSIONS].sort());
+    for (const s of snaps) {
+      const total = Object.values(s.data.byProfession).reduce((a, b) => a + b, 0);
+      const byGen = Object.values(s.data.byGeneration).flatMap((r) => Object.values(r)).reduce((a, b) => a + b, 0);
+      expect(byGen).toBe(total);
+      const tickEvt = events.find((e) => e.type === "sim.tick" && e.tick === s.tick) as DarwinEvent<"sim.tick">;
+      expect(total).toBe(tickEvt.data.alive);
+    }
+    expect(engine.getState().generations).toBeGreaterThanOrEqual(3);
   });
 });

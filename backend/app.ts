@@ -8,7 +8,7 @@ import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { getConnInfo } from "@hono/node-server/conninfo";
-import { redactConfig, type Task } from "../shared/index.ts";
+import { CATALOGUE, PROFESSIONS, formatNear, redactConfig, scaledPrice, type Task } from "../shared/index.ts";
 import { MarketError, SIMULATED_BADGE, VISITOR_FUNDING_LABEL } from "../market/index.ts";
 import { RateLimiter } from "./rate-limit.ts";
 import { safeErrorMessage } from "./redact.ts";
@@ -26,6 +26,7 @@ const OPEN_STATUSES: ReadonlySet<Task["status"]> = new Set(["posted", "awarded",
 export const PUBLIC_STATIC = /^\/(?:index\.html|favicon\.svg|[A-Za-z0-9_-]+\.(?:js|css))?$/;
 const FALLBACK_CSS = "body{font:16px/1.5 system-ui,sans-serif;max-width:40rem;margin:2rem auto;padding:0 1rem}code{background:#8882;padding:0 .3em}";
 const ID_RE = /^[a-z]-\d{1,9}$/;
+const FILE_RE = /^[a-z0-9._-]{1,64}$/;
 
 export const MIN_ADMIN_TOKEN_LENGTH = 24;
 
@@ -110,10 +111,11 @@ export function createApp(rt: Runtime, opts: AppOptions = {}): Hono {
     c.header("X-Content-Type-Options", "nosniff");
     c.header("Referrer-Policy", "no-referrer");
     c.header("X-Frame-Options", "DENY");
-    c.header(
-      "Content-Security-Policy",
-      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
-    );
+    if (!c.res.headers.has("Content-Security-Policy")) // les livrables posent leur propre CSP stricte
+      c.header(
+        "Content-Security-Policy",
+        "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+      );
     if (c.req.path.startsWith("/api/") && !c.res.headers.has("Cache-Control")) c.header("Cache-Control", "no-store");
   });
   // Anti rebond DNS : l'en-tête Host doit être un nom attendu (routes de lecture, SSE, écriture, statique).
@@ -177,7 +179,23 @@ export function createApp(rt: Runtime, opts: AppOptions = {}): Hono {
     });
   });
   app.get("/api/config", (c) => c.json(publicConfig(rt)));
-  app.get("/api/state", (c) => c.json(state()));
+  app.get("/api/state", (c) => c.json({ ...state(), population: rt.lastPopulation() }));
+  app.get("/api/population", (c) => c.json({ population: rt.lastPopulation() ?? null }));
+
+  // ---- catalogue des métiers (formulaire visiteur) + événements de marché actifs ----
+  app.get("/api/catalogue", (c) => {
+    const scale = config.sim.priceScale;
+    const professions = PROFESSIONS.map((p) => {
+      const s = CATALOGUE[p];
+      const price = scaledPrice(p, scale);
+      return {
+        profession: p, label: s.label, refUsd: s.refUsd,
+        nearPrice: price.toString(), nearPriceNear: formatNear(price, 6),
+        deliverable: s.deliverable, files: s.files, rubric: s.rubric, acceptScore: s.acceptScore,
+      };
+    });
+    return c.json({ priceScale: scale, tick: engine.getState().tick, professions, events: rt.activeMarketEvents() });
+  });
 
   app.get("/api/agents", (c) => {
     const status = c.req.query("status");
@@ -235,6 +253,31 @@ export function createApp(rt: Runtime, opts: AppOptions = {}): Hono {
     const task = ID_RE.test(id) ? market.getTask(id) : undefined;
     if (!task) return c.json(errBody("UNKNOWN_TASK", "tâche inconnue"), 404);
     return c.json({ task: taskView(task), bids: rt.bidsOf(id), escrow: market.getEscrow(id) });
+  });
+
+  // ---- livrables (L16) : lecture seule, contenu d'agent servi avec types stricts et CSP verrouillée ----
+  const deliverableOf = (c: Context) => {
+    const id = c.req.param("id") ?? "";
+    return ID_RE.test(id) ? market.getDeliverable(id) : undefined;
+  };
+  app.get("/api/tasks/:id/deliverable", (c) => {
+    const d = deliverableOf(c);
+    if (!d) return c.json(errBody("UNKNOWN_DELIVERABLE", "pas de livrable pour cette tâche"), 404);
+    const { rawText: _raw, ...pub } = d;
+    return c.json({ ...pub, files: d.files.map((f) => ({ name: f.name, mime: f.mime, content: f.content })) });
+  });
+  app.get("/api/tasks/:id/deliverable/:file", (c) => {
+    const file = c.req.param("file") ?? "";
+    if (!FILE_RE.test(file)) return c.json(errBody("INVALID_FILE", "nom de fichier invalide"), 400);
+    const d = deliverableOf(c);
+    const f = d?.files.find((x) => x.name === file);
+    if (!f) return c.json(errBody("UNKNOWN_DELIVERABLE", "livrable ou fichier inconnu"), 404);
+    const type = /^[a-z]+\/[a-z0-9.+-]+$/.test(f.mime) ? f.mime : "text/plain";
+    c.header("Content-Type", type.startsWith("text/") ? `${type}; charset=utf-8` : type);
+    c.header("X-Content-Type-Options", "nosniff");
+    c.header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox");
+    if (c.req.query("download") === "1") c.header("Content-Disposition", `attachment; filename="${file}"`);
+    return c.body(f.content);
   });
 
   app.get("/api/events", (c) => {

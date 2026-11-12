@@ -7,6 +7,12 @@ import {
 } from "../shared/index.ts";
 
 export class StubMarket implements Market {
+  getDeliverable(): undefined {
+    return undefined;
+  }
+  listDeliverables() {
+    return [];
+  }
   private tasks = new Map<string, Task>();
   private bids = new Map<string, Bid>();
   private nTask = 0;

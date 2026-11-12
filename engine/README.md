@@ -8,7 +8,7 @@
 | `genome.ts` | fondateurs, mutation (bornes de `GENOME_BOUNDS`, rapport gène -> [avant, après]) |
 | `lifecycle.ts` | naissance (sous-compte + registre), reproduction, lettre parent -> enfant, mort |
 | `economy.ts` | débits (métabolisme, coût IA via `costYocto`), règlement groupé, synchronisation des soldes |
-| `policy.ts` | décisions d'un agent : enchère, risque, sous-traitance |
+| `policy.ts` | décisions d'un agent : enchère (son métier seulement, jamais sous le prix plancher du métier), risque, sous-traitance |
 | `stub-market.ts` | `Market` minimal pour les tests (l'implémentation réelle est dans `market/`, L6) |
 
 ## Règles de comportement
@@ -41,3 +41,8 @@ Cibles ARCHITECTURE §12 tenues (reproduction avant tick 60, génération 3 avan
 ## Robustesse
 - Règlement groupé : la dette n'est effacée qu'après un transfert réussi (sinon elle reste due et l'erreur remonte). Test dans `failures.test.ts`.
 - `registerAgent` en échec : la naissance est annulée, le compte orphelin est clos et ses fonds retournent à celui qui les a donnés (parent ou maître), avec `system.warning BIRTH_ABORTED` (ou `system.error BIRTH_ORPHAN_ACCOUNT` si le rapatriement échoue aussi). Le parent n'est pas débité et la lettre n'est pas écrite.
+
+## L16 : freelance réel, 6 métiers
+- Métiers : `logo, finance, architecture, marketing, translation, legal`. Fondateurs répartis à tour de rôle (index % 6) ; chaque métier a une personnalité de freelance courte (`personalityWith(profession, trait?)`). Un changement de métier par mutation réécrit la personnalité (trait conservé).
+- Enchère : prix = max(askRatio x budget, coût IA x 1,1, `CATALOGUE[métier].nearPrice`) ; au-dessus du budget, l'agent s'abstient.
+- Spécialisation : événement `population.snapshot { tick, byProfession, byGeneration }` toutes les 5 ticks (`POPULATION_SNAPSHOT_EVERY`), émis juste avant `sim.tick`, vivants uniquement.

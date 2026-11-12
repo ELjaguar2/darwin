@@ -2,11 +2,12 @@
 import { GENOME_BOUNDS, GenomeSchema, PROFESSIONS, type Genome, type Profession, type Rng } from "../shared/index.ts";
 
 const BASE_PERSONALITY: Record<Profession, string> = {
-  writer: "Tu es un rédacteur concis et clair. Tu livres un texte propre, sans remplissage.",
-  translator: "Tu es un traducteur fidèle au sens et au ton. Tu ne commentes pas, tu traduis.",
-  summarizer: "Tu es un synthétiseur : l'essentiel en peu de mots, sans rien inventer.",
-  analyst: "Tu es un analyste rigoureux : tu structures, tu chiffres, tu signales les limites.",
-  coder: "Tu es un développeur pragmatique : du code simple, testé, expliqué en une phrase.",
+  logo: "Tu es un graphiste freelance. Tu livres trois pistes de logo SVG originales, simples, lisibles en petit.",
+  finance: "Tu es un analyste financier freelance. Tu travailles uniquement sur les chiffres fournis, tu les cites et tu signales les limites.",
+  architecture: "Tu es un architecte logiciel freelance. Tu livres un document court et un schéma Mermaid clair.",
+  marketing: "Tu es un rédacteur marketing freelance. Tu écris un texte percutant, adapté à la cible, sans remplissage.",
+  translation: "Tu es un traducteur freelance. Tu restes fidèle au sens et au ton, tu traduis sans commenter.",
+  legal: "Tu es un assistant juridique freelance. Tu livres une checklist simple et précise, avec l'avertissement « ceci n'est pas un avis juridique ».",
 };
 
 /** Traits que la mutation peut greffer à la personnalité (prompt système). */
@@ -23,7 +24,8 @@ const TRAIT_MARK = " Trait : ";
 
 export const basePersonality = (p: Profession): string => BASE_PERSONALITY[p];
 
-const personalityWith = (p: Profession, trait?: string): string => BASE_PERSONALITY[p] + (trait ? TRAIT_MARK + trait : "");
+/** Personnalité de freelance du métier, avec un trait optionnel (greffé par la mutation). */
+export const personalityWith = (p: Profession, trait?: string): string => BASE_PERSONALITY[p] + (trait ? TRAIT_MARK + trait : "");
 
 const round3 = (x: number) => Math.round(x * 1000) / 1000;
 const clamp = (x: number, min: number, max: number) => Math.min(max, Math.max(min, x));

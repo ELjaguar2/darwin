@@ -5,9 +5,10 @@ import { NearChain, createChain, type CreateChainExtras } from "../accounts/inde
 import { createBrain, type Guardrails } from "../brain/index.ts";
 import { createEngine } from "../engine/index.ts";
 import { createMarket, type TaskMarket } from "../market/index.ts";
+import { createSimulatedClient } from "../market/simulated-client.ts";
 import {
   createJournal, createRng,
-  type Bid, type Brain, type Chain, type Config, type DarwinEvent, type Deps, type Engine, type Journal,
+  type Bid, type Brain, type Chain, type Config, type DarwinEvent, type Deps, type Engine, type EventCatalog, type Journal, type MarketEvent,
 } from "../shared/index.ts";
 import { redactText, safeErrorMessage } from "./redact.ts";
 import type { Store } from "./store.ts";
@@ -37,6 +38,10 @@ export interface Runtime {
   startedAt: string;
   /** Offres d'une tâche, reconstruites depuis le journal (le marché n'expose pas `getBid`). */
   bidsOf(taskId: string): Bid[];
+  /** Événements de marché actifs au tick courant (déduits du journal `market.event`). */
+  activeMarketEvents(): MarketEvent[];
+  /** Dernière `population.snapshot` du moteur, undefined avant le premier tick. */
+  lastPopulation(): EventCatalog["population.snapshot"] | undefined;
   /** `chain.mode` de NearChain, sinon `mock`. */
   escrowMode(): "contract" | "operator-account";
   /** Vérifications de démarrage (testnet : RPC et compte maître). Lève une erreur claire sinon. */
@@ -117,14 +122,23 @@ export function createRuntime(config: Config, opts: RuntimeOptions = {}): Runtim
 
   const deps: Deps = { config, chain, brain, journal, rng: createRng(config.seed), now };
   const market = createMarket(deps, { taskSeqStart: idOffset("DARWIN_TASK_SEQ_START", chain.info().kind, 10, now), fundingMargin: chain.info().kind === "mock" ? 0n : 200_000_000_000_000_000_000_000n });
-  const engine = createEngine(deps, market, { emitChainTx, autoRun: opts.autoRun ?? true, agentSeqStart: idOffset("DARWIN_AGENT_SEQ_START", chain.info().kind, 0.25, now) });
+  const simulatedClient = createSimulatedClient(deps, market);
+  const engine = createEngine(deps, market, { simulatedClient, emitChainTx, autoRun: opts.autoRun ?? true, agentSeqStart: idOffset("DARWIN_AGENT_SEQ_START", chain.info().kind, 0.25, now) });
   stopEngine = () => { void engine.stop().catch(() => {}); };
 
   // Index des offres (le journal fait foi pour l'historique).
   const bids = new Map<string, Bid[]>();
   let dirty = false;
+  const marketEvents: MarketEvent[] = [];
+  let population: EventCatalog["population.snapshot"] | undefined;
   journal.subscribe((e) => {
     dirty = true;
+    if (e.type === "market.event") marketEvents.push(e.data.event);
+    if (e.type === "population.snapshot") population = e.data;
+    if (e.type === "deliverable.produced") {
+      const d = market.getDeliverable(e.data.taskId);
+      if (d) store?.saveDeliverable(d);
+    }
     if (e.type === "bid.placed") {
       const list = bids.get(e.data.bid.taskId) ?? [];
       list.push(e.data.bid);
@@ -144,6 +158,11 @@ export function createRuntime(config: Config, opts: RuntimeOptions = {}): Runtim
   let down = false;
   return {
     config, journal, chain, brain, market, engine, startedAt, version: readVersion(),
+    activeMarketEvents: () => {
+      const tick = engine.getState().tick;
+      return marketEvents.filter((ev) => tick >= ev.startTick && tick < ev.endTick).map((ev) => structuredClone(ev));
+    },
+    lastPopulation: () => (population ? structuredClone(population) : undefined),
     bidsOf: (taskId) => bids.get(taskId) ?? [],
     escrowMode: () => (chain instanceof NearChain && chain.mode === "contract" ? "contract" : "operator-account"),
     async checkReady() {

@@ -30,7 +30,11 @@ Erreurs : `{"error":{"code","message", ...}}`. Tous les montants sont des chaîn
 |---|---|
 | `GET /api/health` | `{ok, version, mode, chain:{kind,masterId,contractId?}, brain:{kind}, escrow, mock, tick, running, paused, startedAt, visitors:{spentLastHour, hourlyCap}}` |
 | `GET /api/config` | config publique (mode, preset, chain, brain, sim, intents.enabled) sans secret |
-| `GET /api/state` | `SimState` complet (`lastSeq` = point de reprise du flux) |
+| `GET /api/state` | `SimState` complet (`lastSeq` = point de reprise du flux) + `population` (dernière `population.snapshot` `{tick, byProfession, byGeneration}`, absente avant le 1er tick) |
+| `GET /api/population` | `{population: {tick, byProfession, byGeneration} \| null}` |
+| `GET /api/catalogue` | `{priceScale, tick, professions[{profession,label,refUsd,nearPrice (yocto, x priceScale),nearPriceNear,deliverable,files[],rubric[{id,description,weight}],acceptScore}], events[MarketEvent actifs]}` |
+| `GET /api/tasks/:id/deliverable` | `{taskId, profession, agentId, files[{name,mime,content}], resultHash, productionCostUsd, judgeCostUsd, createdAt, verdict?, score?}` (sans `rawText`) ; 404 `UNKNOWN_DELIVERABLE` |
+| `GET /api/tasks/:id/deliverable/:file[?download=1]` | contenu brut, `Content-Type` du fichier, `nosniff`, `CSP default-src 'none'; style-src 'unsafe-inline'; sandbox` ; `attachment` si `download=1` ; 400 si le nom n'est pas `^[a-z0-9._-]{1,64}$`, 404 s'il n'est pas dans le livrable |
 | `GET /api/agents?status=alive\|dead` | `{agents}` |
 | `GET /api/agents/:id` | `{agent, ancestors[], children[], letterReceived?, lettersWritten[], tasks[]}` |
 | `GET /api/agents/:id/letter`, `GET /api/letters/:id` | `{letter}` (404 pour un fondateur) |
@@ -74,6 +78,8 @@ Chaque message : `id: <seq>`, `event: <type>` (ex. `agent.born`, `chain.tx`), `d
 ## Persistance (`data/`, ignoré par git)
 
 `journal.jsonl` (un événement par ligne, append-only), `state.json` (instantané `SimState`, réécrit toutes les 2 s si le journal a bougé, atomiquement), `lineage.json` (`{generations, nodes}`). V1 : la simulation repart de zéro à chaque lancement ; les fichiers du lancement précédent sont conservés en `journal.prev.jsonl`, `state.prev.json`, `lineage.prev.json`. Si l'écriture échoue, la persistance se désactive avec une alerte unique et la simulation continue. `accounts/` écrit ses propres fichiers (`keys/`, ledger, archive) dans le même dossier.
+
+Livrables : pas de `deliverable.zip` (aucune dépendance de compression ajoutée, D-042). Chaque livrable est écrit dans `data/deliverables/<taskId>/<fichier>` + `meta.json` (noms validés, jamais hors du dossier). Le lancement suivant déplace ce dossier en `deliverables.prev/` et ne le recharge pas : la simulation repart de zéro et les ids de tâche se rejouent. Les livrables ne sont donc servis par l'API que pour le lancement en cours.
 
 ## Tests
 

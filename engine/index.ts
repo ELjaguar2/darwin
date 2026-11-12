@@ -1,7 +1,9 @@
 // Moteur d'évolution : boucle de ticks (contrat ARCHITECTURE §13). Dépend uniquement des interfaces de shared/.
 import {
-  PROFESSIONS, type Agent, type Deps, type Engine, type Letter, type Market, type SimState, type Task,
+  PROFESSIONS, type Agent, type Profession, type Deps, type Engine, type Letter, type Market, type SimState, type Task,
 } from "../shared/index.ts";
+import { CATALOGUE } from "../shared/catalogue.ts";
+import { executeMessages } from "../brain/prompts.ts";
 import { bal, type Ctx, type EngineOptions } from "./context.ts";
 import { chargeBrain, debit, flushAll, resolveModel, syncBalances, warnOnce } from "./economy.ts";
 import { canReproduce, createFounders, die, reproduce } from "./lifecycle.ts";
@@ -10,13 +12,28 @@ import { decideBid, decideSubcontract } from "./policy.ts";
 export type { EngineOptions } from "./context.ts";
 export { createFounderGenome, mutateGenome } from "./genome.ts";
 
-const TASK_PROMPTS: Record<string, string> = {
-  writer: "Rédige un court paragraphe d'accroche pour une boutique en ligne de thé.",
-  translator: "Traduis en anglais : « La sélection naturelle favorise ceux qui gagnent leur vie. »",
-  summarizer: "Résume en deux phrases : l'économie des agents autonomes sur blockchain.",
-  analyst: "Analyse en trois points les risques d'un agent qui dépense plus qu'il ne gagne.",
-  coder: "Écris une fonction qui renvoie la somme des éléments d'un tableau.",
+const TASK_PROMPTS: Record<Profession, string> = {
+  logo: "Crée trois propositions de logo SVG pour une boutique en ligne de thé bio nommée « Feuille ».",
+  finance: "Analyse ces chiffres : recettes 12 400, charges 9 800, stock 3 200, trésorerie 1 500. Donne trois constats et un risque.",
+  architecture: "Décris l'architecture d'une petite application de réservation de salles : document court et schéma Mermaid.",
+  marketing: "Rédige une accroche de 80 mots pour le lancement d'un café de quartier, ton chaleureux.",
+  translation: "Traduis en anglais : « La sélection naturelle favorise ceux qui gagnent leur vie. »",
+  legal: "Prépare une checklist de 8 points pour les mentions légales d'un site e-commerce français.",
 };
+
+/** Un instantané de la répartition par métier toutes les N ticks (indicateur de spécialisation). */
+export const POPULATION_SNAPSHOT_EVERY = 5;
+
+export function populationSnapshot(live: readonly Agent[], tick: number) {
+  const zero = () => Object.fromEntries(PROFESSIONS.map((p) => [p, 0])) as Record<Profession, number>;
+  const byProfession = zero();
+  const byGeneration: Record<string, Record<Profession, number>> = {};
+  for (const a of live) {
+    byProfession[a.genome.profession]++;
+    (byGeneration[String(a.generation)] ??= zero())[a.genome.profession]++;
+  }
+  return { tick, byProfession, byGeneration };
+}
 
 const ID_SORT = (a: Agent, b: Agent) => (a.id < b.id ? -1 : 1);
 
@@ -67,6 +84,14 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
   }
 
   async function simulatedClient() {
+    if (options.simulatedClient) {
+      try {
+        await options.simulatedClient.tick(ctx.tick);
+      } catch (e) {
+        warnOnce(ctx, "POST_TASK_FAILED", (e as Error).message);
+      }
+      return;
+    }
     const n = await poisson(sim.simClientRatePerTick);
     const span = sim.taskBudgetMax - sim.taskBudgetMin;
     for (let i = 0; i < n; i++) {
@@ -113,8 +138,8 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
     try {
       const price = resolveModel(ctx, a);
       const resp = await deps.brain.complete({
-        agentId: a.id, purpose: "execute_task", model: price.id, maxTokens: sim.maxTokensPerCall,
-        messages: [{ role: "system", content: a.genome.personality }, { role: "user", content: t.prompt }],
+        agentId: a.id, purpose: "execute_task", model: price.id, maxTokens: Math.max(sim.maxTokensPerCall, CATALOGUE[t.profession].maxOutputTokens),
+        messages: executeMessages(a.genome, { title: t.title, prompt: t.prompt, profession: t.profession }),
       });
       await chargeBrain(ctx, a, "execute_task", resp, price);
       const sub = decideSubcontract(ctx, a, BigInt(t.budget));
@@ -176,6 +201,7 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
     for (const a of alive()) if (bal(a) < sim.minVital) await die(ctx, a, "starvation");
     // 8. instantané
     const live = alive();
+    if (ctx.tick % POPULATION_SNAPSHOT_EVERY === 0) journal.emit({ type: "population.snapshot", data: populationSnapshot(live, ctx.tick) });
     journal.emit({
       type: "sim.tick",
       data: {

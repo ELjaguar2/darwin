@@ -1,8 +1,8 @@
 // Persistance dans data/ (D-010, ARCHITECTURE §2) : journal JSONL append-only, instantané d'état, lignées.
 // V1 : la simulation repart de zéro à chaque lancement ; les fichiers du lancement précédent sont conservés en `*.prev.*`.
-import { appendFileSync, existsSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import type { Agent, DarwinEvent, SimState } from "../shared/index.ts";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { join, resolve, sep } from "node:path";
+import { PROFESSIONS, type Agent, type DarwinEvent, type Deliverable, type SimState } from "../shared/index.ts";
 import { redactText } from "./redact.ts";
 
 export interface LineageNode {
@@ -32,10 +32,24 @@ export interface Store {
   readonly dir: string;
   appendEvent(e: DarwinEvent): void;
   writeSnapshot(state: SimState): void;
+  /** L16 : écrit `deliverables/<taskId>/<fichier>` + `meta.json` (jamais hors du dossier de données). */
+  saveDeliverable(d: Deliverable): void;
 }
+
+/** Identifiants de tâche et noms de fichier acceptés sur disque (anti traversée de chemin). */
+export const SAFE_TASK_ID = /^[a-z]-\d{1,9}$/;
+export const SAFE_FILE_NAME = /^[a-z0-9._-]{1,64}$/;
 
 export function createStore(dir: string, log: (msg: string) => void = () => {}): Store {
   mkdirSync(dir, { recursive: true });
+  // Livrables : ceux du lancement précédent passent en `deliverables.prev/`. La simulation repart de zéro et les ids de tâche se rejouent :
+  // on ne les recharge pas (on servirait le livrable d'une autre tâche).
+  const delivDir = join(dir, "deliverables");
+  if (existsSync(delivDir)) {
+    rmSync(join(dir, "deliverables.prev"), { recursive: true, force: true });
+    renameSync(delivDir, join(dir, "deliverables.prev"));
+  }
+  const delivRoot = resolve(delivDir) + sep;
   const journalPath = join(dir, "journal.jsonl");
   const statePath = join(dir, "state.json");
   const lineagePath = join(dir, "lineage.json");
@@ -63,6 +77,24 @@ export function createStore(dir: string, log: (msg: string) => void = () => {}):
         fail("journal", err);
       }
     },
+    saveDeliverable(d) {
+      if (failed) return;
+      try {
+        if (!SAFE_TASK_ID.test(d.taskId)) throw new Error("identifiant de tâche invalide");
+        const taskDir = resolve(delivDir, d.taskId);
+        if (!(taskDir + sep).startsWith(delivRoot)) throw new Error("chemin hors du dossier de données");
+        mkdirSync(taskDir, { recursive: true });
+        for (const f of d.files) {
+          if (!SAFE_FILE_NAME.test(f.name) || f.name === "meta.json") throw new Error("nom de fichier invalide");
+          writeFileSync(join(taskDir, f.name), f.content);
+        }
+        const { files, rawText: _raw, ...meta } = d;
+        const listed = files.map((f) => ({ name: f.name, mime: f.mime, bytes: Buffer.byteLength(f.content) }));
+        writeFileSync(join(taskDir, "meta.json"), JSON.stringify({ ...meta, files: listed }, null, 2));
+      } catch (err) {
+        fail("livrables", err);
+      }
+    },
     writeSnapshot(state) {
       if (failed) return;
       try {
@@ -73,4 +105,40 @@ export function createStore(dir: string, log: (msg: string) => void = () => {}):
       }
     },
   };
+}
+
+/** Erreur de relecture d'un état sauvegardé (message destiné à l'opérateur, sans secret). */
+export class SavedStateError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SavedStateError";
+  }
+}
+
+/**
+ * Relit un `state.json` / `state.prev.json`. L16 : le catalogue de métiers a changé (writer, translator, summarizer, analyst, coder
+ * supprimés au profit de logo, finance, architecture, marketing, translation, legal). Un état contenant d'anciens métiers est REJETÉ avec un
+ * message clair (pas de migration : un ancien « writer » n'a pas d'équivalent fidèle). La V1 repart de zéro à chaque lancement (D-010).
+ */
+export function loadSavedState(path: string): SimState {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(path, "utf8"));
+  } catch (e) {
+    throw new SavedStateError(`état sauvegardé illisible (${path}) : ${redactText(e instanceof Error ? e.message : String(e)).slice(0, 200)}`);
+  }
+  const agents = (raw as { agents?: unknown } | null)?.agents;
+  if (!Array.isArray(agents)) throw new SavedStateError(`état sauvegardé invalide (${path}) : champ "agents" absent`);
+  const legacy = new Set<string>();
+  for (const a of agents as { genome?: { profession?: unknown } }[]) {
+    const p = a?.genome?.profession;
+    if (typeof p !== "string" || !(PROFESSIONS as readonly string[]).includes(p)) legacy.add(String(p));
+  }
+  if (legacy.size > 0) {
+    throw new SavedStateError(
+      `état sauvegardé incompatible (${path}) : métiers obsolètes [${[...legacy].join(", ")}]. Métiers actuels : ${PROFESSIONS.join(", ")}. ` +
+        "Supprimez ce fichier et relancez une simulation neuve.",
+    );
+  }
+  return raw as SimState;
 }

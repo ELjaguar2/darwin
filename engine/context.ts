@@ -8,6 +8,8 @@ export interface EngineOptions {
   emitChainTx?: boolean;
   /** Numéro de départ des identifiants d'agents (a-XXXX). Défaut 0. Utile en testnet : les comptes et le registre du contrat persistent entre deux lancements. */
   agentSeqStart?: number;
+  /** Client simulé du marché (gabarits, événements de marché, budgets au prix du métier). Absent : client simple local (tests). */
+  simulatedClient?: { tick(tick: number): Promise<unknown> };
 }
 
 export interface Ctx {

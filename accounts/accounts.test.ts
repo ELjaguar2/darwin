@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { inspect } from "node:util";
 
-const genome: Genome = { profession: "writer", model: "mock-small", askRatio: 0.7, risk: 0.5, reproThreshold: 2, generosity: 0.2, cooperation: 0.3, personality: "Sois utile." };
+const genome: Genome = { profession: "marketing", model: "mock-small", askRatio: 0.7, risk: 0.5, reproThreshold: 2, generosity: 0.2, cooperation: 0.3, personality: "Sois utile." };
 const rec = (id: string, accountId: string, parentId: string | null = null, generation = 1) => ({
   agentId: id, accountId, parentId, generation, genomeHash: hashObject(genome), genome, birthTick: 0,
 });

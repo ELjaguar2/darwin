@@ -5,7 +5,7 @@ import {
 } from "./index.ts";
 
 const genome = {
-  profession: "writer", model: "mock/small", askRatio: 0.7, risk: 0.5, reproThreshold: 2,
+  profession: "marketing", model: "mock/small", askRatio: 0.7, risk: 0.5, reproThreshold: 2,
   generosity: 0.2, cooperation: 0.5, personality: "Sérieux et économe.",
 } as const;
 

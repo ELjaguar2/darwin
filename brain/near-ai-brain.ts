@@ -12,6 +12,7 @@ import type { AiBudget } from "./budget.ts";
 export interface Guardrails {
   /** Plafond de max_tokens par appel (config.sim.maxTokensPerCall). */
   maxTokensPerCall: number;
+  maxTokensHardCap: number;
   /** Budget maximum par appel, en USD (prompt estimé + max_tokens au prix de sortie). Au-delà : max_tokens réduit, sinon refus. */
   maxCostUsdPerCall: number;
   /** Taille maximale du prompt en caractères (refus au-delà). */
@@ -31,6 +32,8 @@ export interface Guardrails {
 
 export const DEFAULT_GUARDRAILS: Guardrails = {
   maxTokensPerCall: 400,
+  /** Plafond dur d'une demande explicite (livrables du catalogue : logo = 3000). Le plafond de coût par appel s'applique toujours. */
+  maxTokensHardCap: 4000,
   maxCostUsdPerCall: 0.05,
   maxPromptChars: 16000,
   maxCallsPerAgentWindow: 30,
@@ -305,7 +308,7 @@ export class NearAiBrain implements Brain {
     if (!info.verified) this.warn("BRAIN_PRICE_UNVERIFIED", `prix de ${info.id} issus du repli du ${FALLBACK_SNAPSHOT_DATE} (non vérifiés)`, true);
 
     // Budget maximum par appel : on réduit max_tokens pour tenir dans maxCostUsdPerCall, sinon on refuse.
-    let maxTokens = Math.max(1, Math.min(req.maxTokens ?? g.maxTokensPerCall, g.maxTokensPerCall));
+    let maxTokens = Math.max(1, Math.min(req.maxTokens ?? g.maxTokensPerCall, Math.max(g.maxTokensPerCall, g.maxTokensHardCap)));
     const promptEst = estimateTokens(promptChars);
     const worst = (mt: number) => costUsd({ promptTokens: promptEst, completionTokens: mt, reasoningTokens: 0, totalTokens: promptEst + mt }, info!);
     if (worst(maxTokens) > g.maxCostUsdPerCall) {
