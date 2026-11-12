@@ -1,10 +1,22 @@
 # CONFORMITE — grille à cocher
 
+> **Avis final du 2026-11-12 sur `lot/L17-integration` (HEAD `787d11a`) : VETO LEVÉ, GO pour la fusion dans `main`.** Voir « Avis final L17-integration » en fin de fichier. Deux corrections de texte (G-1, G-2) sont **obligatoires avant de rendre le dépôt public** ; elles ne bloquent pas la fusion.
+
 > **Mise à jour du 2026-11-12 (revue pré-fusion de `lot/L17-integration` = L16 + L17 + L18, HEAD `c19235a`)** : la section A ci-dessous et l'« Avis L16-L17-L18 » en fin de fichier font foi. Sources officielles relues le 2026-11-12 (nearhackathon.com, HACKATHON.md, docs.near.org/getting-started/hackathons) : dates, livrables, champs du formulaire, consentement, tracks et règles Q-000 à Q-017 inchangés ; seule nuance de rédaction, HACKATHON.md exige maintenant de joindre une **vidéo** au post X (« screenshots alone are not enough when judges cannot open the demo »), la page d'accueil dit toujours « video or screenshots » (voir SPECS L-05). Limite de cette revue : l'outil du gardien n'avait pas de shell, donc ni `npm test`, ni `typecheck`, ni `check-formulaire`, ni serveur relancés par moi ; je m'appuie sur la lecture du code et des documents, et sur `docs/QA_RAPPORT.md` du 2026-11-12 (captures relues).
 >
 > Propriétaire : gardien-des-specs. Vert = conforme `[x]`, rouge = non conforme ou non vérifiable `[ ]` avec justification. Les identifiants renvoient à `docs/SPECS.md`. Recette V1 du 2026-11-09 sur `main` au commit `4c94c30` : sources officielles relues le jour même (nearhackathon.com et HACKATHON.md, aucun changement constaté). Rien n'est coché sans vérification par le gardien (lecture du code, `npm test`, `npm run typecheck`, `node scripts/check-formulaire.mjs`, `node scripts/scan-secrets.mjs --no-history`, backend lancé en preset demo sur le port 3300 puis arrêté). Rust/`cargo` absent de la machine : aucun test Rust relancé.
 
 ## A. Définition de la V1 (CLAUDE.md), état au 2026-11-12 sur `lot/L17-integration`
+
+**Mise à jour de l'avis final (2026-11-12, HEAD `787d11a`)** ; les lignes plus bas gardent l'état de la revue `c19235a` pour l'historique.
+- [x] **Clone neuf + commandes du README = tout tourne** : clone neuf de la branche par la QA (`0d76273`, sans `.env` ni `data/`, Node 22.17.1) : §6b étapes 1, 2, 4 à 7 OK (étape 3 non cliquée, liens présents), §7 et §9 étapes 1 à 15 OK (`docs/QA_RAPPORT.md`, « Clone neuf 2026-11-12 »). Testnet avec clés : run 8 réel (PREUVES §8). Les commits suivants (`470851e`, `8052e38`, `787d11a`) ne touchent que des documents d'après leurs messages ; je n'ai pas pu le contrôler par `git diff` (pas de shell).
+- [x] **>= 3 générations sans intervention** : inchangé (run 8 ; mock). Runs 9a et 9b éteints en génération 1 (PREUVES §11) : n'invalide pas la case, mais doit être dit au README (G-2).
+- [x] **Marché**, [x] **Lettres**, [x] **Page web en direct** : inchangés ; V-6 à V-9 corrigés côté frontend (relus dans la recette QA, captures `docs/captures/clone-neuf-1112/`).
+- [x] **Tests verts** : 22 fichiers, 319/319, `typecheck` 0 erreur, scan de secrets propre (QA, clone neuf `0d76273`). **Non relancés par le gardien** : mon outil n'a pas de shell.
+- [x] **README conforme, étapes vérifiées par la QA** : V-1 à V-4 corrigés et vérifiés (étape 6 en `marketing`, 201 puis `settled` ; étape 14 et §12 ; messages du §6b identiques au code `backend/replay-main.ts:56-58,78` ; preset `selection` du README = `shared/config.ts:81-87`). Écarts QA E-1 à E-3 repris. Réserve : G-1 et G-2 (exactitude sur les runs 9a/9b), à corriger avant publication.
+- [x] **`docs/CONFORMITE.md` tout au vert (ou rouge justifié)** : oui ; les cases rouges restantes (sections B à D) dépendent de l'humain et sont justifiées.
+
+**État de la revue `c19235a` (historique)** :
 - [ ] **Clone neuf + commandes du README = tout tourne** : ROUGE. Mock : clone neuf vérifié par la QA le 2026-11-09 (c99eab0), avant L16. Testnet avec clés : run 8 réel (PREUVES §8) et démarrage avec la clé maître changée (QA 2026-11-12 §3). Rejeu : `npm run replay` vérifié par la QA (QA 2026-11-12 §2). MAIS sur cette branche, le README §9 ne correspond plus au code : l'étape 6 envoie `"profession":"writer"`, que le schéma refuse depuis L16 (`shared/types.ts:12,146`, `PROFESSIONS` = logo/finance/architecture/marketing/translation/legal), donc HTTP 400 au lieu de 201, et l'étape 7 en dépend ; l'étape 14 décrit l'ancienne page, qui est maintenant sur `/?classique` (`frontend/boot.js:2`) ; le §6b, étape 1, cite un message de démarrage en anglais alors que le vrai est en français (`backend/replay-main.ts:56,78`). La QA n'a pas rejoué le §9 depuis L16. Voir écarts V-1 à V-3.
 - [x] **>= 3 générations, sans intervention** : testnet, run 8 (génération 3, 12 naissances, 8 reproductions, 7 morts par famine avec `mark_dead` et clôture de compte, 138 appels IA débités ; PREUVES §8, `docs/preuves/run8-journal.jsonl`) ; mock : `engine/simulation.test.ts`, `engine/selection.test.ts` (D-043). Réserve : le preset `selection` a changé après le run 8 (6 fondateurs, 0,12 NEAR, métabolisme 0,0035, client 2/tick, `shared/config.ts:82-88`), il est calibré en mock seulement et n'a pas été rejoué en réel jusqu'à la génération 3 (écart V-4).
 - [x] **Marché : publication, enchères, séquestre, validation, paiement, réputation** : run 8 (65 séquestres verrouillés dans le contrat, 63 libérés, 2 remboursés, 65 réputations) ; juges par métier L16 (D-039) ; garde de libération relue (`market/index.ts:306-322` : remboursement si rejeté, hash identique exigé, séquestre de la chaîne contrôlé, preuve `accepted` seulement, type `verdict` binaire `shared/types.ts:108`). Tâche de visiteur sur testnet : verrouillée puis remboursée seulement (run 9b), jamais payée : c'est dit partout.
@@ -87,6 +99,7 @@
 | L0 | n/a (rédaction des specs) | 2026-11-09 | SPECS.md et CONFORMITE.md rédigés ; réserves : pages `authentication.md` 1Click, OpenAPI, RPC providers, `private-inference` non lues ; fiabilité des résumés WebFetch à re-vérifier avant soumission. |
 | L1 | VALIDÉ SOUS RÉSERVES (R1 à R10, voir « Avis L1 ») | 2026-11-09 | Architecture conforme aux specs et au concept ; 11 tests verts, typecheck OK ; 6 questions tranchées ; réserves à traiter par lot. |
 | V1 (recette) | VALIDÉE SOUS RÉSERVES (mock) ; testnet non validé | 2026-11-09 | Voir « Avis final V1 » : E1 à E11, R1 à R10 traitées sauf R2 (partielle) et R3 (en cours). |
+| L16 + L17 + L18 (`lot/L17-integration`, `787d11a`) | **VETO LEVÉ : GO pour la fusion dans `main`** ; G-1 et G-2 obligatoires avant de rendre le dépôt public | 2026-11-12 | V-1 à V-5 et V-10 à V-14 vérifiés ; QA clone neuf GO (319 tests) ; sécurité GO sous réserves. Voir « Avis final L17-integration ». |
 | L16 + L17 + L18 (`lot/L17-integration`, `c19235a`) | **VETO sur la fusion en l'état**, levé dès que V-1 à V-5 sont corrigés et que la QA a rejoué §6b et §9 avec tests verts ; ensuite GO SOUS RÉSERVES (V-6 à V-16) | 2026-11-12 | Le concept n'a pas dérivé et le rejeu est honnête, mais le README ne correspond plus au code (étape 6 refusée en 400, étape 14, preset `selection`) : c'est exactement ce que le tri par IA vérifie (J-01). Voir « Avis L16-L17-L18 ». |
 
 ## Avis L1 (architecture)
@@ -260,3 +273,47 @@ Le concept n'a pas dérivé et le rejeu est présenté honnêtement. Mais le REA
 - **V-14 `docs/PREUVES_TESTNET.md:3`** : l'en-tête dit « mis à jour le 2026-11-10 » alors que le §10 est daté du 11. Le run 9b n'est toujours pas résumé ; c'est cohérent avec README:97, mais à faire si la vidéo le montre.
 - **V-15 `docs/SECURITE.md:224`** : aucune revue de sécurité n'est inscrite pour l'interface L17 (composeur, rendu des livrables dans le fil) ni pour D-044 (contrôle du rejeu sans jeton). Demander une passe à la sécurité.
 - **V-16 `docs/SPECS.md` L-05** (mon fichier) : préciser « vidéo exigée » d'après HACKATHON.md du 2026-11-12. Fait le même jour.
+
+## Avis final L17-integration (2026-11-12, HEAD `787d11a`)
+
+### Verdict : VETO LEVÉ. GO pour la fusion de `lot/L17-integration` dans `main`
+
+Lu : README, FORMULAIRE, VIDEO_SCRIPT, POST_X, BESOINS_HUMAIN, PREUVES_TESTNET (§1, §8, §10, §11), RUN_9C, QA_RAPPORT (« Clone neuf 2026-11-12 »), `shared/config.ts`, `backend/replay-main.ts`. **Limite** : mon outil n'a pas de shell. Je n'ai relancé ni `npx vitest run`, ni `npx tsc --noEmit`, ni `check-formulaire`, et je n'ai pas fait de `git diff`. Pour les tests, je me fonde sur la recette QA du clone neuf `0d76273` (319/319, typecheck 0, scan propre). Les trois commits suivants sont annoncés comme des modifications de documents seulement.
+
+### Conditions bloquantes V-1 à V-5 : toutes levées
+- **V-1** : l'étape 6 commande `marketing` (un fondateur mock `a-0004` pratique ce métier ; `translation` expirait). La QA l'a vérifié : 201, `settled`, `accepted` 0.8, séquestre `released`. La raison du choix est écrite au README:197. Conforme.
+- **V-2** : l'étape 14, le §12 et le résumé français décrivent les 3 onglets et `/?classique`. La QA l'a vérifié dans Chromium. Conforme.
+- **V-3** : les lignes du README:118 sont identiques à `backend/replay-main.ts:56-58,78`, et la QA les a vues à l'identique. Conforme.
+- **V-4** : README:168 et :184 reprennent le preset actuel (6 / 18 / 0,12 / 0,0035 / 0,03 / 2), conforme à `shared/config.ts:82-85`. L'ancien preset est attribué au run 8, et le README dit « mock only, not run to generation 3 on testnet ». Conforme.
+- **V-5** : la QA a refait un clone neuf et rejoué le §6b et le §9 (étapes 1 à 15). Résultat : 319 tests, typecheck 0. Conforme, sous la réserve de non-relance par moi indiquée plus haut.
+
+### Réserves V-10 à V-14
+- **V-10** (VIDEO_SCRIPT) : faite. La préparation et les plans 2, 4, 5, 7 et 8 sont dans le bon mode, avec « Replay of our recorded testnet run 8, not live. ». Le plan 6 parle bien du « operator's demo account ». Le plan 9 et POST_X 4/ reprennent les termes exacts du papier.
+- **V-11** (Automaton) : faite (README:35, :39 et résumé français).
+- **V-12** (BESOINS) : faite. Contrôle du `.env` et de `"mode":"mock"`, repli 9c à 12:00 UTC, `npm run replay` sur le clone, vidéo obligatoire.
+- **V-13** (FORMULAIRE) : 1997 caractères d'après le chef de projet. Je ne l'ai pas recompté. La limite étant 2000, toute retouche doit être recomptée avec le script.
+- **V-14** (PREUVES) : faite. En-tête daté du 2026-11-12, §11 résumant 9a et 9b.
+
+### Alignement avec PREUVES_TESTNET et mot « premier »
+- Run 8 (génération 3, 12 naissances, 7 morts, 65 séquestres, 63 libérés, 2 remboursés) : chiffres identiques dans README, FORMULAIRE, POST_X et VIDEO_SCRIPT. Aucun de ces documents ne dit qu'un logo a été livré et payé. Intents est toujours dit « never run ». Le payeur est toujours le client simulé.
+- « premier » / « first » : jamais revendiqué. README:32 dit « not the first attempt ». README:189 (« the first death ») et :211 (« the first ~30 seconds ») sont temporels. VIDEO:57 et POST_X:49 interdisent le mot.
+
+### À corriger AVANT de rendre le dépôt public (obligatoire, ne bloque pas la fusion)
+- **G-1 Exactitude, README:97** : « On testnet the code path ran only in run 9b » est **faux** d'après PREUVES §11.
+  - Run 9a : 3 commandes de logo de visiteur, dont 1 rejetée et remboursée (`t-8669702`) et 2 expirées sans offre.
+  - Run 9b : une commande de visiteur en plus (post LinkedIn, `t-8674030`), expirée.
+  - Correctif (rédacteur) : « On testnet the visitor path ran in runs 9a and 9b (2026-11-11): four logo orders, two of them locked from `visitors.<master>`, rejected by the format rule (truncated output) and refunded by the contract; three other visitor orders expired without a bid. »
+  - Ajuster de même README:9 et :131 (« one logo order … in run 9b » devient « in runs 9a and 9b »).
+  - Ajuster VIDEO_SCRIPT:59 (« La seule commande « visiteur » réelle (run 9b) »), qui contredit VIDEO_SCRIPT:18.
+- **G-2 Omission, README:9, :168 et « Known limitations »** : le README ne dit nulle part que les deux runs réels suivants, 9a et 9b, se sont **éteints en génération 1**. C'est pourtant établi dans PREUVES §11 et RUN_9C §0. Le lecteur ne voit que le succès du run 8.
+  - Correctif : ajouter à :168 et à « Known limitations » : « Two later real runs (9a and 9b, 2026-11-11, an intermediate version of the preset with the L16 professions, output cap of 300 tokens) went extinct in generation 1 (no reproduction; PREUVES section 11). »
+  - Si le run 9c a lieu, écrire son résultat exact, même en cas d'échec.
+
+### Mineurs (facultatifs)
+- **G-3** : FORMULAIRE:44 et POST_X:43 disent `npm install`, alors que le README dit `npm ci`. Les deux fonctionnent ; aligner si le texte est retouché, puis recompter les caractères.
+- **G-4** : l'introduction du README:195 dit encore que l'étape 14 n'a « pas été ouverte dans un navigateur », alors que la QA l'a fait.
+- **G-5** : la note de PREUVES:357 sur l'écart « 6 fondateurs pour 9a » dans RUN_9C est périmée, car RUN_9C §0 indique maintenant 4.
+- **Rappel** : les mentions « À CONFIRMER » de VIDEO_SCRIPT (fusion, run 9c) doivent être résolues avant d'enregistrer. Les réserves de sécurité de SECURITE §7 restent à fermer sur leur branche.
+
+### Concept
+Pas de dérive. Les 8 gènes, le cycle, le séquestre, la validation et la réputation sont inchangés. Le client simulé est étiqueté, le rejeu n'est jamais présenté comme du direct, et Intents reste désactivé.
