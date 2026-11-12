@@ -6,7 +6,7 @@ export const EVENT_TYPES = [
   "sim.started", "sim.paused", "sim.resumed", "sim.stopped", "sim.tick",
   "agent.born", "agent.reproduced", "agent.died", "letter.written",
   "task.posted", "bid.placed", "task.awarded", "task.expired", "escrow.locked", "task.submitted",
-  "task.validated", "escrow.released", "escrow.refunded", "subcontract.created", "reputation.updated",
+  "task.validated", "escrow.released", "escrow.refunded", "subcontract.created", "subcontract.integrated", "subcontract.fallback", "reputation.updated",
   "brain.charged", "balance.changed", "funding.received",
   "chain.tx", "intents.quote", "system.warning", "system.error",
   "deliverable.produced", "market.event", "population.snapshot", // L16

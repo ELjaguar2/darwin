@@ -109,6 +109,21 @@ Full details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Module READMEs: [`
 
 The cost of each AI call is computed in **USD** from the prices of `GET /v1/model/list` and the `usage` of the response, **converted to testnet NEAR at a fixed, configurable rate** (`DARWIN_NEAR_USD_RATE`, a simulation parameter, **not a market price**), and **debited from the agent's balance in favour of the master account**. The real bill is paid in USD by the operator's platform API key. The agent does **not** pay NEAR AI Cloud directly. The billing rule counts reasoning tokens and can slightly overestimate the cost. Global spending caps protect the platform key (`NEARAI_MAX_USD_PER_RUN`, default 2 USD; `NEARAI_MAX_USD_PER_HOUR`, default 1 USD).
 
+### Subcontracting: an agent delegates part of a mission and integrates the result
+
+A mission won by an agent (simulated client or visitor, depth 0 only) can be partly **subcontracted** to an agent of another profession, with probability `baseProb + coopProb x cooperation` (selection preset on testnet: 0.15 + 0.6 x cooperation; other presets: cooperation / 2). Flow: the winner produces its own part, then posts a sub-task (requester = the agent, `parentTaskId`), whose escrow is signed by **the delegating agent's own account**. Agents of the child profession bid through the normal auction; the child's deliverable is judged independently and, once accepted, paid from that escrow. The parent then **integrates it into its own final deliverable** in a section `## Subcontracted to <agent first name> (<profession>)`, submits the complete deliverable, and the judge evaluates the whole. The agent's **commission** is the price paid by the client minus the price paid to the child (journalled in `subcontract.integrated`). The child never subcontracts (depth 1 only).
+
+| Mission profession | Sub-task profession | Brief of the sub-task (derived from the mission and the parent's partial result) |
+|---|---|---|
+| marketing | translation | Spanish translation of the parent's text (`Translate into Spanish: « ... »`) |
+| logo | marketing | slogan and short brand text for the company named in the order |
+| architecture | finance | cost analysis of the proposed system (illustrative table of monthly costs) |
+| finance | marketing | plain-language summary of the analysis for the business owner (the first draft `finance -> legal` did not fit: a legal checklist costs more than a finance mission pays) |
+| legal | marketing | plain-language client summary of the checklist (placed before the closing disclaimer, which must still close the document) |
+| translation | marketing | tone review of the translation (only when the order pays enough to cover the child's floor price) |
+
+The sub-task budget is at least the child profession's floor price and leaves the agent at least 15% of the price won (more cooperative agents delegate a larger share, 30% to 80%). Its deadline is strictly before the mission's, with one tick kept for integration. **The client is never penalised**: if the sub-task gets no bid, is rejected, or is late, the parent does that part itself (one extra AI call debited from its own balance, section `## Done in-house (subcontract failed: <reason>)`), earns no commission, and delivers in time; `subcontract.fallback` records it honestly. Limits: the integration is a text section appended to the deliverable (it does not rewrite the parent's work); the sub-task brief is built by simple templates, not by negotiation; the parent's AI judge sees the complete text, so a very poor child text could lower the score (the engine checks the deterministic rules before submitting and then drops the section). Details: `engine/README.md`, `market/README.md`, decision D-048.
+
 ## 6. Requirements
 
 - **Mock mode**: Node.js **>= 22.12** and npm. No key, no network, no account.

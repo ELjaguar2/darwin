@@ -105,6 +105,9 @@ export function extractDeliverable(
     case "legal": files = [textFile("checklist.md", text)]; break;
     default: throw new DeliverableError(`unknown profession: ${String(task.profession)}`);
   }
+  // L21: a logo deliverable has only SVG files; the section produced by a subcontract stays visible in its own file.
+  const sub = task.profession === "logo" ? /^## (?:Subcontracted to |Done in-house).*$/m.exec(text) : null;
+  if (sub) files.push(textFile("subcontracted.md", text.slice(sub.index).trim()));
   return {
     taskId: task.id, profession: task.profession, agentId, files, rawText: text, resultHash: sha256Hex(rawText),
     productionCostUsd: costs.productionCostUsd ?? 0, judgeCostUsd: costs.judgeCostUsd ?? 0, createdAt: costs.createdAt ?? new Date().toISOString(),

@@ -2,6 +2,7 @@
 // No business logic: everything reflects the backend event log. No innerHTML.
 import { Store, EVENT_TYPES } from "./store.js";
 import { big, explorerUrl } from "./format.js";
+import { subs } from "./subcontract.js";
 
 export const store = new Store();
 store.explorerBase = undefined;
@@ -48,6 +49,7 @@ class Ledger {
   constructor() { this.reset(); }
   reset() {
     this.maxSeq = 0;
+    subs.reset();
     this.hist = new Map(); // agentId -> [{tick, delta (bigint), reason, balance (bigint)}]
     this.totals = { earned: 0n, brain: 0n, passed: 0n, fees: 0n, brainCalls: 0, teeCalls: 0, models: new Map() };
     this.byGen = new Map(); // generation -> {earned, brain, passed}
@@ -57,6 +59,7 @@ class Ledger {
   ingest(ev) {
     if (ev.seq <= this.maxSeq) return;
     this.maxSeq = ev.seq;
+    subs.ingest(ev); // L21: agent-to-agent subcontracting (display aggregates)
     const d = ev.data ?? {};
     switch (ev.type) {
       case "balance.changed": {

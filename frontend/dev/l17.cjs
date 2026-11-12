@@ -135,6 +135,41 @@ const ok = (c, m) => { c ? pass++ : fail++; console.log((c ? "OK   " : "FAIL ") 
   ok((await p.evaluate(() => window.__pwned)) === undefined, "no deliverable script was executed");
   ok((await p.$$eval("#feed script, #feed svg script, #feed [onerror], #feed [onload]", (n) => n.length)) === 0, "no script or event handler in the feed");
 
+  // L21: agent-to-agent subcontracting in the chat feed (the replay of run8 or the fake server both contain some)
+  {
+    const nsub = await p.$$eval("#feed .sub-deleg", (n) => n.length);
+    const txt = await p.$$eval("#feed .sub-deleg .pill-sys", (n) => n.map((x) => x.textContent));
+    console.log("   L21: delegation messages in the feed:", nsub, txt[0] ? "| " + txt[0] : "");
+    ok(nsub >= 1 || REPLAY, "L21: at least one delegation message in the feed");
+    ok(txt.every((t) => /delegates a .*sub-task to the market/.test(t)), "L21: sentence \"X delegates a ... sub-task to the market ...\"");
+    ok(txt.some((t) => /for [\d.]+ NEAR/.test(t) && /keeps [\d.]+ NEAR commission/.test(t)) || !nsub, "L21: budget and commission displayed (computed when the journal lacks them)");
+    ok((await p.$$eval("#feed .thread.sub .rtag.tag-agent", (n) => n.length)) >= (nsub ? 1 : 0), "L21: child task as a linked thread with the \"subcontract\" tag");
+    // pure tracker with and without optional fields, on fabricated events
+    const r = await p.evaluate(async () => {
+      const { SubTracker } = await import("/subcontract.js");
+      const Y = 10n ** 21n; const mk = (seq, type, data) => ({ seq, tick: seq, type, data });
+      const t = new SubTracker();
+      const evs = [
+        mk(1, "task.posted", { task: { id: "P1", requester: { kind: "simulated" }, profession: "marketing", budget: String(100n * Y) } }),
+        mk(2, "task.awarded", { taskId: "P1", winnerId: "a1", price: String(90n * Y) }),
+        mk(3, "task.posted", { task: { id: "C1", requester: { kind: "agent", agentId: "a1" }, profession: "translation", budget: String(40n * Y) } }),
+        mk(4, "subcontract.created", { parentTaskId: "P1", childTaskId: "C1", byAgentId: "a1" }),
+        mk(5, "task.awarded", { taskId: "C1", winnerId: "a2", price: String(35n * Y) }),
+        mk(6, "escrow.locked", { taskId: "C1", payer: "a1.x", amount: String(35n * Y), tx: "LOCK1" }),
+        mk(7, "escrow.released", { taskId: "C1", payee: "a2.x", amount: String(35n * Y), tx: "REL1" }),
+        mk(8, "task.posted", { task: { id: "C2", requester: { kind: "agent", agentId: "a1" }, profession: "logo", budget: String(30n * Y) } }),
+        mk(9, "subcontract.created", { parentTaskId: "P1", childTaskId: "C2", byAgentId: "a1", profession: "logo", budget: String(30n * Y), parentPrice: String(90n * Y), commission: String(60n * Y) }),
+        mk(10, "task.expired", { taskId: "C2", reason: "no_bids" }),
+      ];
+      for (const e of evs) t.ingest(e);
+      const s = t.summary();
+      return { count: s.count, awarded: s.awarded, paid: s.paid, expired: s.expired, delegated: String(s.delegated / Y), paidTotal: String(s.paidTotal / Y), commission: String(s.commission / Y), c1: String(t.record("C1").commission / Y), c2: String(t.record("C2").commission / Y), st: [t.record("C1").status, t.record("C2").status] };
+    });
+    ok(JSON.stringify(r) === JSON.stringify({ count: 2, awarded: 1, paid: 1, expired: 1, delegated: "35", paidTotal: "35", commission: "55", c1: "55", c2: "0", st: ["paid", "expired"] }), "L21: tracker with / without optional fields " + JSON.stringify(r));
+    const dt = await p.evaluate(async () => { const m = await import("/mission.js"); const Y = 10n ** 21n; return [m.delegationText("Ada", "Translation", { budget: 40n * Y, price: 35n * Y, commission: 55n * Y, commissionKind: "actual" }), m.delegationText("Ada", null, {}), m.delegationText("Ada", "Logo", { budget: 40n * Y, commission: 50n * Y, commissionKind: "max" }), m.delegationText("Ada", "Logo", { budget: 40n * Y, commissionKind: "none", commission: 0n })]; });
+    ok(/^Ada delegates a Translation sub-task to the market for [\d.]+ NEAR and keeps [\d.]+ NEAR commission$/.test(dt[0]) && dt[1] === "Ada delegates a sub-task to the market" && /keeps up to [\d.]+ NEAR commission$/.test(dt[2]) && /no money moved, delegator keeps the whole price$/.test(dt[3]), "L21: delegation sentence with / without optional parts: " + dt.join(" || "));
+  }
+
   // Lineage
   await p.click('[data-tab="lignees"]');
   await p.waitForTimeout(1200);
@@ -185,6 +220,18 @@ const ok = (c, m) => { c ? pass++ : fail++; console.log((c ? "OK   " : "FAIL ") 
   console.log("   brain:", brainTxt, "|", brainGen.join(","));
   ok(!/^0\.00 NEAR/.test(brainTxt) && !brainGen.includes("0.00"), "NB-3: \"Spent on AI brain\" without a misleading \"0.00\": " + brainTxt);
   if (REPLAY || /TESTNET/.test(mode)) ok((await p.$$eval("#txs a.hash[href^='https://testnet.nearblocks.io/txns/']", (n) => n.length)) >= 1, "proof: nearblocks links");
+  { // L21: Proof tab, "Agent-to-agent subcontracting" block
+    const vis = await p.isVisible("#subBlock");
+    const sm = await p.evaluate(async () => { const { subs } = await import("/subcontract.js"); const s = subs.summary(); return { count: s.count, paid: s.paid, expired: s.expired, awarded: s.awarded, integrated: s.integrated, fallback: s.fallback }; });
+    ok(vis === (sm.count > 0), `L21: subcontracting block ${vis ? "visible" : "hidden"} (${sm.count} subcontracts)`);
+    if (vis) {
+      const k = await p.$$eval("#subBlock .sub-kpis li", (n) => n.map((x) => x.textContent));
+      ok(k.length === 7 && k[0].startsWith(String(sm.count)) && k[1].startsWith(String(sm.integrated)) && k[2].startsWith(String(sm.fallback)) && k[3].startsWith(String(sm.expired)), "L21: counts shown = tracker: " + k.join(" | "));
+      ok((await p.$$eval("#subBlock .sub-table tbody tr", (n) => n.length)) === Math.min(40, sm.count), "L21: one table row per subcontract");
+      if (sm.paid && REPLAY) ok((await p.$$eval("#subBlock .sub-table a[href^='https://testnet.nearblocks.io/txns/']", (n) => n.length)) >= 2 * sm.paid, "L21: nearblocks links for escrow and release");
+    }
+    await p.screenshot({ path: path.join(out, "l21-subcontract-proof.png"), fullPage: true });
+  }
   ok(/TEE/.test(await p.textContent("#tee")), "proof: TEE attestation badge");
   ok((await p.$$eval("#tools li", (n) => n.length)) === 5, "proof: 5 NEAR building blocks");
   await p.screenshot({ path: path.join(out, "l17-preuves.png"), fullPage: true });

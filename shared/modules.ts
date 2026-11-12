@@ -22,7 +22,7 @@ export interface Deps {
 /** Task market (dev-marche, market/ folder). Only it talks to escrow and reputation. */
 export interface Market {
   /** Publishes a task and opens bidding. The payer's funds are locked at award time (lockEscrow). */
-  postTask(input: { requester: Requester; profession: Profession; title: string; prompt: string; budget: Yocto; parentTaskId?: string }): Promise<Task>;
+  postTask(input: { requester: Requester; profession: Profession; title: string; prompt: string; budget: Yocto; parentTaskId?: string; deadlineTick?: number }): Promise<Task>;
   placeBid(input: { taskId: string; agentId: string; price: Yocto; etaTicks: number; pitch?: string }): Promise<Bid>;
   /** Advances the market by one tick: closes bidding (awards to the best price/reputation), locks escrow, expires. */
   step(tick: number): Promise<void>;

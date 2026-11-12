@@ -173,7 +173,9 @@ Append-only journal, `seq` increasing without gaps. Adding a type requires modif
 | `task.validated` | market | taskId, validation |
 | `escrow.released` | market | taskId, payee, amount, tx |
 | `escrow.refunded` | market | taskId, payer, amount, tx |
-| `subcontract.created` | market | parentTaskId, childTaskId, byAgentId |
+| `subcontract.created` | market | parentTaskId, childTaskId, byAgentId, profession?, budget?, parentPrice?, commission?, deadline? (optional since L21; commission = planned: parentPrice - budget, yocto; deadline = child deadline tick, strictly before the parent's) |
+| `subcontract.integrated` | engine | parentTaskId, childTaskId, childAgentId, childProfession, childPrice, parentPrice, commission (yocto; REAL commission = parentPrice - childPrice). Emitted when the child's accepted deliverable is integrated in the parent's; the integrated section ("## Subcontracted to ...") is in `deliverable.produced.files[].content` of the parent |
+| `subcontract.fallback` | engine | parentTaskId, childTaskId? (absent if the sub-task could not be posted), reason ("no_bids" \| "rejected" \| "deadline" \| "failed"), commission ("0": none earned). The parent did the part itself and delivered in time |
 | `reputation.updated` | market | agentId, delta, total, taskId, tx |
 | `brain.charged` | engine | agentId, purpose, model, promptTokens, completionTokens, reasoningTokens, cost, costUsd, nearUsdRate, priceSource (`models`/`mock`), mock, tx |
 | `balance.changed` | engine | agentId, balance, delta, reason (metabolism/brain/task/birth/...) |

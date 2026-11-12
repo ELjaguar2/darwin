@@ -4,6 +4,7 @@ import { store, core, ledger, api, on, aliveAgents, labelOfJob } from "./core.js
 import { h, formatNear, formatNearSmall, signedNear, nearNumber, big } from "./format.js";
 import { jobOf, icon, avatar, firstName } from "./jobs.js";
 import { TEE_MODELS } from "./preuves.js";
+import { subs, FALLBACK_REASON } from "./subcontract.js";
 
 const NS = "http://www.w3.org/2000/svg";
 const svgEl = (tag, attrs = {}, text) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (text != null) e.textContent = text; return e; };
@@ -211,6 +212,30 @@ class LineageTree {
 // ------------------------------------------------------------------ side panel
 let tree = null, selected = null, panelTimer = 0;
 const REASON = { birth: "Birth capital", task: "Mission paid", brain: "AI brain paid", chain_fee: "Network fee", death: "Death: balance recovered", metabolism: "Cost of living", reproduction: "Capital given to a child" };
+/** L21: "delegated ..." / "subcontract earned ..." lines of an agent (agent-to-agent subcontracting). */
+export function subRowsOf(a, near = (v) => formatNear(v, 3)) {
+  const out = [];
+  for (const r of subs.records()) {
+    const prof = r.profession ? labelOf(r.profession) : "";
+    if (r.byAgentId === a.id) {
+      const st = r.status === "integrated" ? "integrated" : r.status === "fallback" ? "fell back in-house" : r.status === "paid" ? "paid" : r.status === "expired" ? "expired, no bidder" : r.status === "refunded" ? "refunded" : r.status === "awarded" ? "awarded" : "open";
+      const amt = r.price ?? (r.commissionKind === "none" ? null : r.budget);
+      const com = r.commissionKind === "none" ? " · no money moved, delegator keeps the whole price" : r.commission != null ? ` · ${r.commissionKind === "max" ? "up to " : ""}${near(r.commission)} commission` : "";
+      out.push({ tick: r.tick, delta: r.price != null && r.status !== "integrated" ? -r.price : 0n, text: `delegated ${prof ? prof + " " : ""}sub-task${amt != null ? ` · ${near(amt)}` : ""}${com}`, sub: st, amount: r.price != null && r.status !== "integrated" ? `-${near(r.price)}` : "–" });
+    }
+    if (r.byAgentId === a.id && r.status === "integrated") {
+      const ch = store.agents.get(r.winnerId);
+      out.push({ tick: r.tick, delta: -(r.price ?? 0n), text: `paid child${ch ? ` ${firstName(ch)}` : ""}`, sub: prof ? `${prof} sub-task` : "sub-task", amount: `-${near(r.price ?? 0n)}` });
+      out.push({ tick: r.tick, delta: r.commission ?? 0n, text: "subcontract commission", sub: "parent price - child price", amount: `+${near(r.commission ?? 0n)}` });
+    }
+    if (r.byAgentId === a.id && r.status === "fallback") out.push({ tick: r.tick, delta: 0n, text: "fallback: done in-house", sub: FALLBACK_REASON[r.fallbackReason] ?? r.fallbackReason ?? "failed", amount: "–" });
+    if ((r.status === "paid" || r.status === "integrated") && r.payee && r.payee === a.accountId) {
+      const by = store.agents.get(r.byAgentId);
+      out.push({ tick: r.tick, delta: r.paidAmount ?? 0n, text: `subcontract earned${by ? ` from ${firstName(by)}` : ""}`, sub: prof ? `${prof} sub-task` : "sub-task", amount: `+${near(r.paidAmount ?? 0n)}` });
+    }
+  }
+  return out;
+}
 const GENES = [["Asking price", "askRatio", 0.3, 1], ["Risk appetite", "risk", 0, 1], ["Reproduction threshold", "reproThreshold", 1.2, 4], ["Generosity", "generosity", 0, 0.6], ["Cooperation", "cooperation", 0, 1]];
 
 function gene(label, v, lo, hi) {
@@ -247,6 +272,7 @@ async function renderPanel() {
   const tee = TEE_MODELS.has(String(g.model ?? ""));
   const hist = ledger.hist.get(a.id) ?? [];
   const pts = hist.map((x) => nearNumber(x.balance));
+  const subRows = subRowsOf(a);
   const rows = hist.filter((x) => x.reason !== "metabolism").slice(-24).reverse();
   const meta = hist.filter((x) => x.reason === "metabolism");
   const metaSum = meta.reduce((s, x) => s + x.delta, 0n);
@@ -283,6 +309,7 @@ async function renderPanel() {
         h("div", null, h("dt", null, "Missions"), h("dd", null, a.tasksDone ?? 0)),
         h("div", null, h("dt", null, "Reputation"), h("dd", null, a.reputation ?? 0)),
         h("div", null, h("dt", null, "Children"), h("dd", null, kids.length))),
+      subRows.length ? h("ol", { class: "fin sub-fin", "aria-label": "Subcontracting" }, subRows.map((x) => h("li", { class: `sub-row ${x.delta >= 0n ? "up" : "down"}` }, h("span", { class: "f-t" }, `t${x.tick}`), h("span", { class: "f-r" }, x.text, h("small", null, x.sub)), h("b", { class: "f-d" }, x.amount)))) : null,
       rows.length ? h("ol", { class: "fin" }, rows.map((x) => h("li", { class: x.delta >= 0n ? "up" : "down" }, h("span", { class: "f-t" }, `t${x.tick}`), h("span", { class: "f-r" }, REASON[x.reason] ?? x.reason), h("b", { class: "f-d" }, signedNear(x.delta, 3))))) : h("p", { class: "muted" }, "No movement recorded yet."),
       meta.length ? h("p", { class: "muted small" }, `Cumulative cost of living: ${formatNear(-metaSum, 3)} NEAR over ${meta.length} tick${meta.length > 1 ? "s" : ""}.`) : null),
     parent ? h("p", { class: "p-parent" }, "Parent: ", h("button", { type: "button", class: "link", onclick: () => select(parent.id) }, firstName(parent))) : null);

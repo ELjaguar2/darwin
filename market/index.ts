@@ -192,7 +192,14 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
       for (let p: Task | undefined = parent; p?.parentTaskId; p = tasks.get(p.parentTaskId)) depth++;
       if (depth > MAX_SUBCONTRACT_DEPTH) throw new MarketError("INVALID_SUBCONTRACT", "maximum subcontracting depth reached");
       await agentRecord(requester.agentId);
+      if (input.deadlineTick !== undefined) {
+        // The child must end strictly before its parent (integration margin) and leave at least one tick after the bidding.
+        const ends = tick + sim.bidWindowTicks;
+        if (!Number.isInteger(input.deadlineTick) || input.deadlineTick <= ends || input.deadlineTick >= parent.deadlineTick)
+          throw new MarketError("INVALID_SUBCONTRACT", "the subcontract deadline must be after the bidding and strictly before the parent's deadline");
+      }
     } else {
+      if (input.deadlineTick !== undefined) throw new MarketError("INVALID_INPUT", "deadlineTick is reserved for agent subcontracts");
       if (input.parentTaskId) throw new MarketError("INVALID_SUBCONTRACT", "parentTaskId is reserved for agents");
       // Floor price of the profession (L16 catalogue); cap = the config bound, raised if needed to the profession's floor.
       if (!CATALOGUE[input.profession]) throw new MarketError("INVALID_INPUT", `unknown profession: ${String(input.profession)}`);
@@ -219,13 +226,16 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
     const task: Task = {
       id: `t-${pad(++taskSeq)}`, requester, profession: input.profession, title: input.title.trim().slice(0, 120), prompt: input.prompt,
       budget: budget.toString(), status: "posted", createdTick: tick, biddingEndsTick,
-      deadlineTick: biddingEndsTick + (isVisitor ? (sim.visitorTaskDeadlineTicks ?? sim.taskDeadlineTicks) : sim.taskDeadlineTicks), bidIds: [],
+      deadlineTick: input.deadlineTick ?? biddingEndsTick + (isVisitor ? (sim.visitorTaskDeadlineTicks ?? sim.taskDeadlineTicks) : sim.taskDeadlineTicks), bidIds: [],
       ...(input.parentTaskId ? { parentTaskId: input.parentTaskId } : {}),
     };
     tasks.set(task.id, task);
     emit({ type: "task.posted", tick, data: { task: clone(task) } });
     if (requester.kind === "agent" && task.parentTaskId)
-      emit({ type: "subcontract.created", tick, data: { parentTaskId: task.parentTaskId, childTaskId: task.id, byAgentId: requester.agentId } });
+      emit({ type: "subcontract.created", tick, data: {
+        parentTaskId: task.parentTaskId, childTaskId: task.id, byAgentId: requester.agentId, profession: task.profession, budget: task.budget,
+        deadline: task.deadlineTick, parentPrice: winningPrice(tasks.get(task.parentTaskId)!).toString(), commission: (winningPrice(tasks.get(task.parentTaskId)!) - budget).toString(),
+      } });
     return clone(task);
   }
 

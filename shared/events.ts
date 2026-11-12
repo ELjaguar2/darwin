@@ -27,7 +27,10 @@ export interface EventCatalog {
   "task.validated": { taskId: string; validation: Validation };
   "escrow.released": { taskId: string; payee: string; amount: Yocto; tx: string };
   "escrow.refunded": { taskId: string; payer: string; amount: Yocto; tx: string };
-  "subcontract.created": { parentTaskId: string; childTaskId: string; byAgentId: string };
+  "subcontract.created": { parentTaskId: string; childTaskId: string; byAgentId: string; profession?: Profession; budget?: Yocto; parentPrice?: Yocto; commission?: Yocto; deadline?: number };
+  // L21: real subcontracting (all optional-compatible: journals before L21 have neither of these two events)
+  "subcontract.integrated": { parentTaskId: string; childTaskId: string; childAgentId: string; childProfession: Profession; childPrice: Yocto; parentPrice: Yocto; commission: Yocto };
+  "subcontract.fallback": { parentTaskId: string; childTaskId?: string; reason: "no_bids" | "rejected" | "deadline" | "failed"; commission: Yocto };
   "reputation.updated": { agentId: string; delta: number; total: number; taskId: string; tx?: string };
   // real freelance (L16)
   "deliverable.produced": { taskId: string; profession: Profession; agentId: string; files: DeliverableJournalFile[]; productionCostUsd: number; judgeCostUsd: number; resultHash: string };
@@ -51,7 +54,7 @@ export const EVENT_TYPES = [
   "sim.started", "sim.paused", "sim.resumed", "sim.stopped", "sim.tick",
   "agent.born", "agent.reproduced", "agent.died", "letter.written",
   "task.posted", "bid.placed", "task.awarded", "task.expired", "escrow.locked", "task.submitted",
-  "task.validated", "escrow.released", "escrow.refunded", "subcontract.created", "reputation.updated",
+  "task.validated", "escrow.released", "escrow.refunded", "subcontract.created", "subcontract.integrated", "subcontract.fallback", "reputation.updated",
   "deliverable.produced", "market.event",
   "brain.charged", "balance.changed", "funding.received",
   "chain.tx", "intents.quote", "system.warning", "system.error",

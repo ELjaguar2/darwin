@@ -40,19 +40,19 @@ export class StubMarket implements Market {
     return this.simAccount;
   }
 
-  async postTask(input: { requester: Requester; profession: Profession; title: string; prompt: string; budget: string; parentTaskId?: string }): Promise<Task> {
+  async postTask(input: { requester: Requester; profession: Profession; title: string; prompt: string; budget: string; parentTaskId?: string; deadlineTick?: number }): Promise<Task> {
     const { sim } = this.deps.config;
     await this.payerOf(input.requester);
     const id = `t-${String(++this.nTask).padStart(4, "0")}`;
     const task: Task = {
       id, requester: input.requester, parentTaskId: input.parentTaskId, profession: input.profession, title: input.title,
       prompt: input.prompt, budget: input.budget, status: "posted", createdTick: this.tick,
-      biddingEndsTick: this.tick + sim.bidWindowTicks, deadlineTick: this.tick + sim.bidWindowTicks + sim.taskDeadlineTicks, bidIds: [],
+      biddingEndsTick: this.tick + sim.bidWindowTicks, deadlineTick: input.deadlineTick ?? this.tick + sim.bidWindowTicks + sim.taskDeadlineTicks, bidIds: [],
     };
     this.tasks.set(id, task);
     this.deps.journal.emit({ type: "task.posted", data: { task: structuredClone(task) } });
     if (input.parentTaskId) {
-      this.deps.journal.emit({ type: "subcontract.created", data: { parentTaskId: input.parentTaskId, childTaskId: id, byAgentId: (input.requester as { agentId: string }).agentId } });
+      this.deps.journal.emit({ type: "subcontract.created", data: { parentTaskId: input.parentTaskId, childTaskId: id, byAgentId: (input.requester as { agentId: string }).agentId, profession: input.profession, budget: input.budget, deadline: input.deadlineTick } });
     }
     return task;
   }

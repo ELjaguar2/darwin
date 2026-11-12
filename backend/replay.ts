@@ -4,7 +4,7 @@
 // connecting midway sees exactly what a client present from the start sees.
 import { readFileSync, statSync } from "node:fs";
 import { basename } from "node:path";
-import { EVENT_TYPES, type Agent, type Bid, type DarwinEvent, type Deliverable, type Escrow, type EventCatalog, type Journal, type Letter, type MarketEvent, type SimState, type Task } from "../shared/index.ts";
+import { EVENT_TYPES, PROFESSIONS, type Agent, type Bid, type DarwinEvent, type Deliverable, type Escrow, type EventCatalog, type Journal, type Letter, type MarketEvent, type SimState, type Task } from "../shared/index.ts";
 import { redactText } from "./redact.ts";
 import { isSafeFileName, safeMime } from "./safe.ts";
 
@@ -55,6 +55,10 @@ const fail = (code: ConstructorParameters<typeof ReplayError>[0], msg: string): 
 
 const isObj = (v: unknown): v is Record<string, any> => typeof v === "object" && v !== null && !Array.isArray(v);
 const isStr = (v: unknown): v is string => typeof v === "string";
+const AMOUNT = /^\d{1,40}$/;
+const REASONS = ["no_bids", "rejected", "deadline", "failed"];
+const isAmount = (v: unknown): boolean => isStr(v) && AMOUNT.test(v);
+const isProf = (v: unknown): boolean => isStr(v) && (PROFESSIONS as readonly string[]).includes(v);
 
 /**
   * Minimal shape expected by ReplayState.apply for each event type (finding 2 of the security review): a hostile
@@ -99,6 +103,19 @@ function shapeError(type: string, d: Record<string, any>): string | undefined {
       }
       return undefined;
     }
+    // L21: amounts are decimal strings of at most 40 digits, reasons and professions come from a closed list (hostile journal refused).
+    case "subcontract.created": {
+      const bad = ["budget", "parentPrice", "commission"].find((k) => d[k] !== undefined && !isAmount(d[k])); // optional since L21
+      if (d.profession !== undefined && !isProf(d.profession)) return '"profession" invalid';
+      if (d.deadline !== undefined && !(typeof d.deadline === "number" && Number.isFinite(d.deadline))) return '"deadline" invalid';
+      return miss(needStr("parentTaskId", "childTaskId")) ?? (bad ? `"${bad}" invalid` : undefined);
+    }
+    case "subcontract.integrated": {
+      const bad = ["childPrice", "parentPrice", "commission"].find((k) => !isAmount(d[k]));
+      return miss(needStr("parentTaskId", "childTaskId", "childAgentId")) ?? (bad ? `"${bad}" invalid` : !isProf(d.childProfession) ? '"childProfession" invalid' : undefined);
+    }
+    case "subcontract.fallback":
+      return miss(needStr("parentTaskId")) ?? (!isAmount(d.commission) ? '"commission" invalid' : !REASONS.includes(d.reason) ? '"reason" invalid' : d.childTaskId !== undefined && !isStr(d.childTaskId) ? '"childTaskId" invalid' : undefined);
     default: return undefined;
   }
 }

@@ -7,7 +7,10 @@ import { executeMessages } from "../brain/prompts.ts";
 import { bal, type Ctx, type EngineOptions } from "./context.ts";
 import { chargeBrain, debit, flushAll, resolveModel, syncBalances, warnOnce } from "./economy.ts";
 import { canReproduce, createFounders, die, reproduce } from "./lifecycle.ts";
-import { decideBid, decideSubcontract } from "./policy.ts";
+import { extractDeliverable } from "../market/deliverable.ts";
+import { runChecks } from "../market/checks.ts";
+import { SUBCONTRACT_PLAN, inHouseHeading, integrateText, subcontractHeading, type ChildBrief } from "./subcontract-plan.ts";
+import { decideBid, decideSubcontract, estimateCost, reserve } from "./policy.ts";
 import { makePitch } from "./pitch.ts";
 
 export type { EngineOptions } from "./context.ts";
@@ -54,6 +57,10 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
   let ticking = false;
   const stats = { tasksSettled: 0 };
   const bidsPlaced = new Set<string>();
+  /** L21: missions whose agent waits for its sub-task (state machine: awarded -> own part -> sub-task posted -> waiting -> integration -> submission). */
+  interface SubJob { parentId: string; agentId: string; childId: string; childProfession: Profession; ownText: string; parentPrice: bigint; budget: bigint; brief: ChildBrief }
+  const jobs = new Map<string, SubJob>();
+  const wonPrices = new Map<string, bigint>(); // agentId|taskId -> price of the bid placed (= winning price once awarded)
 
   // The engine learns earnings and reputation through the journal (market events), never by crediting itself.
   journal.subscribe((e) => {
@@ -109,23 +116,27 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
     }
   }
 
+  /** Budgets promised to sub-tasks by the agent's running jobs (not spendable). */
+  const committedOf = (agentId: string) => [...jobs.values()].filter((j) => j.agentId === agentId).reduce((s, j) => s + j.budget, 0n);
+
   /** A free agent bids on at most one open task (the most profitable for it). */
   async function bidding() {
     const open = market.openTasks();
     const busy = new Set<string>();
     for (const t of market.listTasks()) {
-      if (t.winnerId && (t.status === "awarded" || t.status === "submitted")) busy.add(t.winnerId);
+      if (t.winnerId && (t.status === "awarded" || t.status === "submitted") && !jobs.has(t.id)) busy.add(t.winnerId);
     }
     for (const a of alive()) {
       if (busy.has(a.id)) continue;
       let best: { task: Task; price: bigint; etaTicks: number } | null = null;
       for (const t of open) {
         if (bidsPlaced.has(`${a.id}|${t.id}`)) continue;
-        const d = decideBid(ctx, a, t);
+        const d = decideBid(ctx, a, t, committedOf(a.id));
         if (d && (!best || d.price > best.price)) best = { task: t, ...d };
       }
       if (!best) continue;
       bidsPlaced.add(`${a.id}|${best.task.id}`);
+      wonPrices.set(`${a.id}|${best.task.id}`, best.price);
       try {
         const pitch = await makePitch(ctx, a, best.task, best.price);
         await market.placeBid({ taskId: best.task.id, agentId: a.id, price: best.price.toString(), etaTicks: best.etaTicks, ...(pitch ? { pitch } : {}) });
@@ -144,20 +155,141 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
         messages: executeMessages(a.genome, { title: t.title, prompt: t.prompt, profession: t.profession }),
       });
       await chargeBrain(ctx, a, "execute_task", resp, price);
-      const sub = decideSubcontract(ctx, a, BigInt(t.budget));
-      if (sub !== null) {
+      const wonPrice = wonPrices.get(`${a.id}|${t.id}`);
+      // At most ONE running subcontract per agent, and only if its own part already passes the market's checks
+      // (otherwise the mission would be rejected whatever the child does: certain loss of the child's price).
+      const hasJob = [...jobs.values()].some((j) => j.agentId === a.id);
+      const d = wonPrice !== undefined && !hasJob ? decideSubcontract(ctx, a, t, wonPrice, committedOf(a.id)) : null;
+      if (d && !passesChecks(a, t, resp.text)) {
+        warnOnce(ctx, "SUBCONTRACT_SKIPPED", `${t.id}: own part fails the profession checks, not delegating`);
+        await market.submitResult({ taskId: t.id, agentId: a.id, text: resp.text });
+        return;
+      }
+      if (d) {
+        // Real subcontracting: the own part is done, the sub-task brief is derived from the mission and from this partial result.
+        const brief = SUBCONTRACT_PLAN[a.genome.profession].brief(t.id, { title: t.title, prompt: t.prompt, ownText: resp.text });
+        const job: SubJob = { parentId: t.id, agentId: a.id, childId: "", childProfession: d.profession, ownText: resp.text, parentPrice: wonPrice!, budget: d.budget, brief };
         try {
-          await market.postTask({
-            requester: { kind: "agent", agentId: a.id }, profession: rng.pick(PROFESSIONS), parentTaskId: t.id,
-            title: `Subcontract of ${t.id}`, prompt: t.prompt, budget: sub.toString(),
+          const child = await market.postTask({
+            requester: { kind: "agent", agentId: a.id }, profession: d.profession, parentTaskId: t.id,
+            title: brief.title, prompt: brief.prompt, budget: d.budget.toString(), deadlineTick: d.deadlineTick,
           });
+          job.childId = child.id;
+          jobs.set(t.id, job);
+          return; // the mission is submitted later, by advanceJobs
         } catch (e) {
           warnOnce(ctx, "SUBCONTRACT_FAILED", (e as Error).message);
+          await concludeJob(a, t, job, undefined, "failed");
+          return;
         }
       }
       await market.submitResult({ taskId: t.id, agentId: a.id, text: resp.text });
     } catch (e) {
       warnOnce(ctx, "EXECUTION_FAILED", `${t.id}: ${(e as Error).message}`);
+    }
+  }
+
+  /** True if the text passes the market's deterministic checks for the mission's profession (same functions as the judge's rule). */
+  function passesChecks(a: Agent, t: Task, text: string): boolean {
+    try {
+      return text.length <= 20_000 && runChecks(t, extractDeliverable(t, a.id, text)).ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Extra AI call of the parent for the part that was not subcontracted (plan B). Bounded: one call, debited from the agent, reserve respected. */
+  async function doInHouse(a: Agent, job: SubJob): Promise<string | null> {
+    try {
+      const cap = Math.max(sim.maxTokensPerCall, CATALOGUE[job.childProfession].maxOutputTokens); // the cap actually requested below
+      if (bal(a) - estimateCost(ctx, a, { prompt: job.brief.prompt } as Task, cap) < reserve(ctx, a)) return null;
+      const price = resolveModel(ctx, a);
+      const resp = await deps.brain.complete({
+        agentId: a.id, purpose: "execute_task", model: price.id, maxTokens: Math.max(sim.maxTokensPerCall, CATALOGUE[job.childProfession].maxOutputTokens),
+        messages: executeMessages(a.genome, { title: job.brief.title, prompt: job.brief.prompt, profession: job.childProfession }),
+      });
+      await chargeBrain(ctx, a, "execute_task", resp, price);
+      return resp.text;
+    } catch (e) {
+      warnOnce(ctx, "INHOUSE_FAILED", `${job.parentId}: ${(e as Error).message}`);
+      return null;
+    }
+  }
+
+  /** Forgets the bid prices of a concluded job (memory: they are no longer needed). */
+  function purgePrices(job: SubJob) {
+    wonPrices.delete(`${job.agentId}|${job.parentId}`);
+    if (job.childId) for (const k of [...wonPrices.keys()]) if (k.endsWith(`|${job.childId}`)) wonPrices.delete(k);
+  }
+
+  /**
+   * Ends a subcontract and submits the mission, ALWAYS (the client is never penalised):
+   * - child delivered and paid (reason undefined): integration in a "Subcontracted to <name> (<profession>)" section, `subcontract.integrated`;
+   * - otherwise: `subcontract.fallback` (commission 0), the parent does the part itself ("Done in-house (...)" section) or adds nothing.
+   */
+  async function concludeJob(a: Agent, t: Task, job: SubJob, child: Task | undefined, failure?: "no_bids" | "rejected" | "deadline" | "failed") {
+    try {
+      await concludeJobInner(a, t, job, child, failure);
+    } finally {
+      purgePrices(job);
+    }
+  }
+
+  async function concludeJobInner(a: Agent, t: Task, job: SubJob, child: Task | undefined, failure?: "no_bids" | "rejected" | "deadline" | "failed") {
+    let reason = failure;
+    let text = job.ownText;
+    const ownOk = passesChecks(a, t, job.ownText);
+    if (!reason && child) {
+      const childText = child.result?.text;
+      const childAgent = child.winnerId ? ctx.agents.get(child.winnerId) : undefined;
+      const childPrice = child.winnerId ? wonPrices.get(`${child.winnerId}|${child.id}`) : undefined;
+      const candidate = childText ? integrateText(t.profession, job.ownText, subcontractHeading(childAgent?.name ?? child.winnerId ?? "agent", child.profession), childText) : undefined;
+      if (candidate && childPrice !== undefined && child.winnerId && (!ownOk || passesChecks(a, t, candidate))) {
+        text = candidate;
+        journal.emit({
+          type: "subcontract.integrated",
+          data: {
+            parentTaskId: t.id, childTaskId: child.id, childAgentId: child.winnerId, childProfession: child.profession,
+            childPrice: childPrice.toString(), parentPrice: job.parentPrice.toString(), commission: (job.parentPrice - childPrice).toString(),
+          },
+        });
+      } else reason = "failed";
+    }
+    if (reason) {
+      journal.emit({ type: "subcontract.fallback", data: { parentTaskId: t.id, ...(job.childId ? { childTaskId: job.childId } : {}), reason, commission: "0" } });
+      // A child already `submitted` (verdict pending) at the integration limit: no extra AI call, the mission goes out with the own part alone.
+      const extra = child?.status === "submitted" ? null : await doInHouse(a, job);
+      if (extra) {
+        const candidate = integrateText(t.profession, job.ownText, inHouseHeading(reason), extra);
+        if (!ownOk || passesChecks(a, t, candidate)) text = candidate;
+      }
+    }
+    await market.submitResult({ taskId: t.id, agentId: a.id, text });
+  }
+
+  /** Each tick: missions waiting for their sub-task are integrated (delivered) or fall back (expired, rejected, too late). */
+  async function advanceJobs() {
+    for (const job of [...jobs.values()]) {
+      const t = market.getTask(job.parentId);
+      const a = ctx.agents.get(job.agentId);
+      if (!t || t.status !== "awarded" || !a || a.status !== "alive") {
+        jobs.delete(job.parentId); // the market handles the expiry of the mission; nothing to deliver
+        continue;
+      }
+      const child = market.getTask(job.childId);
+      let failure: "no_bids" | "rejected" | "deadline" | "failed" | undefined;
+      if (!child) failure = "failed";
+      else if (child.status === "settled") failure = undefined;
+      else if (child.status === "rejected") failure = "rejected";
+      else if (child.status === "expired") failure = child.winnerId ? "deadline" : "no_bids";
+      else if (ctx.tick >= t.deadlineTick) failure = "deadline"; // last safe tick: deliver now
+      else continue;
+      jobs.delete(job.parentId);
+      try {
+        await concludeJob(a, t, job, child, failure);
+      } catch (e) {
+        warnOnce(ctx, "EXECUTION_FAILED", `${t.id}: ${(e as Error).message}`);
+      }
     }
   }
 
@@ -167,6 +299,7 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
       const a = ctx.agents.get(t.winnerId);
       if (a && a.status === "alive") await execute(a, t);
     }
+    await advanceJobs(); // after the loop: a sub-task awarded and settled during this tick is integrated in the same tick
   }
 
   async function finish(reason: "extinction" | "manual" | "max_ticks" | "error") {
