@@ -10,9 +10,9 @@ import { bal, type Ctx } from "./context.ts";
 import { chargeBrain, resolveModel, warnOnce } from "./economy.ts";
 import { reserve } from "./policy.ts";
 
-const PITCH_MAX_TOKENS = 120;
+export const PITCH_MAX_TOKENS = 120;
 /** English reference text: forces the mock pitch language, and pitchLanguageOk(pitch, ENGLISH_REFERENCE) rejects a pitch detected as French. */
-const ENGLISH_REFERENCE = "This is the work that you need for your team, and it will be delivered with the quality that you expect.";
+export const ENGLISH_REFERENCE = "This is the work that you need for your team, and it will be delivered with the quality that you expect.";
 
 /** Pitch of an agent for a task, always in English (see the file header). */
 export async function makePitch(ctx: Ctx, a: Agent, task: Task, price: bigint): Promise<string> {

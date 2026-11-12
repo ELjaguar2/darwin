@@ -148,3 +148,19 @@ sha256sum docs/preuves/*.jsonl          # Linux, macOS, Git Bash
 ```
 
 The values must be identical to those in the table. A line-ending conversion at checkout (`core.autocrlf`) changes the fingerprint: clone with `git -c core.autocrlf=false clone ...` in case of doubt.
+
+## 13. English output validation (2026-11-12)
+
+Goal: check, through the real code path, that the production model answers in English after the L19 switch. Command: `npm run ai:english-validation` (`--dry` computes the worst-case cost without any chat call). Code path: `NearAiBrain` via `createBrain` (same guardrails, budget and caps as the engine), engine prompt builders (`letterRequestMessages` of `engine/lifecycle.ts`, `bidMessages` + `sanitizePitch` + `pitchLanguageOk` of `engine/pitch.ts`, `executeMessages` + market `extractDeliverable` + `runChecks`), `ENGLISH_RULE` included. Model: `google/gemini-2.5-flash-lite` (default model of the brain, price verified in the catalogue: 0.1 / 0.4 USD per million tokens in / out). 3 real calls, no judge call. Raw answers (no secret): `docs/preuves/english-validation/{letter,pitch,deliverable}.json`; offline replay: `brain/english-validation.test.ts`.
+
+| Output | Input | finish_reason | Tokens (prompt / completion) | Cost (USD) | Language check |
+|---|---|---|---|---|---|
+| Parent -> child letter | English genome personality | `stop` | 81 / 138 | 0.000063 | English: 14 English function words, 0 French word, no accent |
+| Bid pitch | task written in **French** (worst case) | `stop` | 266 / 14 | 0.000032 | English, `pitchLanguageOk` = true, 0 French word |
+| Marketing deliverable | order written in **French** | `stop` | 314 / 57 | 0.000054 | English, extraction OK (`texte.md`, 261 chars), `runChecks` ok = true |
+
+Total: 0.00015 USD (worst case computed before the calls: 0.00063 USD).
+
+Excerpts: letter "My dearest Blaise, Welcome to the world! Even with 0.5 NEAR to start, and having already completed 7 tasks ..."; pitch "Your cozy neighborhood escape awaits! Come savor our new cappuccino today."; deliverable "A cozy corner of your neighborhood. Discover your new favorite spot at our charming local cafe. ..."
+
+Notes: (1) the generic heuristic `looksEnglish` requires 2 English function words, which a one-sentence pitch may not contain; the pitch is therefore judged with `englishVerdict(text, short)` (1 function word, zero French word, no accent) plus the engine's own `pitchLanguageOk`. (2) Only the default model was tested; a genome may carry another model (gene), which this validation does not cover. (3) The judge (`validateMessages`) was not called (outside the budget); its prompt carries the English rule (`brain/l19-english.test.ts`).
