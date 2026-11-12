@@ -6,6 +6,7 @@ import { readFileSync, statSync } from "node:fs";
 import { basename } from "node:path";
 import { EVENT_TYPES, type Agent, type Bid, type DarwinEvent, type Deliverable, type Escrow, type EventCatalog, type Journal, type Letter, type MarketEvent, type SimState, type Task } from "../shared/index.ts";
 import { redactText } from "./redact.ts";
+import { isSafeFileName, safeMime } from "./safe.ts";
 
 export class ReplayError extends Error {
   constructor(public code: "REPLAY_FILE_MISSING" | "REPLAY_FILE_UNREADABLE" | "REPLAY_FILE_EMPTY" | "REPLAY_FILE_TOO_BIG" | "REPLAY_FILE_INVALID" | "REPLAY_BAD_SPEED", message: string) {
@@ -14,7 +15,7 @@ export class ReplayError extends Error {
   }
 }
 
-export const MAX_REPLAY_BYTES = 200 * 1024 * 1024;
+export const MAX_REPLAY_BYTES = 20 * 1024 * 1024;
 export const MIN_SPEED = 0.25;
 export const MAX_SPEED = 100;
 /** Un silence plus long que ceci dans le journal d'origine est raccourci à cette valeur (avant division par la vitesse). */
@@ -52,6 +53,56 @@ const fail = (code: ConstructorParameters<typeof ReplayError>[0], msg: string): 
   throw new ReplayError(code, msg);
 };
 
+const isObj = (v: unknown): v is Record<string, any> => typeof v === "object" && v !== null && !Array.isArray(v);
+const isStr = (v: unknown): v is string => typeof v === "string";
+
+/**
+ * Forme minimale attendue par ReplayState.apply pour chaque type d'événement (constat 2 de la revue sécurité) : un journal
+ * hostile ou corrompu est refusé au chargement, avec le champ fautif. Normalise aussi les fichiers de livrable (liste blanche de types).
+ * Retourne une description de l'erreur, ou undefined si la forme est correcte.
+ */
+function shapeError(type: string, d: Record<string, any>): string | undefined {
+  const needStr = (...keys: string[]) => keys.find((k) => !isStr(d[k]));
+  const miss = (k: string | undefined) => (k ? `« ${k} » manquant` : undefined);
+  switch (type) {
+    case "agent.born": {
+      const a = d.agent;
+      if (!isObj(a)) return "« agent » manquant";
+      if (!isStr(a.id) || !isStr(a.accountId ?? "")) return "« agent.id » manquant";
+      if (typeof a.generation !== "number" || !Number.isFinite(a.generation)) return "« agent.generation » manquant";
+      if (a.childrenIds !== undefined && !Array.isArray(a.childrenIds)) return "« agent.childrenIds » invalide";
+      return undefined;
+    }
+    case "agent.reproduced": return miss(needStr("parentId"));
+    case "agent.died": return miss(needStr("agentId"));
+    case "letter.written": return isObj(d.letter) && isStr(d.letter.id) && isStr(d.letter.toAgentId) ? undefined : "« letter » manquant";
+    case "balance.changed": case "brain.charged": case "reputation.updated": return miss(needStr("agentId"));
+    case "task.posted": {
+      const t = d.task;
+      if (!isObj(t) || !isStr(t.id)) return "« task » manquant";
+      if (!isObj(t.requester)) return "« task.requester » manquant";
+      if (t.bidIds !== undefined && !Array.isArray(t.bidIds)) return "« task.bidIds » invalide";
+      return undefined;
+    }
+    case "bid.placed": return isObj(d.bid) && isStr(d.bid.id) && isStr(d.bid.taskId) ? undefined : "« bid » manquant";
+    case "task.awarded": case "task.expired": case "escrow.locked": case "task.submitted": case "task.validated":
+    case "escrow.released": case "escrow.refunded":
+      return miss(needStr("taskId"));
+    case "deliverable.produced": {
+      if (!isStr(d.taskId)) return "« taskId » manquant";
+      if (!Array.isArray(d.files)) return "« files » manquant";
+      for (const f of d.files) {
+        if (!isObj(f)) return "fichier invalide";
+        if (!isSafeFileName(f.name)) return "nom de fichier invalide";
+        if (f.content !== undefined && !isStr(f.content)) return "contenu de fichier invalide";
+        f.mime = safeMime(f.mime);
+      }
+      return undefined;
+    }
+    default: return undefined;
+  }
+}
+
 /** Valide et normalise un journal JSONL. Erreurs : numéro de ligne et cause, jamais de contenu du fichier. */
 export function parseReplay(text: string, fileName: string): ParsedReplay {
   const lines = text.replace(/^﻿/, "").split(/\r?\n/);
@@ -81,6 +132,8 @@ export function parseReplay(text: string, fileName: string): ParsedReplay {
     if (typeof o.tick !== "number" || !Number.isFinite(o.tick) || o.tick < 0) return fail("REPLAY_FILE_INVALID", `journal invalide (${at}) : champ « tick » absent ou invalide.`);
     if (o.data === undefined || o.data === null || typeof o.data !== "object" || Array.isArray(o.data)) return fail("REPLAY_FILE_INVALID", `journal invalide (${at}) : champ « data » (objet) manquant.`);
     if (!KNOWN.has(o.type)) { skipped++; continue; }
+    const bad = shapeError(o.type, o.data);
+    if (bad) return fail("REPLAY_FILE_INVALID", `journal invalide (${at}) : événement ${o.type} mal formé (${bad}).`);
     prevMs = ms;
     const seq = events.length + 1;
     if (o.seq !== seq) renumbered = true; // le flux exige des seq sans trou (le frontend se resynchronise sinon)
@@ -343,6 +396,8 @@ export interface ReplayStatus {
   rounds: number;
   maxGapMs: number;
   meta: ReplayMeta;
+  /** Présent si le rejeu s'est arrêté sur un événement inexploitable. */
+  warning?: string;
 }
 
 export interface ReplayJournal extends Journal {
@@ -397,6 +452,7 @@ export function createReplay(parsed: ParsedReplay, opts: ReplayOptions = {}): Re
   let timer: unknown;
   let rounds = 0;
   let tickHint = 0;
+  let warning: string | undefined;
   const subs = new Set<(e: DarwinEvent) => void>();
   const resetSubs = new Set<() => void>();
 
@@ -440,7 +496,14 @@ export function createReplay(parsed: ParsedReplay, opts: ReplayOptions = {}): Re
       timer = undefined;
       if (phase !== "playing") return;
       const ev = sanitize(events[emitted.length]!);
-      state.apply(ev);
+      try {
+        state.apply(ev);
+      } catch (e) {
+        // garde-fou : un événement que la validation n'a pas attrapé ne doit jamais arrêter le processus
+        phase = "ended";
+        warning = `rejeu interrompu à l'événement ${emitted.length + 1} (${ev.type}) : ${redactText(e instanceof Error ? e.message : String(e)).slice(0, 120)}`;
+        return;
+      }
       emitted.push(ev);
       tickHint = ev.tick;
       for (const fn of subs) {
@@ -457,6 +520,7 @@ export function createReplay(parsed: ParsedReplay, opts: ReplayOptions = {}): Re
   function restart() {
     clear();
     if (phase === "ended") rounds++;
+    warning = undefined;
     emitted = [];
     state = new ReplayState();
     (replay as { state: ReplayState }).state = state;
@@ -475,7 +539,7 @@ export function createReplay(parsed: ParsedReplay, opts: ReplayOptions = {}): Re
     journal,
     state,
     meta,
-    status: () => ({ mode: "replay", phase, speed, loop, position: emitted.length, total: events.length, rounds, maxGapMs, meta }),
+    status: () => ({ mode: "replay", phase, speed, loop, position: emitted.length, total: events.length, rounds, maxGapMs, meta, ...(warning ? { warning } : {}) }),
     start() {
       if (phase === "paused" && emitted.length === 0) { phase = "playing"; schedule(); }
     },

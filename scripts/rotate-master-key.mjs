@@ -10,6 +10,7 @@
 //   Au moindre echec : arret, rien n'est supprime. Les cles ne sont JAMAIS affichees (fragments de 4 caracteres de la cle PUBLIQUE).
 //   Refuse tout reseau autre que testnet et tout compte qui ne se termine pas par .testnet.
 // near-api-js (optionnel) est resolu depuis le dossier courant ou celui du script : lancer depuis un dossier ou il est installe.
+import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync, renameSync, copyFileSync, mkdirSync, existsSync, chmodSync } from "node:fs";
 import { createRequire } from "node:module";
 import { homedir } from "node:os";
@@ -23,11 +24,38 @@ const KEEP_OLD = argv.includes("--keep-old");
 const RESUME = opt("--resume", null); // fichier new-master-key-*.json : reprise apres un arret
 const envPath = resolve(opt("--env", ".env"));
 const backupDir = resolve(opt("--backup-dir", join(homedir(), ".darwin-secure")));
+// Masquage des messages d'erreur (memes motifs que backend/redact.ts) : une erreur RPC ne doit jamais afficher une cle.
+const redactText = (s) =>
+  String(s)
+    .replace(/\b(ed25519|secp256k1):[A-Za-z0-9+/=_-]{16,}/g, "$1:[masque]")
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/gi, "Bearer [masque]")
+    .replace(/\bsk-[A-Za-z0-9_-]{16,}/g, "[cle masquee]")
+    .replace(/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{5,}/g, "[jwt masque]")
+    .replace(/(?<![1-9A-HJ-NP-Za-km-z])[1-9A-HJ-NP-Za-km-z]{86,90}(?![1-9A-HJ-NP-Za-km-z])/g, (m) => (/[A-Z]/.test(m) && /[a-z]/.test(m) && /\d/.test(m) ? "[cle masquee]" : m));
+const safeMsg = (e, max) => redactText(e?.message || e).slice(0, max);
+
+/** Vrai si le dossier (existant ou a creer) est dans l'arbre de travail d'un depot git : la cle en clair y serait committable. */
+function insideGitTree(dir) {
+  let d = dir;
+  while (!existsSync(d)) {
+    const up = dirname(d);
+    if (up === d) return false;
+    d = up;
+  }
+  try {
+    return execFileSync("git", ["-C", d, "rev-parse", "--is-inside-work-tree"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim() === "true";
+  } catch {
+    return false; // git absent ou hors depot
+  }
+}
+
 const ts = new Date().toISOString().replace(/[:.]/g, "-");
 const log = (...a) => console.log("[rotate-master-key]", ...a);
 const fail = (m) => { console.error("[rotate-master-key] ECHEC :", m); process.exit(1); };
 const frag = (pk) => `${String(pk).slice(0, 12)}...${String(pk).slice(-4)}`; // cle PUBLIQUE seulement
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+if (insideGitTree(backupDir)) fail(`--backup-dir (${backupDir}) est dans un depot git : la nouvelle cle en clair y serait committable. Choisissez un dossier hors de tout depot (defaut : ~/.darwin-secure).`);
 
 function loadNear() {
   for (const base of [join(process.cwd(), "package.json"), fileURLToPath(import.meta.url)]) {
@@ -65,7 +93,7 @@ async function withRetry(label, fn, tries = 8) {
     const idx = i % providers.length;
     try { return await fn(providers[idx], idx); } catch (e) {
       last = e;
-      const msg = String(e?.message || e).replace(/ed25519:[1-9A-HJ-NP-Za-km-z]{20,}/g, "ed25519:[REDACTED]").slice(0, 160);
+      const msg = safeMsg(e, 160);
       if (e?.__fatal) throw e;
       log(`${label}: tentative ${i + 1}/${tries} echouee (${msg}); nouvel essai dans ${delay} ms`);
       await sleep(delay); delay = Math.min(delay * 2, 20000);
@@ -143,7 +171,7 @@ if (!before.some((k) => k.pub === newPub)) {
     if (!okOutcome(r)) throw new Error("AddKey non confirmee");
     addHash = txHash(r);
   } catch (e) {
-    log(`(c) erreur sur AddKey (${String(e?.message || e).slice(0, 120)}) : verification de l'etat on-chain avant de conclure...`);
+    log(`(c) erreur sur AddKey (${safeMsg(e, 120)}) : verification de l'etat on-chain avant de conclure...`);
   }
 }
 // (d) verification (la finalite du RPC a quelques secondes de retard : interrogation jusqu'a 60 s)
@@ -180,7 +208,7 @@ try {
   if (!okOutcome(r)) throw new Error("DeleteKey non confirmee");
   delHash = txHash(r);
 } catch (e) {
-  log(`(g) erreur sur DeleteKey (${String(e?.message || e).slice(0, 120)}) : verification de l'etat on-chain...`);
+  log(`(g) erreur sur DeleteKey (${safeMsg(e, 120)}) : verification de l'etat on-chain...`);
 }
 let afterDel = await listKeys();
 for (let i = 0; i < 12 && afterDel.some((k) => k.pub === oldPub); i++) { await sleep(5000); afterDel = await listKeys(); }

@@ -20,6 +20,14 @@ export function replayEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return out;
 }
 
+/** Message d'erreur si DARWIN_REPLAY_CONTROL=locked est demandé sans DARWIN_ADMIN_TOKEN, sinon undefined. */
+export function replayControlError(env: NodeJS.ProcessEnv, adminToken: string | undefined): string | undefined {
+  const locked = /^locked$/i.test((env.DARWIN_REPLAY_CONTROL ?? "").trim());
+  return locked && !adminToken
+    ? "DARWIN_REPLAY_CONTROL=locked exige DARWIN_ADMIN_TOKEN (24 caractères ou plus) : sans jeton le contrôle resterait ouvert. Définissez le jeton, ou videz DARWIN_REPLAY_CONTROL."
+    : undefined;
+}
+
 const truthy = (v: string | undefined) => /^(1|true|yes|oui|on)$/i.test((v ?? "").trim());
 
 export async function runReplayMode(io: { say: (m: string) => void; fail: (m: string, code?: number) => never }): Promise<void> {
@@ -30,6 +38,9 @@ export async function runReplayMode(io: { say: (m: string) => void; fail: (m: st
   try {
     config = loadConfig(replayEnv(env));
     assertSafeBinding(config.server.host, config.server.adminToken);
+    // Échec fermé : « locked » sans jeton laisserait le contrôle ouvert (le garde d'administration laisse tout passer sans jeton).
+    const err = replayControlError(env, config.server.adminToken);
+    if (err) throw new ReplayError("REPLAY_FILE_INVALID", err);
     const file = resolve(env.DARWIN_REPLAY_FILE?.trim() || DEFAULT_REPLAY_FILE);
     const parsed = loadReplayFile(file);
     if (env.DARWIN_REPLAY_LABEL?.trim()) parsed.meta.label = env.DARWIN_REPLAY_LABEL.trim().slice(0, 200);
@@ -71,9 +82,7 @@ export async function runReplayMode(io: { say: (m: string) => void; fail: (m: st
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
   await rt.startSim();
   say(locked
-    ? config.server.adminToken
-      ? "contrôle du rejeu verrouillé (DARWIN_REPLAY_CONTROL=locked) : jeton d'administration exigé"
-      : "ATTENTION : DARWIN_REPLAY_CONTROL=locked sans DARWIN_ADMIN_TOKEN : le contrôle du rejeu est ouvert (aucun jeton défini)"
+    ? "contrôle du rejeu verrouillé (DARWIN_REPLAY_CONTROL=locked) : jeton d'administration exigé"
     : "contrôle du rejeu (vitesse, pause) ouvert à tout visiteur : vitesse partagée ; pour une démo publique, DARWIN_REPLAY_CONTROL=locked");
   say("rejeu démarré");
 }

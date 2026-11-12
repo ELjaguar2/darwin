@@ -10,7 +10,7 @@ import {
   createJournal, createRng,
   type Bid, type Brain, type Chain, type Config, type DarwinEvent, type Deps, type Engine, type EventCatalog, type Journal, type MarketEvent,
 } from "../shared/index.ts";
-import { redactText, safeErrorMessage } from "./redact.ts";
+import { redactEvent, redactText, safeErrorMessage } from "./redact.ts";
 import type { Replay } from "./replay.ts";
 import type { Store } from "./store.ts";
 
@@ -88,7 +88,7 @@ export function createRuntime(config: Config, opts: RuntimeOptions = {}): Runtim
   const journal = createJournal({
     now,
     onAppend: (ev: DarwinEvent) => {
-      if (ev.type === "system.warning" || ev.type === "system.error") ev.data.message = redactText(ev.data.message);
+      redactEvent(ev);
       store?.appendEvent(ev);
     },
   });
