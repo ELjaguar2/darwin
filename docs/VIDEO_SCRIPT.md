@@ -50,7 +50,7 @@
 | 8 | 1:40 to 1:54 (14 s) | **Proof tab, in replay (same on-screen text "not live").** Real run 8 transactions: escrows, `mark_dead`, function-call keys. Text: "run 8: generation 3, 12 births, 7 deaths, 65 escrows (63 released, 2 refunded)". Open a nearblocks link. | "Still the recorded run 8, not live. Every claim has a transaction: sixty-five escrows, seven deaths recorded in the contract. One run, not a guarantee." |
 | 9 | 1:54 to 2:16 (22 s) | **End.** NEAR tools (accounts and sub-accounts, function-call keys, Rust contract, NEAR AI Cloud, NEAR Intents), an "Honest limits" card, repository and X post. | "Spore.fun selected on token price; the paper counts one agent in generation five. Darwin selects on paid, validated work. Selection by speculation died out. Selection by useful work can last: a hypothesis, and Darwin lets you test it. Built at NEAR HACKATHON. Mock needs no key; the client is simulated; NEAR Intents was not run." |
 
-*(Shots 7 and 8 are in replay, shots 2 and 3 in live mock; shot 1 is live mock or replay, your choice, with the matching label. Cumulative length: 2 min 16. If the edit goes over 2:20, cut shot 9 down to the closing sentence, then shorten shot 7.)*
+*(Shots 7 and 8 are in replay, shots 2 and 3 in live mock; shot 1 is live mock or replay, your choice, with the matching label; if it is shot in replay, say "Replay, not live." in the voice-over, and do the same for the run 8 still shots of shots 4 and 5. Cumulative length: 2 min 16. If the edit goes over 2:20, cut shot 9 down to the closing sentence, then shorten shot 7.)*
 
 ## What not to say
 
