@@ -45,13 +45,13 @@ fn lock(c: &mut Darwin, task: &str) {
     c.lock_escrow(task.into(), payer());
 }
 
-/// Simule la reussite du transfert (callback) apres release/refund.
+/// Simulates a successful transfer (callback) after release/refund.
 fn settle_ok(c: &mut Darwin, task: &str) {
     ctx(env::current_account_id(), 0);
     c.on_settled(task.into(), Ok(()));
 }
 
-// ---------------------------------------------------------------- registre
+// ---------------------------------------------------------------- registry
 
 #[test]
 fn registry_lineage_and_death_keeps_record() {
@@ -116,7 +116,7 @@ fn cannot_die_twice() {
     c.mark_dead("a-0001".into(), 6, Cause::Manual);
 }
 
-// ---------------------------------------------------------------- sequestre
+// ---------------------------------------------------------------- escrow
 
 #[test]
 fn escrow_lock_release_flow() {
@@ -155,7 +155,7 @@ fn lock_without_reservation_refused() {
 fn squatter_cannot_take_reserved_id() {
     let mut c = setup();
     c.reserve_task("t-0001".into(), payer());
-    // Un tiers se declare payeur sur un id reserve pour un autre : refuse.
+    // A third party claims to be the payer on an id reserved for another: refused.
     ctx(accounts(4), ONE);
     c.lock_escrow("t-0001".into(), accounts(4));
 }
@@ -287,7 +287,7 @@ fn failed_transfer_restores_locked() {
 
 #[test]
 fn refund_reason_rejects_other_values() {
-    // Le motif est un enum serde : toute autre valeur est refusee a la deserialisation.
+    // The reason is a serde enum: any other value is rejected at deserialization.
     assert!(near_sdk::serde_json::from_str::<RefundReason>("\"changed_my_mind\"").is_err());
     assert!(near_sdk::serde_json::from_str::<RefundReason>("\"rejected\"").is_ok());
 }

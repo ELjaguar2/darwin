@@ -1,10 +1,10 @@
-//! Contrat Darwin : registre des agents + sequestre des taches + reputation.
+//! Darwin contract: agent registry + task escrow + reputation.
 //!
-//! Modele de confiance (D-015, D-024) : l'operateur (compte maitre) est l'oracle de validation.
-//! Le contrat garantit seulement que : (1) l'argent verrouille ne sort que par `release_escrow`
-//! avec une preuve `accepted` ou par `refund_escrow` pour `rejected`/`expired` ; (2) la reputation
-//! ne se credite qu'apres une liberation confirmee correspondant a la preuve ; (3) la lignee est
-//! conservee. Ce n'est pas "trustless".
+//! Trust model (D-015, D-024): the operator (master account) is the validation oracle.
+//! The contract only guarantees that: (1) locked funds leave only through `release_escrow`
+//! with an `accepted` proof or through `refund_escrow` for `rejected`/`expired`; (2) reputation
+//! is credited only after a confirmed release matching the proof; (3) the lineage is
+//! kept. This is not "trustless".
 pub mod escrow;
 pub mod events;
 pub mod registry;
@@ -37,10 +37,10 @@ pub struct Darwin {
     operator: AccountId,
     agents: IterableMap<String, AgentRecord>,
     escrows: LookupMap<String, Escrow>,
-    /// task_id -> payer, reserves par l'operateur avant `lock_escrow` (anti-squat d'identifiants).
+    /// task_id -> payer, reserved by the operator before `lock_escrow` (id anti-squatting).
     reservations: LookupMap<String, AccountId>,
     reputation: LookupMap<String, i64>,
-    /// Cles "task_id|agent_id" deja creditees (une seule ecriture de reputation par tache et agent).
+    /// Keys "task_id|agent_id" already credited (one reputation write per task and agent).
     rep_applied: LookupSet<String>,
 }
 
@@ -72,7 +72,7 @@ impl Darwin {
         require!(env::predecessor_account_id() == self.operator, "Reserve a l'operateur");
     }
 
-    // ------------------------------------------------------------------ registre
+    // ------------------------------------------------------------------ registry
 
     pub fn register_agent(&mut self, record: NewAgent) {
         self.assert_operator();
@@ -139,10 +139,10 @@ impl Darwin {
         self.agents.iter().skip(from).take(limit).map(|(_, v)| v.clone()).collect()
     }
 
-    // ------------------------------------------------------------------ sequestre
+    // ------------------------------------------------------------------ escrow
 
-    /// Reserve un identifiant de tache pour un payeur donne (operateur seulement). Sans cette
-    /// reservation, `lock_escrow` est refuse : un tiers ne peut pas squatter un id previsible.
+    /// Reserves a task id for a given payer (operator only). Without this reservation,
+    /// `lock_escrow` is refused: a third party cannot squat a predictable id.
     pub fn reserve_task(&mut self, task_id: String, payer: AccountId) {
         self.assert_operator();
         require!(valid_id(&task_id), "task_id invalide");
@@ -156,8 +156,8 @@ impl Darwin {
         self.reservations.get(&task_id).cloned()
     }
 
-    /// Verrouille le depot attache. L'id doit etre reserve par l'operateur pour CE payeur ;
-    /// l'appelant est le payeur (signataire) ou l'operateur.
+    /// Locks the attached deposit. The id must be reserved by the operator for THIS payer;
+    /// the caller is the payer (signer) or the operator.
     #[payable]
     pub fn lock_escrow(&mut self, task_id: String, payer: AccountId) {
         let caller = env::predecessor_account_id();
@@ -187,7 +187,7 @@ impl Darwin {
         events::emit("escrow_locked", json!({"task_id": task_id, "payer": payer, "amount": U128(amount)}));
     }
 
-    /// Libere vers `payee`. Exige une preuve `accepted` (resultat hash, validateur non vides).
+    /// Releases to `payee`. Requires an `accepted` proof (non-empty result hash and validator).
     pub fn release_escrow(&mut self, task_id: String, payee: AccountId, proof: ReleaseProof) -> Promise {
         self.assert_operator();
         require!(proof.verdict == "accepted", "PROOF_REQUIRED : verdict doit etre accepted");
@@ -210,7 +210,7 @@ impl Darwin {
             .then(Self::ext(env::current_account_id()).on_settled(task_id))
     }
 
-    /// Rembourse le payeur. Seulement pour `rejected` ou `expired`.
+    /// Refunds the payer. Only for `rejected` or `expired`.
     pub fn refund_escrow(&mut self, task_id: String, reason: RefundReason) -> Promise {
         self.assert_operator();
         let esc = self.escrows.get_mut(&task_id).unwrap_or_else(|| env::panic_str("ESCROW_UNKNOWN"));
@@ -223,7 +223,7 @@ impl Darwin {
             .then(Self::ext(env::current_account_id()).on_settled(task_id))
     }
 
-    /// Callback : confirme le transfert, ou remet le sequestre a `locked` s'il a echoue.
+    /// Callback: confirms the transfer, or puts the escrow back to `locked` if it failed.
     #[private]
     pub fn on_settled(&mut self, task_id: String, #[callback_result] result: Result<(), PromiseError>) {
         let esc = self.escrows.get_mut(&task_id).unwrap_or_else(|| env::panic_str("ESCROW_UNKNOWN"));
@@ -264,8 +264,8 @@ impl Darwin {
 
     // ------------------------------------------------------------------ reputation
 
-    /// Credit (delta > 0) : exige un sequestre `released` vers ce meme agent, avec `proof_hash`
-    /// = result_hash de la preuve. Debit (delta < 0) : exige un sequestre `refunded` pour `rejected`.
+    /// Credit (delta > 0): requires an escrow `released` to this same agent, with `proof_hash`
+    /// = the proof's result_hash. Debit (delta < 0): requires an escrow `refunded` (`rejected` or `expired`).
     pub fn add_reputation(&mut self, agent_id: String, task_id: String, delta: i32, proof_hash: String) -> i64 {
         self.assert_operator();
         require!(delta != 0 && delta.abs() <= MAX_REPUTATION_DELTA, "delta hors bornes");

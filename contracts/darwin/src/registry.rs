@@ -1,4 +1,4 @@
-//! Registre des agents et genealogie (la lignee est conservee apres la mort).
+//! Agent registry and genealogy (the lineage is kept after death).
 use near_sdk::{near, AccountId};
 
 #[near(serializers = [json, borsh])]
@@ -10,7 +10,7 @@ pub enum Cause {
     Reset,
 }
 
-/// Entree fournie par l'operateur pour enregistrer un agent.
+/// Input supplied by the operator to register an agent.
 #[near(serializers = [json])]
 #[derive(Clone, Debug)]
 pub struct NewAgent {
@@ -18,9 +18,9 @@ pub struct NewAgent {
     pub account_id: AccountId,
     pub parent_id: Option<String>,
     pub generation: u32,
-    /// sha256 hex du `genome_json` (verifie par le contrat).
+    /// sha256 hex of `genome_json` (checked by the contract).
     pub genome_hash: String,
-    /// JSON canonique du genome, stocke tel quel (petit).
+    /// Canonical genome JSON, stored as is (small).
     pub genome_json: String,
     pub birth_tick: u64,
 }
