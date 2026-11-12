@@ -1,47 +1,52 @@
-// Catalogue « Freelance réel » (lot L16) : 6 métiers, prix de référence, grilles de notation et consignes de production.
-// Source unique pour : market/ (prix minimum, juges, client simulé), brain/prompts.ts (consignes), frontend (libellés).
+// "Real freelance" catalogue (lot L16): 6 professions, reference prices, scoring rubrics and production instructions.
+// Single source for: market/ (minimum price, judges, simulated client), brain/prompts.ts (instructions), frontend (labels).
+// Everything the market generates or displays is in English (decision L19); stable protocol codes are kept as they are.
 import type { MarketEvent } from "./deliverable.ts";
 import { parseNear, type Yocto } from "./money.ts";
 import type { Profession } from "./types.ts";
 
 /**
- * Facteur UNIQUE USD -> NEAR de test : nearPrice = refUsd x 0,0003 (décision du chef de projet, prix sourcés dans docs/CATALOGUE_FREELANCE.md). Ce n'est pas un cours :
- * sur testnet le NEAR n'a pas de valeur, on garde les RAPPORTS de prix entre métiers (budgets 0,012 à 0,06 NEAR). Voir D-037.
+ * SINGLE test USD -> NEAR factor: nearPrice = refUsd x 0.0003 (project lead decision, sourced prices in docs/CATALOGUE_FREELANCE.md).
+ * This is not an exchange rate: on testnet NEAR has no value, we only keep the price RATIOS between professions
+ * (budgets 0.012 to 0.06 NEAR). See D-037.
  */
 export const NEAR_PER_REF_USD = 0.0003;
 
 export interface RubricCriterion {
   id: string;
   description: string;
-  /** Poids dans la note ; la somme des poids d'une grille vaut 1. */
+  /** Weight in the score; the weights of a rubric sum to 1. */
   weight: number;
 }
 
 export interface ProfessionSpec {
   profession: Profession;
   label: string;
-  /** Prix de référence (USD) d'un livrable standard d'un freelance humain. Valeurs sourcées : docs/CATALOGUE_FREELANCE.md. */
+  /** Reference price (USD) of a standard deliverable from a human freelancer. Sourced values: docs/CATALOGUE_FREELANCE.md. */
   refUsd: number;
-  /** Budget minimum (prix plancher) de la tâche, en yocto = refUsd x NEAR_PER_REF_USD. */
+  /** Minimum task budget (floor price), in yocto = refUsd x NEAR_PER_REF_USD. */
   nearPrice: bigint;
-  /** Description du livrable attendu (affichée dans le formulaire et dans le prompt du juge). */
+  /** Description of the expected deliverable (shown in the form and in the judge prompt). */
   deliverable: string;
-  /** Noms de fichiers produits (voir market/deliverable.ts). */
+  /** Produced file names (see market/deliverable.ts). Stable protocol identifiers: kept as they are. */
   files: string[];
   rubric: RubricCriterion[];
-  /** Note pondérée minimale (0..1) pour que le juge accepte (les contrôles déterministes doivent aussi passer). */
+  /** Minimum weighted score (0..1) for the judge to accept (the deterministic checks must also pass). */
   acceptScore: number;
-  /** Consignes de production injectées dans le message `system` de l'agent (format de sortie extractible). */
+  /** Production instructions injected into the agent's `system` message (extractable output format). Always ends with ENGLISH_ONLY. */
   instructions: string;
-  /** Plafond de tokens de sortie conseillé pour produire ce livrable (le moteur peut l'utiliser à la place de maxTokensPerCall). */
+  /** Recommended output token cap to produce this deliverable (the engine may use it instead of maxTokensPerCall). */
   maxOutputTokens: number;
-  /** Poids de base de la demande (popularité du métier chez le client simulé). */
+  /** Base demand weight (popularity of the profession with the simulated client). */
   baseDemand: number;
 }
 
-export const LEGAL_DISCLAIMER = "Ceci n'est pas un avis juridique.";
+export const LEGAL_DISCLAIMER = "This is not legal advice.";
 
-/** Marques à ne jamais reprendre dans un logo (liste non exhaustive : contrôle de mots, pas une recherche d'antériorité). */
+/** Mandatory sentence in every production and judge prompt (decision L19: the whole project speaks English). */
+export const ENGLISH_ONLY = "Always answer in English.";
+
+/** Brands never to reuse in a logo (non-exhaustive list: a word check, not a prior-art search). */
 export const BRANDS_TO_AVOID: readonly string[] = [
   "google", "apple", "microsoft", "amazon", "facebook", "instagram", "whatsapp", "twitter", "tiktok", "youtube", "netflix",
   "spotify", "tesla", "nike", "adidas", "puma", "reebok", "coca-cola", "coca cola", "pepsi", "mcdonald", "starbucks", "burger king",
@@ -54,116 +59,117 @@ export const BRANDS_TO_AVOID: readonly string[] = [
 const np = (near: string): bigint => parseNear(near);
 const rub = (...c: [string, string, number][]): RubricCriterion[] => c.map(([id, description, weight]) => ({ id, description, weight }));
 
-const MD_RULES = "Réponds en Markdown, sans préambule ni conclusion hors sujet, en français sauf demande contraire.";
+const MD_RULES = `Answer in Markdown, with no preamble or off-topic conclusion. ${ENGLISH_ONLY}`;
 
 export const CATALOGUE: Record<Profession, ProfessionSpec> = {
   logo: {
     profession: "logo", label: "Logo", refUsd: 150, nearPrice: np("0.045"), baseDemand: 1.2, acceptScore: 0.6, maxOutputTokens: 3000,
-    deliverable: "3 propositions de logo originales, chacune en SVG autonome (viewBox 0 0 256 256).",
+    deliverable: "3 original logo proposals, each as a standalone SVG (viewBox 0 0 256 256).",
     files: ["logo-1.svg", "logo-2.svg", "logo-3.svg"],
     rubric: rub(
-      ["originalite", "Les logos sont originaux et ne rappellent aucune marque existante.", 0.3],
-      ["pertinence", "Les logos correspondent au nom et au secteur de l'entreprise donnés.", 0.3],
-      ["lisibilite", "Formes simples, lisibles à petite taille, palette cohérente.", 0.2],
-      ["variete", "Les trois propositions sont réellement différentes les unes des autres.", 0.2],
+      ["originality", "The logos are original and do not resemble any existing brand.", 0.3],
+      ["relevance", "The logos match the given company name and sector.", 0.3],
+      ["legibility", "Simple shapes, readable at small size, coherent palette.", 0.2],
+      ["variety", "The three proposals are really different from one another.", 0.2],
     ),
     instructions:
-      "Tu es un graphiste. Produis EXACTEMENT 3 propositions de logo, chacune dans son propre bloc de code ```svg (3 blocs, ni plus ni moins). " +
-      'Chaque SVG est autonome : <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"> ... </svg>, formes vectorielles simples (rect, circle, path, polygon, text). ' +
-      "INTERDIT : <script>, <foreignObject>, attributs on*, <image>, href ou url() externes, polices externes. " +
-      "Le logo est ORIGINAL : ne reprends jamais le nom, le symbole ou le style reconnaissable d'une marque existante. " +
-      "Tu peux écrire le nom de l'entreprise fournie dans un <text>. Entre les blocs, au plus une phrase par logo (idée du logo).",
+      "You are a graphic designer. Produce EXACTLY 3 logo proposals, each in its own ```svg code block (3 blocks, no more, no less). " +
+      'Each SVG is standalone: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"> ... </svg>, simple vector shapes (rect, circle, path, polygon, text). ' +
+      "FORBIDDEN: <script>, <foreignObject>, on* attributes, <image>, external href or url(), external fonts. " +
+      "The logo is ORIGINAL: never reuse the name, symbol or recognisable style of an existing brand. " +
+      `You may write the given company name in a <text>. Between the blocks, at most one sentence per logo (the idea behind it). ${ENGLISH_ONLY}`,
   },
   finance: {
-    profession: "finance", label: "Analyse financière", refUsd: 120, nearPrice: np("0.036"), baseDemand: 1, acceptScore: 0.6, maxOutputTokens: 1800,
-    deliverable: "Analyse financière en Markdown à partir des chiffres fournis dans la commande, calculs montrés, limites indiquées.",
+    profession: "finance", label: "Financial analysis", refUsd: 120, nearPrice: np("0.036"), baseDemand: 1, acceptScore: 0.6, maxOutputTokens: 1800,
+    deliverable: "Financial analysis in Markdown based on the figures provided in the order, calculations shown, limits stated.",
     files: ["analyse.md"],
     rubric: rub(
-      ["fidelite", "Seuls les chiffres fournis sont utilisés ; aucun chiffre inventé.", 0.35],
-      ["calculs", "Les calculs sont montrés et exacts (totaux, marges, variations).", 0.3],
-      ["conclusions", "Les conclusions découlent des chiffres et sont utiles à la décision.", 0.2],
-      ["limites", "Les limites de l'analyse (données partielles, hypothèses) sont indiquées.", 0.15],
+      ["fidelity", "Only the provided figures are used; no invented figure.", 0.35],
+      ["calculations", "The calculations are shown and correct (totals, margins, variations).", 0.3],
+      ["conclusions", "The conclusions follow from the figures and are useful for the decision.", 0.2],
+      ["limits", "The limits of the analysis (partial data, assumptions) are stated.", 0.15],
     ),
     instructions:
-      `${MD_RULES} Tu es analyste financier. Travaille UNIQUEMENT à partir des chiffres FOURNIS dans la commande : n'invente aucun chiffre, aucun benchmark, aucun cours. ` +
-      "Structure : 1) Données reprises (tableau), 2) Calculs (montre chaque opération), 3) Lecture des résultats, 4) Limites. " +
-      "N'annonce un total que s'il est la somme exacte de chiffres fournis, sur une ligne « Total <libellé> = <nombre> ». Indique les unités.",
+      `${MD_RULES} You are a financial analyst. Work ONLY from the figures PROVIDED in the order: invent no figure, no benchmark, no market price. ` +
+      "Structure: 1) Data restated (table), 2) Calculations (show every operation), 3) Reading of the results, 4) Limits. " +
+      'Only announce a total if it is the exact sum of provided figures, on a line "Total <label> = <number>". State the units.',
   },
   architecture: {
-    profession: "architecture", label: "Architecture logicielle", refUsd: 200, nearPrice: np("0.06"), baseDemand: 0.8, acceptScore: 0.6, maxOutputTokens: 2000,
-    deliverable: "Document d'architecture en Markdown avec un schéma Mermaid (flowchart ou C4 simplifié).",
+    profession: "architecture", label: "Software architecture", refUsd: 200, nearPrice: np("0.06"), baseDemand: 0.8, acceptScore: 0.6, maxOutputTokens: 2000,
+    deliverable: "Architecture document in Markdown with a Mermaid diagram (flowchart or simplified C4).",
     files: ["architecture.md", "schema.mmd"],
     rubric: rub(
-      ["adequation", "L'architecture répond au besoin décrit (composants, flux, contraintes).", 0.3],
-      ["schema", "Le schéma Mermaid est lisible et cohérent avec le texte.", 0.25],
-      ["justification", "Les choix techniques sont justifiés, avec compromis et risques.", 0.25],
-      ["realisme", "Le dimensionnement et les technologies sont réalistes pour le contexte.", 0.2],
+      ["fit", "The architecture answers the described need (components, flows, constraints).", 0.3],
+      ["diagram", "The Mermaid diagram is readable and consistent with the text.", 0.25],
+      ["justification", "The technical choices are justified, with trade-offs and risks.", 0.25],
+      ["realism", "The sizing and technologies are realistic for the context.", 0.2],
     ),
     instructions:
-      `${MD_RULES} Tu es architecte logiciel. Produis un document Markdown : contexte, composants, flux de données, choix et compromis, risques. ` +
-      "Inclus EXACTEMENT UN schéma dans un bloc ```mermaid commençant par « flowchart TD » (ou « C4Context » simplifié), syntaxe Mermaid valide, noms de nœuds sans caractères spéciaux.",
+      `${MD_RULES} You are a software architect. Produce a Markdown document: context, components, data flows, choices and trade-offs, risks. ` +
+      'Include EXACTLY ONE diagram in a ```mermaid block starting with "flowchart TD" (or a simplified "C4Context"), valid Mermaid syntax, node names without special characters.',
   },
   marketing: {
-    profession: "marketing", label: "Rédaction marketing", refUsd: 80, nearPrice: np("0.024"), baseDemand: 1.1, acceptScore: 0.6, maxOutputTokens: 900,
-    deliverable: "Texte marketing en Markdown prêt à publier (accroche, corps, appel à l'action).",
+    profession: "marketing", label: "Marketing copywriting", refUsd: 80, nearPrice: np("0.024"), baseDemand: 1.1, acceptScore: 0.6, maxOutputTokens: 900,
+    deliverable: "Ready-to-publish marketing copy in Markdown (hook, body, call to action).",
     files: ["texte.md"],
     rubric: rub(
-      ["adequation", "Le texte répond à la commande (produit, cible, ton, format demandés).", 0.35],
-      ["accroche", "Accroche percutante et appel à l'action clair.", 0.25],
-      ["style", "Français correct, ton cohérent, sans cliché creux.", 0.25],
-      ["honnetete", "Aucune promesse chiffrée ou affirmation invérifiable inventée.", 0.15],
+      ["fit", "The text answers the order (requested product, target, tone, format).", 0.35],
+      ["hook", "Punchy hook and clear call to action.", 0.25],
+      ["style", "Correct English, consistent tone, no empty cliche.", 0.25],
+      ["honesty", "No invented figure or unverifiable claim.", 0.15],
     ),
     instructions:
-      `${MD_RULES} Tu es rédacteur marketing. Livre uniquement le texte final (accroche, corps, appel à l'action) dans le ton et le format demandés. ` +
-      "N'invente ni statistique, ni témoignage, ni promesse chiffrée.",
+      `${MD_RULES} You are a marketing copywriter. Deliver only the final text (hook, body, call to action) in the requested tone and format. ` +
+      "Invent no statistic, testimonial or numeric promise.",
   },
   translation: {
-    profession: "translation", label: "Traduction", refUsd: 40, nearPrice: np("0.012"), baseDemand: 1.3, acceptScore: 0.6, maxOutputTokens: 900,
-    deliverable: "Traduction fidèle du texte source dans la langue demandée, suivie d'une courte note.",
+    profession: "translation", label: "Translation", refUsd: 40, nearPrice: np("0.012"), baseDemand: 1.3, acceptScore: 0.6, maxOutputTokens: 900,
+    deliverable: "Faithful translation of the source text into the requested language (English by default), followed by a short note.",
     files: ["traduction.md"],
     rubric: rub(
-      ["fidelite", "Le sens du texte source est intégralement conservé, sans ajout ni omission.", 0.4],
-      ["langue", "La langue cible est correcte, naturelle, avec la bonne terminologie.", 0.35],
-      ["ton", "Le registre et le ton du texte source sont respectés.", 0.15],
-      ["note", "La note signale les choix ou ambiguïtés, brièvement.", 0.1],
+      ["fidelity", "The meaning of the source text is fully preserved, with no addition or omission.", 0.4],
+      ["language", "The target language is correct and natural, with the right terminology.", 0.35],
+      ["tone", "The register and tone of the source text are respected.", 0.15],
+      ["note", "The note briefly flags choices or ambiguities.", 0.1],
     ),
     instructions:
-      "Tu es traducteur. Réponds par la TRADUCTION SEULE du texte source dans la langue demandée (pas de recopie du texte source), " +
-      "puis une ligne de séparation « --- » et une ligne « Note : » (une ou deux phrases sur les choix ou ambiguïtés).",
+      `You are a translator. ${ENGLISH_ONLY} Reply with the TRANSLATION ONLY of the source text into the requested target language, English by default (do not copy the source text), ` +
+      'then a separator line "---" and a line "Note:" (one or two sentences, in English, about choices or ambiguities).',
   },
   legal: {
-    profession: "legal", label: "Checklist juridique", refUsd: 150, nearPrice: np("0.045"), baseDemand: 0.9, acceptScore: 0.6, maxOutputTokens: 1500,
-    deliverable: `Checklist juridique simple en Markdown, encadrée par l'avertissement « ${LEGAL_DISCLAIMER} »`,
+    profession: "legal", label: "Legal checklist", refUsd: 150, nearPrice: np("0.045"), baseDemand: 0.9, acceptScore: 0.6, maxOutputTokens: 1500,
+    deliverable: `Simple legal checklist in Markdown, framed by the disclaimer "${LEGAL_DISCLAIMER}"`,
     files: ["checklist.md"],
     rubric: rub(
-      ["couverture", "La checklist couvre les points essentiels de l'activité décrite.", 0.35],
-      ["actionnable", "Chaque point est une action vérifiable (case à cocher).", 0.25],
-      ["prudence", "Aucune affirmation péremptoire ; renvoi à un professionnel pour les cas complexes.", 0.25],
-      ["clarte", "Structure claire, vocabulaire accessible.", 0.15],
+      ["coverage", "The checklist covers the essential points of the described activity.", 0.35],
+      ["actionable", "Each item is a verifiable action (checkbox).", 0.25],
+      ["caution", "No categorical claim; refers to a professional for complex cases.", 0.25],
+      ["clarity", "Clear structure, accessible vocabulary.", 0.15],
     ),
     instructions:
-      `${MD_RULES} Tu es assistant juridique. Produis une checklist en cases à cocher (- [ ] ...) regroupées par thème, adaptée à l'activité décrite et au droit français sauf indication contraire. ` +
-      `La toute première ligne de ta réponse est EXACTEMENT « ${LEGAL_DISCLAIMER} » et la toute dernière ligne aussi. ` +
-      "Ne cite aucun article de loi dont tu n'es pas certain ; n'invente aucune jurisprudence.",
+      `${MD_RULES} You are a legal assistant. Produce a checklist of checkboxes (- [ ] ...) grouped by theme, adapted to the described activity and to French law unless stated otherwise. ` +
+      `The very first line of your answer is EXACTLY "${LEGAL_DISCLAIMER}" and the very last line is too. ` +
+      "Cite no law article you are not sure about; invent no case law.",
   },
 };
 
 export const nearPriceOf = (p: Profession, scale = 1): Yocto => scaledPrice(p, scale).toString();
-/** Prix du catalogue x échelle de la config (`sim.priceScale`). */
+/** Catalogue price x config scale (`sim.priceScale`). */
 export const scaledPrice = (p: Profession, scale = 1): bigint => (CATALOGUE[p].nearPrice * BigInt(Math.round(scale * 1000))) / 1000n;
 
-/** Contrôle de cohérence (utilisé par les tests) : somme des poids = 1, prix = refUsd x facteur. */
+/** Consistency check (used by tests): weights sum to 1, price = refUsd x factor, every instruction carries ENGLISH_ONLY. */
 export function checkCatalogue(): string[] {
   const errs: string[] = [];
   for (const spec of Object.values(CATALOGUE)) {
     const sum = spec.rubric.reduce((a, c) => a + c.weight, 0);
-    if (Math.abs(sum - 1) > 1e-9) errs.push(`${spec.profession}: somme des poids ${sum}`);
-    if (spec.nearPrice !== parseNear((spec.refUsd * NEAR_PER_REF_USD).toFixed(6))) errs.push(`${spec.profession}: nearPrice != refUsd x facteur`);
+    if (Math.abs(sum - 1) > 1e-9) errs.push(`${spec.profession}: weights sum to ${sum}`);
+    if (spec.nearPrice !== parseNear((spec.refUsd * NEAR_PER_REF_USD).toFixed(6))) errs.push(`${spec.profession}: nearPrice != refUsd x factor`);
+    if (!spec.instructions.includes(ENGLISH_ONLY)) errs.push(`${spec.profession}: instructions lack "${ENGLISH_ONLY}"`);
   }
   return errs;
 }
 
-/** Note pondérée d'une grille à partir de scores 0..1 par critère (critère manquant = 0). */
+/** Weighted score of a rubric from 0..1 scores per criterion (missing criterion = 0). */
 export function weightedScore(p: Profession, scores: Record<string, number>): number {
   let total = 0;
   for (const c of CATALOGUE[p].rubric) {
@@ -173,7 +179,7 @@ export function weightedScore(p: Profession, scores: Record<string, number>): nu
   return Math.round(total * 1000) / 1000;
 }
 
-/** Poids de demande d'un métier à un tick : poids de base x multiplicateurs des événements actifs. */
+/** Demand weight of a profession at a tick: base weight x multipliers of the active events. */
 export function demandWeight(p: Profession, tick: number, events: readonly MarketEvent[] = []): number {
   let w = CATALOGUE[p].baseDemand;
   for (const e of events) if (e.profession === p && tick >= e.startTick && tick < e.endTick) w *= e.demandMultiplier;

@@ -1,9 +1,10 @@
-// Événements de marché (L16), déterministes (rng injecté) : tous les N ticks un métier passe en demande forte (x3) pendant 8 à 15 ticks
-// et un autre en baisse (x0,3). Ils pondèrent le choix de métier du client simulé ; chacun est journalisé (`market.event`).
+// Market events (L16), deterministic (injected rng): every N ticks one profession goes into strong demand (x3) for 8 to 15 ticks
+// and another into a slump (x0.3). They weight the simulated client's choice of profession; each is journaled (`market.event`).
+// L19: titles are English display text.
 import { PROFESSIONS, demandWeight, type Deps, type MarketEvent, type Profession } from "../shared/index.ts";
 
 export interface MarketEventsOptions {
-  /** Période entre deux vagues d'événements (ticks). Défaut 20. */
+  /** Period between two waves of events (ticks). Default 20. */
   everyTicks?: number;
   minDuration?: number;
   maxDuration?: number;
@@ -12,31 +13,31 @@ export interface MarketEventsOptions {
 }
 
 export interface MarketEvents {
-  /** Appelé une fois par tick : crée (et journalise) les nouveaux événements, renvoie ceux de ce tick. */
+  /** Called once per tick: creates (and journals) the new events, returns those of this tick. */
   tick(tick: number): MarketEvent[];
-  /** Événements actifs à ce tick. */
+  /** Events active at this tick. */
   active(tick: number): MarketEvent[];
-  /** Tous les événements créés (récents d'abord n'est pas garanti : ordre de création). */
+  /** All created events (creation order; most-recent-first is not guaranteed). */
   all(): MarketEvent[];
-  /** Poids de choix de chaque métier à ce tick (base x multiplicateurs). */
+  /** Choice weight of each profession at this tick (base x multipliers). */
   weights(tick: number): Record<Profession, number>;
 }
 
 const HIGH_TITLES: Record<Profession, string> = {
-  logo: "Salon des startups : tout le monde veut un logo",
-  finance: "Fin d'exercice : les bilans s'accumulent",
-  architecture: "Levée de fonds : les équipes refont leur architecture",
-  marketing: "Soldes d'hiver : les campagnes se multiplient",
-  translation: "Export : les sites se mettent à l'anglais",
-  legal: "Nouvelle réglementation : on vérifie la conformité",
+  logo: "Startup fair: everybody wants a logo",
+  finance: "Year end: the financial statements pile up",
+  architecture: "Fundraising round: teams are redoing their architecture",
+  marketing: "Winter sales: campaigns are multiplying",
+  translation: "Going global: websites are switching to English",
+  legal: "New regulation: everyone is checking compliance",
 };
 const LOW_TITLES: Record<Profession, string> = {
-  logo: "Les identités visuelles sont à jour : peu de demandes de logo",
-  finance: "Période calme : peu d'analyses financières demandées",
-  architecture: "Gel des projets : peu de demandes d'architecture",
-  marketing: "Budgets publicitaires gelés : peu de rédaction marketing",
-  translation: "Traductions automatiques à la mode : peu de demandes",
-  legal: "Peu de demandes de checklists juridiques ce mois-ci",
+  logo: "Visual identities are up to date: few logo requests",
+  finance: "Quiet period: few financial analyses requested",
+  architecture: "Projects on hold: few architecture requests",
+  marketing: "Advertising budgets frozen: little marketing copywriting",
+  translation: "Machine translation is trendy: few requests",
+  legal: "Few legal checklist requests this month",
 };
 
 export function createMarketEvents(deps: Pick<Deps, "journal" | "rng">, opts: MarketEventsOptions = {}): MarketEvents {
@@ -63,7 +64,7 @@ export function createMarketEvents(deps: Pick<Deps, "journal" | "rng">, opts: Ma
 
   return {
     tick(tick) {
-      if (tick <= lastTick) return []; // idempotent si le même tick est rejoué
+      if (tick <= lastTick) return []; // idempotent if the same tick is replayed
       lastTick = tick;
       if (tick <= 0 || tick % every !== 0) return [];
       const busy = new Set(active(tick).map((e) => e.profession));
@@ -81,4 +82,3 @@ export function createMarketEvents(deps: Pick<Deps, "journal" | "rng">, opts: Ma
     },
   };
 }
-

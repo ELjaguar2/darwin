@@ -1,5 +1,5 @@
-// Règle d'attribution : meilleur score = prix le plus bas ; égalité -> meilleure réputation ; puis délai annoncé le plus court ;
-// puis offre la plus ancienne (tick, puis id). Déterministe : aucune part de hasard.
+// Award rule: best score = lowest price; tie -> best reputation; then shortest announced delay;
+// then oldest bid (tick, then id). Deterministic: no randomness.
 import type { Bid } from "../shared/index.ts";
 
 export interface RankedBid {

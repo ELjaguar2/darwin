@@ -1,6 +1,7 @@
-// Marché des tâches (L6). Dépend uniquement de `shared/` (Chain, Brain, Journal, Config).
-// Règles dures : aucune libération sans verdict `accepted` enregistré ; remboursement seulement sur `rejected` ou `expired` ;
-// le validateur n'est jamais l'agent payé ni l'agent qui sous-traite ; texte visiteur toujours en message `user`.
+// Task market (L6). Depends only on `shared/` (Chain, Brain, Journal, Config).
+// Hard rules: no release without a recorded `accepted` verdict; refund only on `rejected` or `expired`;
+// the validator is never the paid agent nor the agent that subcontracts; visitor text always in a `user` message.
+// L19: error messages and reasons are English; API protocol values (badge "simulé", "sous-traitance", error/event codes) are unchanged.
 import {
   CATALOGUE, ChainError, TaskInputSchema, formatNear, hashObject, journalFiles, nearPriceOf, parseNear, sanitizePitch,
   type Bid, type Deliverable, type Deps, type Escrow, type Market, type Profession, type Requester, type Task, type Validation, type Yocto,
@@ -9,7 +10,7 @@ import { rankBids } from "./auction.ts";
 import { MarketError } from "./errors.ts";
 import { MAX_RESULT_CHARS, brainJudge, professionRule, resultHashOf, type Validator } from "./validation.ts";
 import { DeliverableError, extractDeliverable } from "./deliverable.ts";
-import { SIMULATED_LABEL_PREFIX } from "./simulated-client.ts";
+import { LEGACY_SIMULATED_LABEL_PREFIX, SIMULATED_LABEL_PREFIX } from "./simulated-client.ts";
 
 export * from "./errors.ts";
 export * from "./validation.ts";
@@ -20,10 +21,22 @@ export * from "./checks.ts";
 export * from "./events.ts";
 export * from "./templates.ts";
 
-/** Étiquettes normalisées (D-024). */
+/**
+ * Normalised labels (D-024). The three values below are API PROTOCOL values (`badge` of /api/tasks, read by the frontend and by
+ * journal/replay tests): they stay in French on purpose. English display texts live in `BADGE_LABELS` (use them for display).
+ */
 export const VISITOR_FUNDING_LABEL = "Visiteur (financé par le compte de démo)";
 export const SIMULATED_BADGE = "simulé";
-/** Sous-comptes possédés, créés et financés par le marché (décision du chef de projet après L4). */
+export const SUBCONTRACT_BADGE = "sous-traitance";
+/** English display labels matching each protocol badge value (L19): `badgeLabel` that the frontend can show. */
+export const BADGE_LABELS: Readonly<Record<string, string>> = {
+  [VISITOR_FUNDING_LABEL]: "Visitor (funded by the demo account)",
+  [SIMULATED_BADGE]: "simulated",
+  [SUBCONTRACT_BADGE]: "subcontracting",
+};
+/** English display label of a protocol badge value (unknown value: returned as is). */
+export const badgeLabelOf = (badge: string): string => BADGE_LABELS[badge] ?? badge;
+/** Sub-accounts owned, created and funded by the market (project lead decision after L4). */
 export const VISITORS_ACCOUNT_LABEL = "visitors";
 export const SIM_CLIENT_ACCOUNT_LABEL = "sim-client";
 export const MAX_SUBCONTRACT_DEPTH = 2;
@@ -31,26 +44,26 @@ const MAX_BIDS_PER_TASK = 50;
 const HOUR_MS = 3_600_000;
 
 export interface MarketOptions {
-  /** Numéro de départ des identifiants de tâches (t-XXXX). Testnet : les séquestres du contrat persistent entre deux lancements. Défaut 0. */
+  /** Starting number of task identifiers (t-XXXX). Testnet: the contract's escrows persist between two launches. Default 0. */
   taskSeqStart?: number;
-  /** Marge ajoutée à chaque financement des comptes du marché (gaz + réserve de stockage sur chaîne réelle). Défaut 0. */
+  /** Margin added to every funding of the market accounts (gas + storage reserve on a real chain). Default 0. */
   fundingMargin?: bigint;
-  /** Validateur par type de demandeur. Défaut : juge IA composite (règle de base + brain) pour tous. */
+  /** Validator per requester type. Default: composite AI judge (base rule + brain) for all. */
   validators?: Partial<Record<Requester["kind"], Validator>>;
-  /** Plafond de dépense par heure du compte visiteurs. Défaut : `config.sim.visitorHourlyCap` si présent, sinon 10 x budget max. */
+  /** Hourly spending cap of the visitors account. Default: `config.sim.visitorHourlyCap` if present, otherwise 10 x max budget. */
   visitorHourlyCap?: bigint;
-  /** Ticks de grâce après le délai pour retenter une validation différée avant remboursement. Défaut : taskDeadlineTicks. */
+  /** Grace ticks after the deadline to retry a deferred validation before refunding. Default: taskDeadlineTicks. */
   validationGraceTicks?: number;
-  /** Variation de réputation : accepté / rejeté / expiré. */
+  /** Reputation change: accepted / rejected / expired. */
   reputationDeltas?: { accepted: number; rejected: number; expired: number };
 }
 
 export interface TaskMarket extends Market {
-  /** Formulaire visiteur : valide `TaskInput`, applique budget min/max et plafond horaire (MarketError 400/429). */
+  /** Visitor form: validates `TaskInput`, applies min/max budget and hourly cap (MarketError 400/429). */
   postVisitorTask(input: unknown): Promise<Task>;
   getEscrow(taskId: string): Escrow | undefined;
   accountIds(): { visitors: string; simClient: string };
-  /** Dépense visiteurs comptée sur l'heure glissante. */
+  /** Visitor spending counted over the sliding hour. */
   visitorSpentLastHour(): bigint;
   visitorHourlyCap(): bigint;
 }
@@ -58,7 +71,7 @@ export interface TaskMarket extends Market {
 type Settleable = "rejected" | "expired";
 
 const clone = <T>(v: T): T => structuredClone(v);
-const cleanLabel = (s: string) => s.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 60) || "visiteur";
+const cleanLabel = (s: string) => s.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 60) || "visitor";
 
 export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
   const { chain, journal, config } = deps;
@@ -72,7 +85,7 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
   const validatorFor = (k: Requester["kind"]): Validator => opts.validators?.[k] ?? defaultValidator;
 
   const deliverables = new Map<string, Deliverable>();
-  /** Coût IA de production (USD) cumulé par tâche : `brain.charged` `execute_task` de l'agent, rattaché à sa plus ancienne tâche attribuée non remise. */
+  /** Cumulative AI production cost (USD) per task: the agent's `brain.charged` `execute_task`, attached to its oldest awarded task not yet delivered. */
   const productionCost = new Map<string, number>();
   const tasks = new Map<string, Task>();
   const bids = new Map<string, Bid>();
@@ -86,7 +99,7 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
   let stepTick = 0;
   let stepQueue: Promise<void> = Promise.resolve();
 
-  /** Tick courant : dernier `step`, ou tick du dernier événement du journal s'il est plus récent. */
+  /** Current tick: last `step`, or tick of the last journal event if more recent. */
   let journalTick = 0;
   journal.subscribe((e) => {
     journalTick = Math.max(journalTick, e.tick);
@@ -107,13 +120,13 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
 
   function mustTask(id: string): Task {
     const t = tasks.get(id);
-    if (!t) throw new MarketError("UNKNOWN_TASK", `Tâche inconnue : ${id}`);
+    if (!t) throw new MarketError("UNKNOWN_TASK", `Unknown task: ${id}`);
     return t;
   }
 
   async function agentRecord(agentId: string) {
     const r = await chain.getAgentRecord(agentId);
-    if (!r) throw new MarketError("UNKNOWN_AGENT", `Agent inconnu du registre : ${agentId}`);
+    if (!r) throw new MarketError("UNKNOWN_AGENT", `Agent not found in the registry: ${agentId}`);
     return r;
   }
 
@@ -121,9 +134,9 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
     return BigInt(bids.get(t.winningBidId ?? "")?.price ?? "0");
   }
 
-  /** Le marché possède et finance ses comptes : création au premier besoin, complément depuis le maître ensuite. */
+  /** The market owns and funds its accounts: created on first need, topped up from the master afterwards. */
   async function ensureFunded(label: string, accountId: string, price: bigint, source: "master" | "demo"): Promise<void> {
-    // Marge : le séquestre exige le prix + gaz + réserve de stockage, et plusieurs tâches peuvent se verrouiller dans le même tick.
+    // Margin: the escrow requires price + gas + storage reserve, and several tasks may lock in the same tick.
     const amount = price + fundingMargin;
     let balance: bigint;
     try {
@@ -156,42 +169,43 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
   // ---------- publication ----------
   async function postTask(input: Parameters<Market["postTask"]>[0]): Promise<Task> {
     const budget = BigInt(input.budget);
-    if (budget <= 0n) throw new MarketError("INVALID_INPUT", "budget doit être > 0");
-    if (!input.title.trim() || !input.prompt.trim()) throw new MarketError("INVALID_INPUT", "titre et prompt requis");
+    if (budget <= 0n) throw new MarketError("INVALID_INPUT", "budget must be > 0");
+    if (!input.title.trim() || !input.prompt.trim()) throw new MarketError("INVALID_INPUT", "title and prompt required");
     const tick = currentTick();
     let requester: Requester = clone(input.requester);
 
     if (requester.kind === "agent") {
       const parent = input.parentTaskId ? tasks.get(input.parentTaskId) : undefined;
-      if (!parent) throw new MarketError("INVALID_SUBCONTRACT", "une sous-traitance exige une tâche parente connue");
+      if (!parent) throw new MarketError("INVALID_SUBCONTRACT", "a subcontract requires a known parent task");
       if (parent.status !== "awarded" || parent.winnerId !== requester.agentId)
-        throw new MarketError("INVALID_SUBCONTRACT", "seul le gagnant d'une tâche attribuée peut sous-traiter");
-      if (budget >= winningPrice(parent)) throw new MarketError("INVALID_SUBCONTRACT", "le budget sous-traité doit rester < au prix gagnant (l'agent garde la marge)");
+        throw new MarketError("INVALID_SUBCONTRACT", "only the winner of an awarded task can subcontract");
+      if (budget >= winningPrice(parent)) throw new MarketError("INVALID_SUBCONTRACT", "the subcontracted budget must stay below the winning price (the agent keeps the margin)");
       let depth = 1;
       for (let p: Task | undefined = parent; p?.parentTaskId; p = tasks.get(p.parentTaskId)) depth++;
-      if (depth > MAX_SUBCONTRACT_DEPTH) throw new MarketError("INVALID_SUBCONTRACT", "profondeur de sous-traitance maximale atteinte");
+      if (depth > MAX_SUBCONTRACT_DEPTH) throw new MarketError("INVALID_SUBCONTRACT", "maximum subcontracting depth reached");
       await agentRecord(requester.agentId);
     } else {
-      if (input.parentTaskId) throw new MarketError("INVALID_SUBCONTRACT", "parentTaskId réservé aux agents");
-      // Prix plancher du métier (catalogue L16) ; plafond = la borne de config, relevée si besoin au plancher du métier.
-      if (!CATALOGUE[input.profession]) throw new MarketError("INVALID_INPUT", `métier inconnu : ${String(input.profession)}`);
+      if (input.parentTaskId) throw new MarketError("INVALID_SUBCONTRACT", "parentTaskId is reserved for agents");
+      // Floor price of the profession (L16 catalogue); cap = the config bound, raised if needed to the profession's floor.
+      if (!CATALOGUE[input.profession]) throw new MarketError("INVALID_INPUT", `unknown profession: ${String(input.profession)}`);
       const floor = BigInt(nearPriceOf(input.profession, deps.config.sim.priceScale));
       if (budget < floor)
-        throw new MarketError("BUDGET_OUT_OF_RANGE", `budget minimum pour ${CATALOGUE[input.profession].label} : ${formatNear(floor, 6)} NEAR (reçu ${formatNear(budget, 6)} NEAR)`);
-      if (budget > (sim.taskBudgetMax > floor ? sim.taskBudgetMax : floor)) throw new MarketError("BUDGET_OUT_OF_RANGE", `budget maximum : ${formatNear(sim.taskBudgetMax, 6)} NEAR`);
+        throw new MarketError("BUDGET_OUT_OF_RANGE", `minimum budget for ${CATALOGUE[input.profession].label}: ${formatNear(floor, 6)} NEAR (received ${formatNear(budget, 6)} NEAR)`);
+      if (budget > (sim.taskBudgetMax > floor ? sim.taskBudgetMax : floor)) throw new MarketError("BUDGET_OUT_OF_RANGE", `maximum budget: ${formatNear(sim.taskBudgetMax, 6)} NEAR`);
       if (requester.kind === "simulated") {
         const label = cleanLabel(requester.label);
-        requester = { kind: "simulated", label: label.startsWith(SIMULATED_LABEL_PREFIX) ? label : `${SIMULATED_LABEL_PREFIX} : ${label}`.slice(0, 80) };
+        const labelled = label.startsWith(SIMULATED_LABEL_PREFIX) || label.startsWith(LEGACY_SIMULATED_LABEL_PREFIX);
+        requester = { kind: "simulated", label: labelled ? label : `${SIMULATED_LABEL_PREFIX}: ${label}`.slice(0, 80) };
       } else {
-        requester = { kind: "visitor", label: cleanLabel(requester.label) }; // le compte payeur est toujours `visitors`, jamais fourni par l'appelant
+        requester = { kind: "visitor", label: cleanLabel(requester.label) }; // the paying account is always `visitors`, never supplied by the caller
         if (spent() + budget > cap)
-          throw new MarketError("VISITOR_CAP_EXCEEDED", `plafond horaire des tâches visiteurs atteint (${cap} yocto/h) : réessayez plus tard`);
+          throw new MarketError("VISITOR_CAP_EXCEEDED", `hourly cap on visitor tasks reached (${cap} yocto/h): try again later`);
         ledger.push({ at: deps.now().getTime(), amount: budget });
       }
     }
 
-    // Une commande de visiteur peut avoir des délais plus longs que les tâches simulées (config visitor*Ticks ; testnet : 3 et 6 ticks)
-    // pour laisser aux agents le temps de finir leur travail en cours (au run 9, deux commandes de logo ont expiré faute d'agent libre en 1 tick).
+    // A visitor order may have longer delays than simulated tasks (config visitor*Ticks; testnet: 3 and 6 ticks)
+    // to give agents time to finish their current work (in run 9, two logo orders expired for lack of a free agent within 1 tick).
     const isVisitor = requester.kind === "visitor";
     const biddingEndsTick = tick + (isVisitor ? (sim.visitorBidWindowTicks ?? sim.bidWindowTicks) : sim.bidWindowTicks);
     const task: Task = {
@@ -216,20 +230,20 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
     });
   }
 
-  // ---------- enchères ----------
+  // ---------- bids ----------
   async function placeBid(input: Parameters<Market["placeBid"]>[0]): Promise<Bid> {
     const task = mustTask(input.taskId);
-    if (task.status !== "posted") throw new MarketError("NOT_OPEN", "enchères closes");
+    if (task.status !== "posted") throw new MarketError("NOT_OPEN", "bidding is closed");
     const price = BigInt(input.price);
-    if (price <= 0n || price > BigInt(task.budget)) throw new MarketError("INVALID_INPUT", "prix hors de ]0, budget]");
-    if (!Number.isInteger(input.etaTicks) || input.etaTicks < 1) throw new MarketError("INVALID_INPUT", "etaTicks entier >= 1");
+    if (price <= 0n || price > BigInt(task.budget)) throw new MarketError("INVALID_INPUT", "price outside ]0, budget]");
+    if (!Number.isInteger(input.etaTicks) || input.etaTicks < 1) throw new MarketError("INVALID_INPUT", "etaTicks must be an integer >= 1");
     const rec = await agentRecord(input.agentId);
-    if (!rec.alive) throw new MarketError("UNKNOWN_AGENT", `agent mort : ${input.agentId}`);
-    if (task.bidIds.length >= MAX_BIDS_PER_TASK) throw new MarketError("NOT_OPEN", "trop d'offres");
-    if (task.bidIds.some((id) => bids.get(id)?.agentId === input.agentId)) throw new MarketError("DUPLICATE_BID", "une seule offre par agent");
-    // pas d'auto-contrat : ni le demandeur, ni aucun demandeur ancêtre dans la chaîne de sous-traitance
+    if (!rec.alive) throw new MarketError("UNKNOWN_AGENT", `agent is dead: ${input.agentId}`);
+    if (task.bidIds.length >= MAX_BIDS_PER_TASK) throw new MarketError("NOT_OPEN", "too many bids");
+    if (task.bidIds.some((id) => bids.get(id)?.agentId === input.agentId)) throw new MarketError("DUPLICATE_BID", "one bid per agent");
+    // no self-dealing: neither the requester, nor any ancestor requester in the subcontracting chain
     for (let t: Task | undefined = task; t; t = t.parentTaskId ? tasks.get(t.parentTaskId) : undefined) {
-      if (t.requester.kind === "agent" && t.requester.agentId === input.agentId) throw new MarketError("SELF_DEALING", "un agent ne peut pas enchérir sur sa propre chaîne de sous-traitance");
+      if (t.requester.kind === "agent" && t.requester.agentId === input.agentId) throw new MarketError("SELF_DEALING", "an agent cannot bid on its own subcontracting chain");
     }
     const pitch = sanitizePitch(input.pitch);
     const bid: Bid = {
@@ -242,7 +256,7 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
     return clone(bid);
   }
 
-  // ---------- attribution ----------
+  // ---------- award ----------
   async function award(task: Task, tick: number): Promise<void> {
     const ranked: { bid: Bid; reputation: number }[] = [];
     for (const id of task.bidIds) {
@@ -263,13 +277,13 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
       emit({ type: "task.awarded", tick, data: { taskId: task.id, bidId: best.bid.id, winnerId: best.bid.agentId, price: best.bid.price, bids: ranked.length } });
       emit({ type: "escrow.locked", tick, data: { taskId: task.id, payer, amount: price.toString(), tx: tx.hash } });
     } catch (e) {
-      // Fonds du demandeur indisponibles : rien n'est verrouillé, rien à rembourser. Le catalogue n'a pas de motif dédié (voir README).
+      // Requester funds unavailable: nothing is locked, nothing to refund. The catalogue has no dedicated reason (see README).
       emit({ type: "system.warning", tick, data: { code: "ESCROW_LOCK_FAILED", message: `${task.id} : ${(e as Error).message}`.slice(0, 300) } });
       await expire(task, "no_bids", tick);
     }
   }
 
-  // ---------- réputation ----------
+  // ---------- reputation ----------
   async function reputation(task: Task, agentId: string, delta: number, proofHash: string, tick: number): Promise<void> {
     const key = `${task.id}:${agentId}`;
     if (reputationDone.has(key)) return;
@@ -282,12 +296,12 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
     }
   }
 
-  // ---------- remboursement (uniquement rejected / expired) ----------
+  // ---------- refund (only rejected / expired) ----------
   async function refund(task: Task, cause: Settleable, tick: number): Promise<void> {
     const esc = escrows.get(task.id);
     if (!esc || esc.status !== "locked") return;
-    if (cause === "rejected" && task.validation?.verdict !== "rejected") throw new MarketError("ESCROW_MISMATCH", "remboursement 'rejected' sans verdict rejeté");
-    if (cause === "expired" && task.status !== "expired") throw new MarketError("ESCROW_MISMATCH", "remboursement 'expired' sur une tâche non expirée");
+    if (cause === "rejected" && task.validation?.verdict !== "rejected") throw new MarketError("ESCROW_MISMATCH", "'rejected' refund without a rejected verdict");
+    if (cause === "expired" && task.status !== "expired") throw new MarketError("ESCROW_MISMATCH", "'expired' refund on a task that has not expired");
     const tx = await chain.refundEscrow({ taskId: task.id, reason: cause });
     esc.status = "refunded";
     esc.settleTx = tx.hash;
@@ -302,7 +316,7 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
     if (winner && reason === "deadline" && penalize) await reputation(task, winner, deltas.expired, hashObject({ taskId: task.id, event: "expired" }), tick);
   }
 
-  // ---------- paiement ----------
+  // ---------- payment ----------
   async function settle(task: Task, tick: number): Promise<void> {
     const v = task.validation;
     const esc = escrows.get(task.id);
@@ -313,10 +327,10 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
       await reputation(task, task.winnerId, deltas.rejected, v.resultHash, tick);
       return;
     }
-    if (v.resultHash !== task.result.resultHash) throw new MarketError("ESCROW_MISMATCH", "résultat modifié depuis la validation");
+    if (v.resultHash !== task.result.resultHash) throw new MarketError("ESCROW_MISMATCH", "result modified since the validation");
     const onChain = await chain.getEscrow(task.id);
     if (!onChain || onChain.status !== "locked" || onChain.amount !== esc.amount || onChain.payer !== esc.payer)
-      throw new MarketError("ESCROW_MISMATCH", "séquestre on-chain différent de celui du marché");
+      throw new MarketError("ESCROW_MISMATCH", "on-chain escrow differs from the market's");
     const proof = { resultHash: v.resultHash, verdict: "accepted" as const, validator: v.validator };
     try {
       const tx = await chain.releaseEscrow({ taskId: task.id, payee: esc.payee!, proof });
@@ -327,7 +341,7 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
       emit({ type: "escrow.released", tick, data: { taskId: task.id, payee: esc.payee!, amount: esc.amount, tx: tx.hash } });
     } catch (e) {
       if (e instanceof ChainError && (e.code === "ACCOUNT_DELETED" || e.code === "UNKNOWN_ACCOUNT")) {
-        // bénéficiaire mort avant le paiement : le séquestre revient au demandeur (traité comme expiré)
+        // payee died before payment: the escrow goes back to the requester (treated as expired)
         await expire(task, "deadline", tick);
         return;
       }
@@ -344,17 +358,17 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
     }
   }
 
-  // ---------- avance du marché ----------
+  // ---------- market advance ----------
   async function stepInner(tick: number): Promise<void> {
     stepTick = Math.max(stepTick, tick);
     for (const t of [...tasks.values()]) {
       if (busy.has(t.id)) continue;
       busy.add(t.id);
       try {
-        if (t.status === "submitted" && t.validation) await trySettle(t, tick); // reprise d'un paiement interrompu
+        if (t.status === "submitted" && t.validation) await trySettle(t, tick); // resume an interrupted payment
         else if (t.status === "submitted") {
-          // validation différée (juge indisponible ou plafond d'appels) : nouvel essai à chaque step ;
-          // au-delà du délai de grâce, remboursement sans pénalité pour l'agent (la panne n'est pas de son fait)
+          // deferred validation (judge unavailable or call cap): retried at every step;
+          // beyond the grace period, refund with no penalty for the agent (the outage is not its fault)
           if (tick > t.deadlineTick + graceTicks) await expire(t, "deadline", tick, false);
           else {
             try {
@@ -380,15 +394,15 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
     return run;
   };
 
-  // ---------- exécution : remise du résultat ----------
+  // ---------- execution: result submission ----------
   async function submitResult(input: Parameters<Market["submitResult"]>[0]): Promise<{ task: Task; validation: Validation }> {
     const task = mustTask(input.taskId);
-    if (task.status !== "awarded" || busy.has(task.id)) throw new MarketError("NOT_AWARDED", "tâche non en attente de résultat");
-    if (task.winnerId !== input.agentId) throw new MarketError("NOT_WINNER", "seul le gagnant peut remettre le résultat");
+    if (task.status !== "awarded" || busy.has(task.id)) throw new MarketError("NOT_AWARDED", "task is not waiting for a result");
+    if (task.winnerId !== input.agentId) throw new MarketError("NOT_WINNER", "only the winner can submit the result");
     const tick = currentTick();
-    if (tick > task.deadlineTick) throw new MarketError("DEADLINE_PASSED", "délai d'exécution dépassé");
+    if (tick > task.deadlineTick) throw new MarketError("DEADLINE_PASSED", "execution deadline passed");
     const text = input.text.trim();
-    if (!text || text.length > MAX_RESULT_CHARS) throw new MarketError("INVALID_INPUT", "résultat vide ou trop long");
+    if (!text || text.length > MAX_RESULT_CHARS) throw new MarketError("INVALID_INPUT", "result empty or too long");
 
     busy.add(task.id);
     task.status = "submitted";
@@ -399,8 +413,8 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
       const validation = await validateAndSettle(task, tick);
       return { task: clone(task), validation: clone(validation) };
     } catch (e) {
-      // Échec fermé : validation impossible (juge indisponible, plafond d'appels, panne, validateur interdit).
-      // Rien n'est payé ni remboursé ; la tâche reste `submitted`, `step` retente puis rembourse après le délai de grâce.
+      // Fail closed: validation impossible (judge unavailable, call cap, outage, forbidden validator).
+      // Nothing is paid or refunded; the task stays `submitted`, `step` retries then refunds after the grace period.
       const msg = (e as Error).message;
       emit({ type: "system.warning", tick, data: { code: "VALIDATION_PENDING", message: `${task.id} : ${msg}`.slice(0, 300) } });
       throw new MarketError(e instanceof MarketError && e.code === "INVALID_VALIDATOR" ? "INVALID_VALIDATOR" : "VALIDATION_PENDING", msg);
@@ -409,7 +423,7 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
     }
   }
 
-  /** Extrait et conserve le livrable (si le format est valide), puis journalise `deliverable.produced`. Aucun effet sur le paiement. */
+  /** Extracts and keeps the deliverable (if the format is valid), then journals `deliverable.produced`. No effect on payment. */
   function recordDeliverable(task: Task, validation: Validation, judgeCostUsd: number, tick: number): void {
     if (deliverables.has(task.id)) return;
     try {
@@ -424,12 +438,12 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
         data: { taskId: d.taskId, profession: d.profession, agentId: d.agentId, files: journalFiles(d.files), productionCostUsd: d.productionCostUsd, judgeCostUsd: d.judgeCostUsd, resultHash: d.resultHash },
       });
     } catch (e) {
-      // format invalide : rien à stocker (le juge de métier rejette ce cas) ; toute autre erreur ne doit jamais bloquer le règlement
+      // invalid format: nothing to store (the profession judge rejects this case); any other error must never block settlement
       if (!(e instanceof DeliverableError)) emit({ type: "system.warning", tick, data: { code: "DELIVERABLE_FAILED", message: `${task.id} : ${(e as Error).message}`.slice(0, 300) } });
     }
   }
 
-  /** Valide le résultat remis puis règle (paiement ou remboursement). Lève si aucune validation n'a pu être enregistrée. */
+  /** Validates the submitted result then settles (payment or refund). Throws if no validation could be recorded. */
   async function validateAndSettle(task: Task, tick: number): Promise<Validation> {
     const result = task.result!;
     const validator = validatorFor(task.requester.kind);
@@ -437,8 +451,8 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
     const who = verdict.validator;
     const requesterAgent = task.requester.kind === "agent" ? task.requester.agentId : undefined;
     if (!who || who.startsWith("agent:") || who === task.winnerId || who === requesterAgent)
-      throw new MarketError("INVALID_VALIDATOR", `validateur interdit : ${who}`);
-    if (verdict.verdict !== "accepted" && verdict.verdict !== "rejected") throw new MarketError("INVALID_VALIDATOR", "verdict invalide");
+      throw new MarketError("INVALID_VALIDATOR", `forbidden validator: ${who}`);
+    if (verdict.verdict !== "accepted" && verdict.verdict !== "rejected") throw new MarketError("INVALID_VALIDATOR", "invalid verdict");
     const validation: Validation = {
       verdict: verdict.verdict, score: Math.min(1, Math.max(0, Number.isFinite(verdict.score) ? verdict.score : 0)),
       validator: who, reason: verdict.reason.slice(0, 300), resultHash: result.resultHash, tick,

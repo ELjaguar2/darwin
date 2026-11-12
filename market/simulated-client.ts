@@ -1,12 +1,15 @@
-// Client SIMULÉ : poste des tâches variées à un rythme de Poisson. Toujours `requester.kind = "simulated"`,
-// libellé toujours préfixé « Client simulé » (jamais présenté comme un vrai client). Financé par le compte maître.
+// SIMULATED client: posts varied tasks at a Poisson rate. Always `requester.kind = "simulated"`,
+// label always prefixed "Simulated client" (never presented as a real client). Funded by the master account.
 import { PROFESSIONS, scaledPrice, type Deps, type Market, type Profession, type Task } from "../shared/index.ts";
 import { createMarketEvents, type MarketEvents } from "./events.ts";
 import { simTemplate } from "./templates.ts";
 
-export const SIMULATED_LABEL_PREFIX = "Client simulé";
+/** Display prefix of the simulated client's label (L19: English). Purely displayed; the protocol value is `requester.kind = "simulated"`. */
+export const SIMULATED_LABEL_PREFIX = "Simulated client";
+/** Prefix written by versions before L19 (French journals, e.g. docs/preuves): still recognised as already labelled. */
+export const LEGACY_SIMULATED_LABEL_PREFIX = "Client simulé";
 
-/** Tirage de Poisson (Knuth), borné pour éviter les rafales. */
+/** Poisson draw (Knuth), capped to avoid bursts. */
 export function poisson(rate: number, next: () => number, cap = 6): number {
   if (!(rate > 0)) return 0;
   const limit = Math.exp(-rate);
@@ -20,13 +23,13 @@ export function poisson(rate: number, next: () => number, cap = 6): number {
 }
 
 export interface SimulatedClient {
-  /** Poste les tâches de ce tick et les renvoie (fait aussi avancer les événements de marché). */
+  /** Posts this tick's tasks and returns them (also advances the market events). */
   tick(tick: number): Promise<Task[]>;
-  /** Événements de marché qui pondèrent le choix du métier (à afficher dans l'interface). */
+  /** Market events that weight the choice of profession (to display in the interface). */
   readonly events: MarketEvents;
 }
 
-/** Choix pondéré d'un métier : poids = demande de base x multiplicateurs des événements actifs. */
+/** Weighted choice of a profession: weight = base demand x multipliers of the active events. */
 export function pickWeightedProfession(weights: Record<Profession, number>, u: number): Profession {
   const total = PROFESSIONS.reduce((a, p) => a + Math.max(0, weights[p]), 0);
   let x = u * total;
@@ -37,7 +40,7 @@ export function pickWeightedProfession(weights: Record<Profession, number>, u: n
   return PROFESSIONS[PROFESSIONS.length - 1]!;
 }
 
-/** Budget du client simulé : prix plancher du métier x facteur aléatoire dans [1, 1,5] (jamais sous le plancher). */
+/** Simulated client budget: floor price of the profession x random factor in [1, 1.5] (never below the floor). */
 export function simBudget(profession: Profession, u: number, scale = 1): bigint {
   const floor = scaledPrice(profession, scale);
   return floor + (floor * BigInt(Math.floor(Math.min(0.999999, Math.max(0, u)) * 500_000))) / 1_000_000n;

@@ -1,34 +1,34 @@
-// Livrable réellement produit pour une tâche (lot L16). Contrat partagé par market/, backend/ et frontend/.
+// Deliverable actually produced for a task (lot L16). Contract shared by market/, backend/ and frontend/.
 import type { Profession } from "./types.ts";
 
 export interface DeliverableFile {
-  /** Nom de fichier sûr : [a-z0-9._-]{1,64}, ex. "logo-1.svg", "architecture.md", "schema.mmd". */
+  /** Safe file name: [a-z0-9._-]{1,64}, e.g. "logo-1.svg", "architecture.md", "schema.mmd". Stable protocol identifier (not translated). */
   name: string;
   /** "image/svg+xml" | "text/markdown" | "text/plain" | "text/vnd.mermaid" */
   mime: string;
   content: string;
-  /** Vrai si le contenu a été coupé (bornes du journal, voir `journalFiles`). Absent = complet. */
+  /** True if the content was cut (journal bounds, see `journalFiles`). Absent = complete. */
   truncated?: boolean;
 }
 
-/** Fichier tel qu'écrit dans `deliverable.produced` (journal, flux SSE). `content` et `truncated` sont optionnels : anciens journaux = nom/mime/taille seuls. */
+/** File as written in `deliverable.produced` (journal, SSE stream). `content` and `truncated` are optional: old journals = name/mime/size only. */
 export interface DeliverableJournalFile {
   name: string;
   mime: string;
-  /** Taille réelle en octets UTF-8 du fichier complet (même si `content` est tronqué). */
+  /** Real UTF-8 size in bytes of the complete file (even if `content` is truncated). */
   bytes: number;
-  /** Contenu PUBLIC (texte, SVG déjà assaini, Markdown), borné. */
+  /** PUBLIC content (text, already sanitised SVG, Markdown), bounded. */
   content?: string;
   truncated?: boolean;
 }
 
-/** Bornes du contenu embarqué dans le journal : par fichier, puis par livrable (somme des fichiers). */
+/** Bounds of the content embedded in the journal: per file, then per deliverable (sum of the files). */
 export const JOURNAL_MAX_FILE_CHARS = 24_000;
 export const JOURNAL_MAX_DELIVERABLE_CHARS = 64_000;
 
 const utf8 = (s: string) => new TextEncoder().encode(s).length;
 
-/** Fichiers d'un livrable pour le journal : taille réelle + contenu borné (`truncated: true` si coupé). Ne coupe jamais une paire de substitution. */
+/** Files of a deliverable for the journal: real size + bounded content (`truncated: true` if cut). Never splits a surrogate pair. */
 export function journalFiles(files: readonly { name: string; mime: string; content: string }[]): DeliverableJournalFile[] {
   let left = JOURNAL_MAX_DELIVERABLE_CHARS;
   return files.map((f) => {
@@ -52,24 +52,24 @@ export interface Deliverable {
   profession: Profession;
   agentId: string;
   files: DeliverableFile[];
-  /** Texte brut renvoyé par l'agent (preuve : sha256 = resultHash de la validation). */
+  /** Raw text returned by the agent (proof: sha256 = resultHash of the validation). */
   rawText: string;
   resultHash: string;
-  /** Coût IA de production (agent) en USD, journal `brain.charged` ; le coût du juge est à part. */
+  /** AI production cost (agent) in USD, journal `brain.charged`; the judge cost is separate. */
   productionCostUsd: number;
   judgeCostUsd: number;
   createdAt: string;
-  /** Renseigné après validation. */
+  /** Set after validation. */
   verdict?: "accepted" | "rejected";
   score?: number;
 }
 
-/** Un événement de marché fait varier la demande d'un métier pendant `durationTicks` ticks. */
+/** A market event changes the demand for a profession between `startTick` and `endTick`. */
 export interface MarketEvent {
   id: string; // "e-0001"
-  title: string; // « Salon des startups : tout le monde veut un logo »
+  title: string; // "Startup fair: everybody wants a logo" (English display text)
   profession: Profession;
-  /** Multiplicateur de la demande (>1 hausse, <1 baisse), appliqué au taux du client simulé. */
+  /** Demand multiplier (>1 up, <1 down), applied to the simulated client's rate. */
   demandMultiplier: number;
   startTick: number;
   endTick: number;

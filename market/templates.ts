@@ -1,5 +1,7 @@
-// Gabarits de tâches du client SIMULÉ (L16) : réalistes, avec les données nécessaires fournies dans la commande.
-// Toutes les entreprises sont fictives (jamais une marque existante) ; le tirage est déterministe via le rng injecté.
+// Task templates of the SIMULATED client (L16): realistic, with the data needed provided in the order.
+// All companies are fictional (never an existing brand); drawing is deterministic through the injected rng.
+// L19: titles and prompts are in English. Translation tasks always go INTO English (the source texts are French, the target is English).
+// The source text is delimited by « » (a delimiter, not a language choice: the mock brain and checks.ts parse it).
 import type { Profession, Rng } from "../shared/index.ts";
 
 export interface TaskTemplate {
@@ -7,38 +9,39 @@ export interface TaskTemplate {
   prompt: string;
 }
 
-const COMPANIES = ["Atelier Lumio", "Brasserie des Trois Ponts", "Studio Vernis", "Maison Cordelia", "Ferme du Haut Chêne", "Velo Nomade", "Cabinet Archibald", "Librairie Papyrus Bleu", "Boulangerie Fournil Doré", "Kayak Rivière Claire"];
-const SECTORS = ["restauration", "artisanat", "conseil", "librairie indépendante", "agriculture locale", "location de vélos", "design d'intérieur", "sport de plein air"];
-const STYLES = ["minimaliste", "chaleureux et artisanal", "moderne et géométrique", "ludique", "élégant"];
-const PRODUCTS = ["une gourde isotherme en acier recyclé", "un carnet de notes en papier recyclé", "une application de partage de trajets à vélo", "un service de livraison de paniers de légumes", "une lampe de bureau à LED sans fil"];
-const TARGETS = ["jeunes actifs urbains", "familles", "petites entreprises locales", "étudiants", "retraités actifs"];
+const COMPANIES = ["Atelier Lumio", "Three Bridges Brewery", "Studio Vernis", "Maison Cordelia", "High Oak Farm", "Velo Nomade", "Archibald Consulting", "Blue Papyrus Bookshop", "Golden Oven Bakery", "Clear River Kayaks"];
+const SECTORS = ["restaurants", "crafts", "consulting", "independent bookshop", "local farming", "bike rental", "interior design", "outdoor sports"];
+const STYLES = ["minimalist", "warm and artisanal", "modern and geometric", "playful", "elegant"];
+const PRODUCTS = ["an insulated water bottle made of recycled steel", "a notebook made of recycled paper", "an app for sharing bike rides", "a vegetable box delivery service", "a cordless LED desk lamp"];
+const TARGETS = ["young urban professionals", "families", "small local businesses", "students", "active retirees"];
 const SYSTEMS = [
-  "une plateforme de réservation de salles de réunion pour 200 utilisateurs, avec notifications par e-mail",
-  "une application mobile de suivi de livraisons avec carte en temps réel pour 5 000 coursiers",
-  "un site de vente en ligne de produits locaux avec paiement par carte et gestion de stock",
-  "un tableau de bord interne qui agrège les ventes de trois boutiques physiques",
+  "a meeting-room booking platform for 200 users, with email notifications",
+  "a mobile delivery-tracking app with a real-time map for 5,000 couriers",
+  "an online shop for local products with card payment and stock management",
+  "an internal dashboard that aggregates the sales of three physical shops",
 ];
 const ACTIVITIES = [
-  "vente en ligne d'objets artisanaux, clients particuliers en France et en Belgique",
-  "micro-entreprise de conseil en informatique, clients professionnels",
-  "association qui organise des ateliers de cuisine et encaisse des cotisations",
-  "location saisonnière d'un gîte de quatre personnes",
+  "online sale of handmade items, private customers in France and Belgium",
+  "IT consulting micro-business, professional customers",
+  "association that runs cooking workshops and collects membership fees",
+  "seasonal rental of a four-person holiday cottage",
 ];
-const SOURCES: { dir: "en" | "fr"; text: string }[] = [
-  { dir: "en", text: "Merci de votre patience, votre commande sera expédiée sous deux jours ouvrés." },
-  { dir: "en", text: "Notre équipe est disponible du lundi au vendredi pour répondre à toutes vos questions." },
-  { dir: "fr", text: "Please restart the application after installing the update so that the changes take effect." },
-  { dir: "fr", text: "Your subscription will renew automatically unless you cancel it at least seven days before the renewal date." },
+/** French source texts: every simulated translation task goes into English. */
+const SOURCES: string[] = [
+  "Merci de votre patience, votre commande sera expédiée sous deux jours ouvrés.",
+  "Notre équipe est disponible du lundi au vendredi pour répondre à toutes vos questions.",
+  "Veuillez redémarrer l'application après l'installation de la mise à jour afin que les changements prennent effet.",
+  "Votre abonnement sera renouvelé automatiquement, sauf résiliation au moins sept jours avant la date d'échéance.",
 ];
-const MONTHS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin"];
+const MONTHS = ["January", "February", "March", "April", "May", "June"];
 
 export function simTemplate(profession: Profession, rng: Rng): TaskTemplate {
   switch (profession) {
     case "logo": {
       const name = rng.pick(COMPANIES);
       return {
-        title: `Logo pour ${name}`,
-        prompt: `Entreprise : ${name}\nSecteur : ${rng.pick(SECTORS)}\nStyle souhaité : ${rng.pick(STYLES)}\nCrée 3 propositions de logo originales pour cette entreprise fictive.`,
+        title: `Logo for ${name}`,
+        prompt: `Company: ${name}\nSector: ${rng.pick(SECTORS)}\nDesired style: ${rng.pick(STYLES)}\nCreate 3 original logo proposals for this fictional company.`,
       };
     }
     case "finance": {
@@ -50,19 +53,17 @@ export function simTemplate(profession: Profession, rng: Rng): TaskTemplate {
         return `| ${m} | ${rev} | ${charges} |`;
       });
       return {
-        title: "Analyse de rentabilité sur quelques mois",
-        prompt: `Voici les chiffres d'une petite entreprise (en euros) :\n\n| Mois | Revenus | Charges |\n|---|---|---|\n${rows.join("\n")}\n\nAnalyse la rentabilité : totaux, résultat de la période, tendance. N'utilise que ces chiffres.`,
+        title: "Profitability analysis over a few months",
+        prompt: `Here are the figures of a small business (in euros):\n\n| Month | Revenue | Costs |\n|---|---|---|\n${rows.join("\n")}\n\nAnalyse the profitability: totals, result of the period, trend. Use only these figures.`,
       };
     }
     case "architecture":
-      return { title: "Architecture d'un petit service", prompt: `Propose l'architecture de ${rng.pick(SYSTEMS)}. Contrainte : budget d'hébergement modeste, équipe de deux développeurs.` };
+      return { title: "Architecture of a small service", prompt: `Propose the architecture of ${rng.pick(SYSTEMS)}. Constraint: modest hosting budget, a team of two developers.` };
     case "marketing":
-      return { title: "Texte de présentation produit", prompt: `Rédige un texte de présentation de 100 à 150 mots pour ${rng.pick(PRODUCTS)}. Cible : ${rng.pick(TARGETS)}. Ton : chaleureux, avec un appel à l'action.` };
-    case "translation": {
-      const s = rng.pick(SOURCES);
-      return { title: s.dir === "en" ? "Traduction FR vers EN" : "Traduction EN vers FR", prompt: `Traduis en ${s.dir === "en" ? "anglais" : "français"} : « ${s.text} »` };
-    }
+      return { title: "Product presentation text", prompt: `Write a presentation text of 100 to 150 words for ${rng.pick(PRODUCTS)}. Target: ${rng.pick(TARGETS)}. Tone: warm, with a call to action.` };
+    case "translation":
+      return { title: "Translation FR to EN", prompt: `Translate into English: « ${rng.pick(SOURCES)} »` };
     case "legal":
-      return { title: "Checklist de conformité de base", prompt: `Établis une checklist juridique simple pour cette activité : ${rng.pick(ACTIVITIES)}.` };
+      return { title: "Basic compliance checklist", prompt: `Draw up a simple legal checklist for this activity: ${rng.pick(ACTIVITIES)}.` };
   }
 }

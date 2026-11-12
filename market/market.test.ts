@@ -274,7 +274,7 @@ describe("visiteurs et client simulé", () => {
     expect(new Set(all.map((t) => t.profession)).size).toBeGreaterThan(1);
     for (const t of all) {
       expect(t.requester.kind).toBe("simulated");
-      expect((t.requester as { label: string }).label).toMatch(/^Client simulé/);
+      expect((t.requester as { label: string }).label).toMatch(/^Simulated client/);
       expect(BigInt(t.budget)).toBeGreaterThanOrEqual(CATALOGUE[t.profession].nearPrice);
       expect(BigInt(t.budget)).toBeLessThanOrEqual((CATALOGUE[t.profession].nearPrice * 3n) / 2n);
     }
@@ -283,7 +283,7 @@ describe("visiteurs et client simulé", () => {
   it("un libellé simulé fourni sans préfixe est préfixé", async () => {
     const s = await setup();
     const t = await post(s.market, "1", "simulated");
-    expect((t.requester as { label: string }).label).toBe("Client simulé : x");
+    expect((t.requester as { label: string }).label).toBe("Simulated client: x");
   });
 });
 

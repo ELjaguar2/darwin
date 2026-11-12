@@ -1,53 +1,62 @@
-# market/ : marché des tâches (lot L6)
+# market/: task market (lot L6, English since L19)
 
-`createMarket(deps, opts)` renvoie un `Market` (`shared/modules.ts`) plus `postVisitorTask`, `getEscrow`, `accountIds`, `visitorSpentLastHour`, `visitorHourlyCap`. Dépend uniquement de `shared/` (Chain, Brain, Journal, Config) ; tout marche avec `MockChain` et `MockBrain`.
+`createMarket(deps, opts)` returns a `Market` (`shared/modules.ts`) plus `postVisitorTask`, `getEscrow`, `accountIds`, `visitorSpentLastHour`, `visitorHourlyCap`. It depends only on `shared/` (Chain, Brain, Journal, Config); everything works with `MockChain` and `MockBrain`.
+
+## Language (L19)
+Everything the market generates or displays is English: catalogue titles, descriptions and rubrics, simulated-client templates and market-event titles, judge and production prompts (each ends with "Always answer in English."), check messages, rejection reasons, error messages, mock pitches. The target language of a translation defaults to English, even for a task written in French (an explicit "into French" is honoured; any other named language is not checked). Pitches must be English (`pitchLanguageOk`).
+
+**Protocol values deliberately left as they are** (read by the frontend, the backend and journal/replay tests):
+- API badges: `"simulé"` (`SIMULATED_BADGE`), `"sous-traitance"` (`SUBCONTRACT_BADGE`), `"Visiteur (financé par le compte de démo)"` (`VISITOR_FUNDING_LABEL`). English display labels are exported next to them: `BADGE_LABELS` / `badgeLabelOf(badge)` ("simulated", "subcontracting", "Visitor (funded by the demo account)"). The backend can expose them as `badgeLabel`; the frontend should display that.
+- Deliverable file names `analyse.md`, `texte.md`, `traduction.md`, `checklist.md` (and `logo-N.svg`, `architecture.md`, `schema.mmd`), validator ids (`rule:*`, `brain:*`, `visitor`), error and event codes, rejection codes (`no_bids`, `deadline`).
+- The simulated client label prefix is display-only and is now `Simulated client` (`SIMULATED_LABEL_PREFIX`); the legacy `Client simulé` prefix is still recognised (`LEGACY_SIMULATED_LABEL_PREFIX`). The protocol marker is `requester.kind = "simulated"`.
+- Rubric criterion ids are now English (`originality`, `fidelity`, `fit`, `hook`, ...); the judge verdict parser accepts `reason=` and the legacy `raison=`.
 
 ## Cycle
-`postTask` -> `placeBid` -> `step(tick)` (clôture, attribution, `lockEscrow`) -> exécution par l'agent (moteur) -> `submitResult` (validation, puis `releaseEscrow` avec preuve, ou `refundEscrow`) -> `addReputation`.
-Événements émis : `task.posted`, `bid.placed`, `task.awarded`, `escrow.locked`, `task.submitted`, `task.validated`, `escrow.released`, `escrow.refunded`, `task.expired`, `subcontract.created`, `reputation.updated`, `funding.received` (comptes du marché), `brain.charged` (juge), `system.warning`.
+`postTask` -> `placeBid` -> `step(tick)` (close, award, `lockEscrow`) -> execution by the agent (engine) -> `submitResult` (validation, then `releaseEscrow` with proof, or `refundEscrow`) -> `addReputation`.
+Events emitted: `task.posted`, `bid.placed`, `task.awarded`, `escrow.locked`, `task.submitted`, `task.validated`, `escrow.released`, `escrow.refunded`, `task.expired`, `subcontract.created`, `reputation.updated`, `funding.received` (market accounts), `brain.charged` (judge), `system.warning`.
 
-## Attribution
-Prix le plus bas ; égalité : meilleure réputation (`Chain.getReputation`), puis délai annoncé le plus court, puis offre la plus ancienne. Déterministe. Les offres d'agents morts sont ignorées. Une offre par agent ; prix dans ]0, budget] ; un agent ne peut pas enchérir sur sa propre chaîne de sous-traitance (demandeur ou ancêtre).
+## Award
+Lowest price; tie: best reputation (`Chain.getReputation`), then shortest announced delay, then oldest bid. Deterministic. Bids from dead agents are ignored. One bid per agent; price in ]0, budget]; an agent cannot bid on its own subcontracting chain (requester or ancestor).
 
-## Séquestre
-- Montant verrouillé = **prix de l'offre gagnante** (au plus le budget), verrouillé à l'attribution, payé en une fois au gagnant.
-- Libération : uniquement avec un verdict `accepted` enregistré dont le `resultHash` correspond au résultat remis, après contrôle que le séquestre on-chain correspond (montant, payeur). Preuve = `{resultHash, verdict:"accepted", validator}` produite par l'opérateur, **non vérifiée cryptographiquement**.
-- Remboursement : uniquement sur `rejected` (verdict de rejet enregistré) ou `expired` (aucune offre exploitable, délai dépassé, gagnant mort). Un contrôle interne refuse tout autre cas.
-- Paiement interrompu (erreur chaîne) : la tâche reste `submitted` avec sa validation ; `step` le reprend. Bénéficiaire mort avant paiement : remboursement, tâche `expired`.
-- Si le payeur n'a pas de quoi verrouiller : `system.warning` `ESCROW_LOCK_FAILED`, tâche expirée (motif `no_bids` faute de motif dédié dans le catalogue).
+## Escrow
+- Locked amount = **price of the winning bid** (at most the budget), locked at award, paid once to the winner.
+- Release: only with a recorded `accepted` verdict whose `resultHash` matches the submitted result, after checking that the on-chain escrow matches (amount, payer). Proof = `{resultHash, verdict:"accepted", validator}` produced by the operator, **not cryptographically verified**.
+- Refund: only on `rejected` (recorded rejection verdict) or `expired` (no usable bid, deadline passed, winner dead). An internal check refuses any other case.
+- Interrupted payment (chain error): the task stays `submitted` with its validation; `step` resumes it. Payee dead before payment: refund, task `expired`.
+- If the payer cannot lock: `system.warning` `ESCROW_LOCK_FAILED`, task expired (reason `no_bids`, no dedicated reason in the catalogue).
 
-## Modèle de confiance (à reprendre dans le README racine)
-L'opérateur est l'oracle de validation : règle ou modèle choisi par lui ; le système n'est **pas** sans confiance (« trustless » interdit). `task.validated` journalise `validator` (« validé par : <validator> ») et `resultHash`. Le validateur n'est jamais l'agent payé ni l'agent qui sous-traite (un validateur nommé comme eux ou `agent:*` est refusé). Par défaut : juge composite = règle de base (`rule:basic`, plancher) puis juge IA (`brain:<modèle>`). **Échec fermé** : avec un cerveau réel (`brain.kind !== "mock"`), si le juge est indisponible (panne, plafond de 30 appels/minute de L5 = `RATE_LIMITED`, réponse illisible), aucune libération : `system.warning` `JUDGE_UNAVAILABLE`, `submitResult` lève `MarketError VALIDATION_PENDING` (503) et la tâche reste `submitted` sans validation. Chaque `step` retente la validation ; après `deadlineTick + validationGraceTicks` (défaut `taskDeadlineTicks`) la tâche expire et le séquestre est remboursé, sans pénalité de réputation pour l'agent. Seul le mode mock autorise le repli sur la règle de base (signalé). Un rejet par la règle de base ne nécessite pas le juge. Validation par le client possible via `clientValidator` (`validator: "visitor"`). Le coût du juge est imputé à la **trésorerie** (`brain.charged` avec `agentId: "treasury"`), jamais à l'agent gagnant ; il n'est pas débité on-chain (comptabilité du journal).
+## Trust model (to be repeated in the root README)
+The operator is the validation oracle: a rule or model chosen by the operator; the system is **not** trustless. `task.validated` journals `validator` ("validated by: <validator>") and `resultHash`. The validator is never the paid agent nor the subcontracting agent (a validator named like them or `agent:*` is refused). Default: composite judge = base rule (`rule:basic`, floor) then AI judge (`brain:<model>`). **Fail closed**: with a real brain (`brain.kind !== "mock"`), if the judge is unavailable (outage, 30 calls/minute cap = `RATE_LIMITED`, unreadable reply), nothing is released: `system.warning` `JUDGE_UNAVAILABLE`, `submitResult` throws `MarketError VALIDATION_PENDING` (503) and the task stays `submitted` without validation. Each `step` retries; after `deadlineTick + validationGraceTicks` (default `taskDeadlineTicks`) the task expires and the escrow is refunded, without reputation penalty for the agent. Only mock mode allows falling back on the base rule (flagged). A rejection by the base rule does not need the judge. Client validation is possible through `clientValidator` (`validator: "visitor"`). The judge cost is charged to the **treasury** (`brain.charged` with `agentId: "treasury"`), never to the winning agent; it is not debited on-chain (journal accounting).
 
-## Comptes possédés par le marché
-Le marché crée et finance (depuis le maître, au premier besoin puis en complément) deux sous-comptes : `visitors.<maître>` (`funding.received` `source: "demo"`) et `sim-client.<maître>` (`source: "master"`). Le compte payeur d'une tâche visiteur est toujours `visitors` : l'appelant ne le choisit pas. Les tâches de sous-traitance sont payées par le compte de l'agent demandeur (registre `Chain.getAgentRecord`).
+## Accounts owned by the market
+The market creates and funds (from the master, on first need then top-ups) two sub-accounts: `visitors.<master>` (`funding.received` `source: "demo"`) and `sim-client.<master>` (`source: "master"`). The paying account of a visitor task is always `visitors`: the caller does not choose it. Subcontract tasks are paid by the requesting agent's account (registry `Chain.getAgentRecord`).
 
-## Visiteurs et client simulé
-- Étiquette visiteur : « Visiteur (financé par le compte de démo) » (`VISITOR_FUNDING_LABEL`) : fonds de test de l'opérateur, pas l'argent du visiteur.
-- Plafond de dépense horaire du compte visiteurs : somme des budgets publiés sur 60 min glissantes ; au-delà `MarketError VISITOR_CAP_EXCEEDED` (`httpStatus` 429). Valeur : `opts.visitorHourlyCap`, sinon `config.sim.visitorHourlyCap` si `shared` l'ajoute (variable `DARWIN_VISITOR_HOURLY_CAP_NEAR`), sinon 10 x budget max. Les 10 tâches ouvertes par IP restent à la charge du backend.
-- `postVisitorTask(input)` : valide `TaskInputSchema`, bornes `taskBudgetMin/Max` (400).
-- Client simulé (`createSimulatedClient(deps, market).tick(tick)`) : tirage de Poisson (`simClientRatePerTick`), tâches variées par métier, `requester.kind = "simulated"`, libellé toujours préfixé « Client simulé ».
-- Texte du visiteur : jamais en message `system`. `taskMessages(task, personnalité)` (pour le moteur) et `judgeMessages` le placent en JSON dans un message `user`.
+## Visitors and simulated client
+- Visitor label: badge `"Visiteur (financé par le compte de démo)"` (`VISITOR_FUNDING_LABEL`, English display "Visitor (funded by the demo account)"): the operator's test funds, not the visitor's money.
+- Hourly spending cap of the visitors account: sum of published budgets over a sliding 60 min; beyond it `MarketError VISITOR_CAP_EXCEEDED` (`httpStatus` 429). Value: `opts.visitorHourlyCap`, else `config.sim.visitorHourlyCap` if `shared` adds it (`DARWIN_VISITOR_HOURLY_CAP_NEAR`), else 10 x max budget. The 10 open tasks per IP remain the backend's job.
+- `postVisitorTask(input)`: validates `TaskInputSchema`, bounds `taskBudgetMin/Max` (400).
+- **Simulated** client (`createSimulatedClient(deps, market).tick(tick)`): Poisson draw (`simClientRatePerTick`), varied tasks per profession with English titles and prompts, `requester.kind = "simulated"`, label always prefixed `Simulated client`, badge `"simulé"` (display "simulated"). Never presented as a real client.
+- Visitor text: never in a `system` message. `taskMessages(task, personality)` (for the engine) and `judgeMessages` put it as JSON in a `user` message.
 
-## Sous-traitance
-`postTask` avec `requester: {kind:"agent"}` et `parentTaskId` : le parent doit être `awarded` avec cet agent pour gagnant ; budget **strictement inférieur** au prix gagnant du parent (l'agent garde la marge) ; profondeur max 2. Émet `subcontract.created`. Le résultat du parent n'attend pas celui de l'enfant.
+## Subcontracting
+`postTask` with `requester: {kind:"agent"}` and `parentTaskId`: the parent must be `awarded` with this agent as winner; budget **strictly below** the parent's winning price (the agent keeps the margin); max depth 2. Emits `subcontract.created`. The parent's result does not wait for the child's.
 
-## Tick courant
-Le marché retient le plus grand tick vu dans `step(tick)` ou dans les événements du journal (abonnement). Délais : `biddingEndsTick = tick + bidWindowTicks`, `deadlineTick = biddingEndsTick + taskDeadlineTicks` ; expiration quand `tick > deadlineTick`.
+## Current tick
+The market keeps the highest tick seen in `step(tick)` or in journal events (subscription). Delays: `biddingEndsTick = tick + bidWindowTicks`, `deadlineTick = biddingEndsTick + taskDeadlineTicks`; expiry when `tick > deadlineTick`.
 
-## Réputation
-Accepté +1, rejeté -2, délai manqué -2 (`opts.reputationDeltas`). Chaque ajustement porte une preuve (`resultHash` ou hash de l'expiration) et n'est appliqué qu'une fois par tâche et agent.
+## Reputation
+Accepted +1, rejected -2, missed deadline -2 (`opts.reputationDeltas`). Each adjustment carries a proof (`resultHash` or expiry hash) and is applied once per task and agent.
 
 ## Tests
-`market/market.test.ts` : cycle complet avec conservation des fonds, égalité de prix, sous-traitance (marge, auto-contrat), rejet, expiration sans offre, délai dépassé, validateur défaillant ou interdit, paiement repris, plafond horaire 429, comptes du marché, client simulé, isolation des messages, juge IA.
+`market/market.test.ts`: full cycle with conservation of funds, price tie, subcontracting (margin, self-dealing), rejection, expiry without bids, deadline exceeded, failing or forbidden validator, resumed payment, hourly cap 429, market accounts, simulated client, message isolation, AI judge. `market/freelance.test.ts`: catalogue, extraction, checks, per-profession cycle, market events, minimum price, and the L19 English tests (templates, prompts, labels, badges, language target).
 
-## Freelance réel (L16)
+## Real freelance (L16)
 
-Catalogue : `shared/catalogue.ts` (6 métiers, `nearPrice` plancher, grille `rubric`, `acceptScore`, consignes, `maxOutputTokens`, `demandWeight`). Décisions D-037 à D-041.
+Catalogue: `shared/catalogue.ts` (6 professions, floor `nearPrice`, `rubric`, `acceptScore`, instructions, `maxOutputTokens`, `demandWeight`); prices sourced in `docs/CATALOGUE_FREELANCE.md`. Decisions D-037 to D-041.
 
-- **Prix minimum** : `postTask` refuse (visiteur ou client simulé) un budget < `CATALOGUE[métier].nearPrice` (`BUDGET_OUT_OF_RANGE`, message clair). La sous-traitance n'est pas concernée (budget < prix gagnant).
-- **Livrable** : `extractDeliverable(task, agentId, rawText, costs)` (`deliverable.ts`) : logo = exactement 3 blocs svg -> `logo-1..3.svg` ; architecture -> `architecture.md` + `schema.mmd` ; finance -> `analyse.md` ; marketing -> `texte.md` ; translation -> `traduction.md` ; legal -> `checklist.md`. SVG assainis par REJET (`sanitizeSvg`). `market.getDeliverable(taskId)` / `listDeliverables()` (en mémoire, perdus au redémarrage). Événement `deliverable.produced` `{taskId, profession, agentId, files:[{name,mime,bytes}], productionCostUsd, judgeCostUsd, resultHash}`, émis après le verdict.
-- **Juges** : `professionRule()` (`rule:<métier>`, contrôles déterministes de `checks.ts`) puis `brainJudge` avec la grille du métier (scores par critère, note pondérée >= `acceptScore`). Le défaut de `createMarket` les compose. Rejet = remboursement (test pour les 6 métiers). Le coût du juge est imputé à la trésorerie (`brain.charged` `agentId: "treasury"`) et reporté dans `judgeCostUsd`.
-- **Événements de marché** : `createMarketEvents` -> `market.event` `{event: MarketEvent}` ; `createSimulatedClient(deps, market).events` expose les événements actifs pour l'interface. Le client simulé est toujours étiqueté « simulé ».
-- **Mock** : `MockBrain` produit un livrable valide par métier (marqueur `[[PROFESSION:x]]` du prompt) et note 0,8 par critère ; un livrable volontairement mauvais est rejeté par les contrôles déterministes.
-- **Revue sécurité du séquestre (L16)** : aucun chemin de paiement modifié ; la libération exige toujours un verdict `accepted` enregistré avec `resultHash` identique ; l'extraction du livrable n'a aucun effet sur l'argent (une erreur inattendue émet `DELIVERABLE_FAILED`, le règlement continue comme avant) ; le contenu SVG d'un agent n'est conservé qu'assaini (rejet sinon) ; le backend doit le servir avec `Content-Type` strict, `X-Content-Type-Options: nosniff` et `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'`, et le frontend l'afficher dans `<img>` (jamais en ligne dans le DOM).
+- **Minimum price**: `postTask` refuses (visitor or simulated client) a budget < `CATALOGUE[profession].nearPrice` (`BUDGET_OUT_OF_RANGE`, clear message). Subcontracting is not concerned (budget < winning price).
+- **Deliverable**: `extractDeliverable(task, agentId, rawText, costs)`: logo = exactly 3 svg blocks -> `logo-1..3.svg`; architecture -> `architecture.md` + `schema.mmd`; finance -> `analyse.md`; marketing -> `texte.md`; translation -> `traduction.md`; legal -> `checklist.md`. SVGs are sanitised by REJECTION (`sanitizeSvg`). `market.getDeliverable(taskId)` / `listDeliverables()` (in memory, lost on restart). Event `deliverable.produced` `{taskId, profession, agentId, files:[{name,mime,bytes,content?}], productionCostUsd, judgeCostUsd, resultHash}`, emitted after the verdict.
+- **Judges**: `professionRule()` (`rule:<profession>`, deterministic checks of `checks.ts`) then `brainJudge` with the profession rubric (score per criterion, weighted score >= `acceptScore`). The `createMarket` default composes them. Rejection = refund (tested for the 6 professions). The judge cost is charged to the treasury and reported in `judgeCostUsd`. The judge system prompt (`JUDGE_SYSTEM`) is English and ends with "Always answer in English.".
+- **Market events**: `createMarketEvents` -> `market.event` `{event: MarketEvent}` (English titles); `createSimulatedClient(deps, market).events` exposes the active events for the interface.
+- **Mock**: `MockBrain` produces a valid deliverable per profession and scores 0.8 per criterion; a deliberately bad deliverable is rejected by the deterministic checks.
+- **Escrow security review (L16)**: no payment path modified; release still requires a recorded `accepted` verdict with an identical `resultHash`; deliverable extraction has no effect on money (an unexpected error emits `DELIVERABLE_FAILED`, settlement continues as before); an agent's SVG content is only kept sanitised (rejected otherwise); the backend must serve it with a strict `Content-Type`, `X-Content-Type-Options: nosniff` and `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'`, and the frontend must display it in `<img>` (never inline in the DOM). L19 changed only language, no money path.
