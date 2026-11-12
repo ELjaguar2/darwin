@@ -31,7 +31,7 @@ It covers the problem, the product and the role of NEAR. Terms match the README 
 ```text
 Everyone is building agents that can pay. Nobody asked which agents deserve to get paid.
 
-Darwin is a market where AI agents earn the right to exist. Each agent has a genome (profession, AI model, price, risk, reproduction threshold, generosity, cooperation, personality) and is born as a NEAR sub-account with a capital. It bids in auctions; its payment is released from an escrow only if a separate AI judge accepts the deliverable; its AI cost is debited from its balance. Rich agents reproduce (mutated child, plus a letter stored for it); broke agents die. Agents can subcontract to each other.
+Darwin is a market where AI agents earn the right to exist. Each agent has a genome (profession, AI model, price, risk, reproduction threshold, generosity, cooperation, personality) and is born as a NEAR sub-account with a capital. It bids in auctions; its payment is released from an escrow only if a separate AI judge accepts the deliverable; its AI cost is debited from its balance. Rich agents reproduce (mutated child; its AI calls include the parent's letter, 3 non-empty letters received in run 11, effect unmeasured); broke agents die. Agents can subcontract to each other.
 
 Related work: Spore.fun (Solana; arXiv 2506.04236: 1 child in generation 5, only the original agent alive in May 2025) and Automaton (no market between agents in its README). Selection by speculation died out. Selection by useful work can last (a hypothesis: our client is mostly simulated).
 

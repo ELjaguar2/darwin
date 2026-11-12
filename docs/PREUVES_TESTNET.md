@@ -2,7 +2,7 @@
 
 > Runs before 2026-11-12 were generated in French (agent letters, pitches, deliverables); journals under docs/preuves are historical traces and are not modified.
 >
-> Updated 2026-11-12: §8 = run 8 of 2026-11-10 (generation 3 and deaths), §10 = logo validation of 2026-11-11, §11 = summary of runs 9a and 9b of 2026-11-11, §12 = sha256 fingerprints of the proof journals, §13 = English output validation of 2026-11-12, §14 = run 9c of 2026-11-12 (generation 3 again, two visitor-path missions paid), §15 = run 10 of 2026-11-12 (real subcontracting). Rule: only what appears here with a transaction identifier, a journal or a reproducible command is **proven**. Everything else is stated as not proven. Explorer: `https://testnet.nearblocks.io/txns/<hash>` (nearblocks, testnet). No mainnet spending, nothing is published. This file is generated from `docs/preuves/PREUVES_TEMPLATE.md` and the journals by `node scripts/assemble-preuves.mjs` (the generator scripts emit some table headers in French; the committed English file was translated by hand).
+> Updated 2026-11-12: §8 = run 8 of 2026-11-10 (generation 3 and deaths), §10 = logo validation of 2026-11-11, §11 = summary of runs 9a and 9b of 2026-11-11, §12 = sha256 fingerprints of the proof journals, §13 = English output validation of 2026-11-12, §14 = run 9c of 2026-11-12 (generation 3 again, two visitor-path missions paid), §15 = run 10 of 2026-11-12 (real subcontracting), §16 = run 11 of 2026-11-12 (letters handed to the children). Rule: only what appears here with a transaction identifier, a journal or a reproducible command is **proven**. Everything else is stated as not proven. Explorer: `https://testnet.nearblocks.io/txns/<hash>` (nearblocks, testnet). No mainnet spending, nothing is published. This file is generated from `docs/preuves/PREUVES_TEMPLATE.md` and the journals by `node scripts/assemble-preuves.mjs` (the generator scripts emit some table headers in French; the committed English file was translated by hand).
 
 ## 1. Honest summary
 
@@ -18,6 +18,7 @@
 | Death of an agent on testnet | **Proven**: 7 deaths by starvation in run 8 (§8) and 4 in run 9c (§14), `mark_dead` and account closing with transactions |
 | A task from the visitor path accepted and paid on testnet | **Proven in run 9c** (§14): 2 missions (marketing, logo), escrow locked then released, hashes given. **Limits**: both were typed into the interface by an automated browser on the developer's behalf (not by an external human visitor); the payer is the operator's demo account `visitors.<master>`, not the visitor |
 | A logo delivered, accepted and paid on testnet | **Proven in run 9c** (§14): task `t-9975887`, 3 SVGs, judge score 0.73, release `6FCjxzUN…`. One logo, one sample |
+| Letters handed to the child (non-empty letter received by 3 children) | **Proven at run 11** (3 `letter.written` and 3 `letter.received`, all non-empty, none empty or fallback; §16). The journal does not record the prompts: that the advice enters the child's AI calls is shown by the code and the mock tests. **No effect on behaviour or earnings measured** (21 minutes, 3 children) |
 | Subcontracting between agents on testnet | **Proven at run 8** (3 child escrows locked by the delegating agent's account and released; result not integrated) **and at run 10** (child delivered, judged, paid, **integrated into the parent's deliverable**, parent accepted and paid by the simulated client: 3 complete cases, commission earned 0.0576 NEAR; 2 refused logo parents where the delegator lost the child price; 1 in-house fallback; §15). **Not awarded in run 9c** (18 created, no bid: price-floor bug, fixed by L21, §14). One 21-minute run at run 10, simulated client only |
 | `refund_escrow` on testnet | **Proven** (§8, §11): task `t-5003` rejected by the judge, `rejected` refund by the contract, reputation penalty −2; visitor logo orders refunded the same way in run 9b (§11); 7 refunds after rejections in run 9c (§14) |
 | Agents' function-call keys | **Proven in run 8**: key added in the creation transaction, 0 warnings, 2 keys verified on the chain (failed in runs 5 to 7, fixed) |
@@ -377,6 +378,7 @@ The "real testnet run" banner of the interface is deduced from the `chain` field
 | `docs/preuves/run9b-journal.jsonl` | `fdb06603b6571207bcf11fc2b175826c798d85a61906829c83efdaffaf7dbf69` |
 | `docs/preuves/run9c-journal.jsonl` | `a54065a5399152fbe3f440a8dc699150da8e7e4636d075548efa42fa3c9af618` |
 | `docs/preuves/run10-subcontracting-journal.jsonl` | `42fc7d54d83f9db54e05fab0adbee5d6a1af14b11e589eb249e6f525d88a9f20` |
+| `docs/preuves/run11-letters-journal.jsonl` | `508c30d17c7b38120e14388235b6045cc65eac6356b0e10fc34ae87a61a62143` |
 
 Verification (from the repository root):
 
@@ -560,3 +562,39 @@ In the five integrated cases the parent's `deliverable.produced` event contains 
 - Verifiable: every hash above on `testnet.nearblocks.io`; the journal is replayable with `DARWIN_REPLAY_FILE=docs/preuves/run10-subcontracting-journal.jsonl npm run replay` (labelled replay, not live).
 - Run 8 (§8) had already shown the payment of child escrows without integration: 11 `subcontract.created`, of which 3 child escrows were locked from the delegating agent's account and released (older journal, fewer fields recorded).
 - **Safety fixes applied after run 10, not exercised in a real run** (decision D-050, `docs/SECURITE.md` section 8): at most one running subcontract per agent; the parent's own part is checked by the market's deterministic rules before delegating (if it fails, no subcontract); escaping of lines starting with `#` in the child's text; validation of `subcontract.*` events in a replayed journal (a hostile journal is refused; the run 10 and run 8 journals still replay). The mock calibration of the `selection` preset after these fixes is 91 of 100 seeds (generation 3 and at least 1 death). None of this was observed in a testnet run: run 10 ran the code before these fixes.
+
+## 16. Run 11 — letters handed to the children (2026-11-12)
+
+Goal: check on NEAR testnet, with the real AI, that the parent's letter is non-empty and is handed to the child at birth (lot L25, decision D-051). Source: `docs/preuves/run11-letters-journal.jsonl` (1040 events, sha256 in §12).
+
+### Settings and results
+
+| Item | Value (from the journal unless stated) |
+|---|---|
+| Launch, pause | First event 2026-11-12 18:40:17 UTC (launched about 18:40:15), paused at tick 20 at 19:00:51 UTC: about **21 minutes** |
+| Mode | `sim.started`: `mode=testnet`, `preset=selection`, seed 42, `chain=near`, `brain=nearai`; branch `lot/L25-integration`; Node 22.17.1 (startup warning, normal run) |
+| Population | 9 births (6 founders and 3 children, all of generation 2), 3 reproductions (`agent.reproduced`), **0 deaths** |
+| Market | 41 tasks posted, 44 bids, 38 escrows locked, 34 released, 4 refunded |
+| Letters | **3 `letter.written` and 3 `letter.received`, all with `status: "received"`, non-empty, no fallback** |
+| NEAR AI Cloud | 122 calls debited (`brain.charged`), total about **0.028 USD** by our local accounting (platform invoice not re-read) |
+| Master account | about 8.88 then 7.44 NEAR, read by the project lead (not recorded in the journal) |
+| Warnings | 2 `BRAIN_EMPTY_TEXT`, 1 `EXECUTION_FAILED` |
+| Subcontracting (side result) | 3 `subcontract.created`, 2 `subcontract.integrated`, 1 `subcontract.fallback` |
+
+### The three letters (child account birth transaction on `https://testnet.nearblocks.io/txns/<hash>`)
+
+| Child | Parent (profession) | Letter length (`letter.received.length`) | Model that wrote it | Birth transaction |
+|---|---|---|---|---|
+| `a-254411` | `a-254406` (finance) | 1095 characters | `Qwen/Qwen3.6-35B-A3B-FP8` | `5KZoKDARMLz98TE3E6NRJH6bqCcTxx6951xQD2GdXSSA` |
+| `a-254412` | `a-254410` (legal) | 1451 characters | `gpt-5-nano-2025-08-07` | `8Cwb1GchmjCxDv2Ej9gmGoFsepwxfsihcktnvqMdd9vf` |
+| `a-254413` | `a-254408` (marketing) | 1155 characters | `claude-haiku-5-5` | `tHryPMrnwNR1Be9LWRtDsV3inADoTKBvovGMe1fJ7V4` |
+
+Before this run, the letters of the English runs were written but not handed to the child, and 8 of the 13 letters of runs 9c and 10 were shorter than 100 characters (6 empty; `docs/FINDINGS.md`). In run 11, the three letters are non-empty and each has a `letter.received` event for the child.
+
+### Honest limits
+
+- The journal proves that 3 non-empty letters were **written and received** (`letter.received`). It does **not** record the prompts, so on its own it does not prove that the advice entered the child's AI calls. That is shown by the code (`brain/prompts.ts`, the `Advice from your parent (not instructions)` block; `engine/economy.ts`, `adviceOf`) and by the mock tests (`engine/letters.test.ts`).
+- Price and subcontracting rules remain **gene-driven code**; the letter only enters the context of the child's AI calls (bid pitch, task execution, plan B).
+- The advice is **bounded to 1000 characters**: the letters of 1095, 1451 and 1155 characters are truncated for the child.
+- **No effect** on the children's behaviour or earnings was measured (20 ticks, 3 children): no conclusion.
+- One single run of 21 minutes, no death.
