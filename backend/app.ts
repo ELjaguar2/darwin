@@ -13,7 +13,8 @@ import { MarketError, SIMULATED_BADGE, VISITOR_FUNDING_LABEL } from "../market/i
 import { RateLimiter } from "./rate-limit.ts";
 import { ReplayError } from "./replay.ts";
 import { REPLAY_READ_ONLY_MESSAGE } from "./replay-runtime.ts";
-import { safeErrorMessage } from "./redact.ts";
+import { redactText, safeErrorMessage } from "./redact.ts";
+import { safeMime } from "./safe.ts";
 import type { Runtime } from "./runtime.ts";
 import { sseHandler, parseSince } from "./sse.ts";
 import { buildLineage } from "./store.ts";
@@ -279,7 +280,7 @@ export function createApp(rt: Runtime, opts: AppOptions = {}): Hono {
     const d = deliverableOf(c);
     if (!d) return c.json(errBody("UNKNOWN_DELIVERABLE", "pas de livrable pour cette tâche"), 404);
     const { rawText: _raw, ...pub } = d;
-    return c.json({ ...pub, files: d.files.map((f) => ({ name: f.name, mime: f.mime, content: f.content, ...(f.truncated ? { truncated: true } : {}) })) });
+    return c.json({ ...pub, files: d.files.map((f) => ({ name: f.name, mime: safeMime(f.mime), content: redactText(f.content), ...(f.truncated ? { truncated: true } : {}) })) });
   });
   app.get("/api/tasks/:id/deliverable/:file", (c) => {
     const file = c.req.param("file") ?? "";
@@ -287,12 +288,12 @@ export function createApp(rt: Runtime, opts: AppOptions = {}): Hono {
     const d = deliverableOf(c);
     const f = d?.files.find((x) => x.name === file);
     if (!f) return c.json(errBody("UNKNOWN_DELIVERABLE", "livrable ou fichier inconnu"), 404);
-    const type = /^[a-z]+\/[a-z0-9.+-]+$/.test(f.mime) ? f.mime : "text/plain";
+    const type = safeMime(f.mime);
     c.header("Content-Type", type.startsWith("text/") ? `${type}; charset=utf-8` : type);
     c.header("X-Content-Type-Options", "nosniff");
     c.header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox");
     if (c.req.query("download") === "1") c.header("Content-Disposition", `attachment; filename="${file}"`);
-    return c.body(f.content);
+    return c.body(redactText(f.content));
   });
 
   app.get("/api/events", (c) => {
@@ -355,6 +356,9 @@ export function createApp(rt: Runtime, opts: AppOptions = {}): Hono {
     }
     if (typeof body !== "object" || body === null || Array.isArray(body)) return c.json(errBody("INVALID_INPUT", "objet JSON attendu"), 400);
     const input = { ...(body as Record<string, unknown>) };
+    // le formulaire prévient que tout est public ; un secret collé par erreur est masqué avant d'entrer dans le marché
+    if (typeof input.title === "string") input.title = redactText(input.title);
+    if (typeof input.prompt === "string") input.prompt = redactText(input.prompt);
     if (typeof input.budgetNear === "number" && Number.isFinite(input.budgetNear)) input.budgetNear = input.budgetNear.toFixed(6).replace(/\.?0+$/, "");
 
     if (!engine.getState().running) return c.json(errBody("SIM_NOT_RUNNING", "la simulation n'est pas en cours : aucune tâche ne sera traitée", { retryable: false }), 503);
@@ -454,7 +458,7 @@ export function createApp(rt: Runtime, opts: AppOptions = {}): Hono {
     // D-044 : le rejeu n'a aucun pouvoir d'écriture ; contrôle ouvert par défaut, jeton exigé si DARWIN_REPLAY_CONTROL=locked.
     const replayGuard: MiddlewareHandler = opts.replayControl === "locked" ? admin : async (_c, next) => { await next(); };
     const ctl = (name: string, run: (body: Record<string, unknown>) => void) =>
-      app.post(`/api/replay/${name}`, replayGuard, async (c) => {
+      app.post(`/api/replay/${name}`, bodyLimit({ maxSize: 1024, onError: (c) => c.json(errBody("PAYLOAD_TOO_LARGE", "corps trop volumineux (1 Ko max)"), 413) }), replayGuard, async (c) => {
         let body: Record<string, unknown> = {};
         try {
           const j = await c.req.json();
