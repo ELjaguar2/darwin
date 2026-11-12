@@ -1,4 +1,4 @@
-// Point d'entrée de accounts/ : `createChain(config)` choisit MockChain ou NearChain selon la configuration.
+// Entry point of accounts/: `createChain(config)` picks MockChain or NearChain according to the configuration.
 import { MockChain } from "../shared/mock/mock-chain.ts";
 import type { Chain } from "../shared/chain.ts";
 import type { Config } from "../shared/config.ts";
@@ -20,7 +20,7 @@ export * from "./faucet.ts";
 export * from "./near-backend.ts";
 export * from "./near-chain.ts";
 
-/** Backend near-api-js chargé à la première utilisation (le paquet reste optionnel). */
+/** near-api-js backend loaded on first use (the package stays optional). */
 export function lazyNearBackend(rpcUrl: string): NearBackend {
   let p: Promise<NearBackend> | undefined;
   const b = () => (p ??= loadNearApiBackend(rpcUrl));
@@ -43,15 +43,15 @@ export interface CreateChainExtras {
   onWarning?: NearChainOptions["onWarning"];
 }
 
-/** Mock sans aucune clé (défaut) ou NearChain testnet. Jamais de mainnet. */
+/** Keyless mock (default) or testnet NearChain. Never mainnet. */
 export function createChain(config: Config, extra: CreateChainExtras = {}): Chain {
   if (config.chain === "mock") return new MockChain();
   const { masterAccountId, masterPrivateKey, contractId, rpcUrl } = config.near;
   if (!masterAccountId || !masterPrivateKey) {
-    throw new ChainError("RPC_ERROR", "Mode testnet : NEAR_MASTER_ACCOUNT_ID et NEAR_MASTER_PRIVATE_KEY sont requis (voir docs/BESOINS_HUMAIN.md).");
+    throw new ChainError("RPC_ERROR", "Testnet mode: NEAR_MASTER_ACCOUNT_ID and NEAR_MASTER_PRIVATE_KEY are required (see docs/BESOINS_HUMAIN.md).");
   }
   const masterKey = new Secret(masterPrivateKey);
-  publicKeyOf(masterKey); // valide le format sans l'afficher
+  publicKeyOf(masterKey); // validates the format without displaying it
   const dir = join(config.server.dataDir, "keys");
   const birth = config.sim.birthCapital;
   return new NearChain({

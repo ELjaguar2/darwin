@@ -10,15 +10,15 @@ async function mk(frontendDir: string) {
   return createApp(rt, { getIp: () => "1.2.3.4", frontendDir });
 }
 
-describe("statique : liste blanche et CSP sans style inline", () => {
-  it("/classique redirige vers /?classique (backend live)", async () => {
+describe("static: allow-list and CSP without inline style", () => {
+  it("/classique redirects to /?classique (live backend)", async () => {
     const app = await mk(join(process.cwd(), "frontend"));
     const r = await app.request("/classique");
     expect(r.status).toBe(302);
     expect(r.headers.get("location")).toBe("/?classique");
   });
 
-  it("page et scripts servis ; dev/, screens/, .md, fichiers cachés et traversées refusés", async () => {
+  it("page and scripts served; dev/, screens/, .md, hidden files and traversals refused", async () => {
     const app = await mk(join(process.cwd(), "frontend"));
     for (const ok of ["/", "/index.html", "/app.js", "/store.js", "/style.css", "/favicon.svg"]) expect((await app.request(ok)).status, ok).toBe(200);
     for (const bad of [
@@ -29,8 +29,8 @@ describe("statique : liste blanche et CSP sans style inline", () => {
     }
   });
 
-  it("CSP sans unsafe-inline ; page de repli sans style inline, feuille servie en fichier", async () => {
-    const app = await mk(join(process.cwd(), "pas-de-frontend"));
+  it("CSP without unsafe-inline; fallback page without inline style, stylesheet served as a file", async () => {
+    const app = await mk(join(process.cwd(), "no-frontend"));
     const home = await app.request("/");
     expect(home.status).toBe(200);
     expect(home.headers.get("content-security-policy")).not.toContain("unsafe-inline");

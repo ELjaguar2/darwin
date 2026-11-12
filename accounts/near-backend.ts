@@ -1,8 +1,8 @@
-// Adaptateur near-api-js (SEUL fichier qui la touche, en import dynamique : le paquet est optionnel, Node >= 22.22.2).
-// API vérifiée dans les types de near-api-js 7.4.0 (2026-11-09) : `new Account(id, provider|url, signer|KeyPairString)`,
+// near-api-js adapter (the ONLY file that touches it, via dynamic import: the package is optional, Node >= 22.22.2).
+// API checked in the near-api-js 7.4.0 types (2026-11-09): `new Account(id, provider|url, signer|KeyPairString)`,
 // getState(), createSubAccount({accountOrPrefix, publicKey, nearToTransfer}), transfer({receiverId, amount}),
 // deleteAccount(beneficiaryId), addFunctionCallAccessKey({publicKey, contractId, methodNames, allowance}).
-// NearChain ne dépend que de l'interface `NearBackend`, donc se teste sans réseau avec un faux backend.
+// NearChain depends only on the `NearBackend` interface, so it can be tested without a network using a fake backend.
 import { createHash } from "node:crypto";
 import { ChainError } from "../shared/chain.ts";
 import type { Secret } from "./keys.ts";
@@ -12,7 +12,7 @@ export interface NearSigner {
   secretKey: Secret;
 }
 
-/** Clé function call à droits limités, ajoutée dans la MÊME transaction que la création du compte. */
+/** Limited-rights function call key, added in the SAME transaction as the account creation. */
 export interface FunctionCallKeySpec {
   publicKey: string;
   contractId: string;
@@ -21,11 +21,11 @@ export interface FunctionCallKeySpec {
 }
 
 export interface NearBackend {
-  /** Vérifie que le RPC répond et renvoie le réseau (attendu : "testnet"). */
+  /** Checks that the RPC answers and returns the network (expected: "testnet"). */
   status(): Promise<{ chainId: string }>;
-  /** null si le compte n'existe pas. `available` = total moins le stockage immobilisé. */
+  /** null if the account does not exist. `available` = total minus locked storage. */
   getState(accountId: string): Promise<{ total: bigint; available: bigint } | null>;
-  /** Crée `<label>.<signer.accountId>` financé de `fund` ; renvoie le hash de transaction. */
+  /** Creates `<label>.<signer.accountId>` funded with `fund`; returns the transaction hash. */
   createSubAccount(signer: NearSigner, label: string, publicKey: string, fund: bigint, fc?: FunctionCallKeySpec): Promise<string>;
   transfer(signer: NearSigner, to: string, amount: bigint): Promise<string>;
   deleteAccount(signer: NearSigner, beneficiary: string): Promise<string>;
@@ -34,7 +34,7 @@ export interface NearBackend {
     publicKey: string,
     opts: { contractId: string; methodNames: string[]; allowance: bigint },
   ): Promise<string>;
-  /** Appel de méthode (écriture) signé. Lève ChainError si la transaction ou un reçu échoue. Renvoie le hash. */
+  /** Signed (write) method call. Throws ChainError if the transaction or a receipt fails. Returns the hash. */
   call(
     signer: NearSigner,
     contractId: string,
@@ -42,7 +42,7 @@ export interface NearBackend {
     args: Record<string, unknown>,
     opts?: { deposit?: bigint; gas?: bigint },
   ): Promise<string>;
-  /** Appel de vue (lecture seule, sans signature). */
+  /** View call (read-only, unsigned). */
   view(contractId: string, methodName: string, args: Record<string, unknown>): Promise<unknown>;
 }
 
@@ -51,17 +51,17 @@ type AnyRec = Record<string, any>;
 
 function hashOf(res: AnyRec): string {
   const h = res?.transaction?.hash ?? res?.transaction_outcome?.id;
-  if (typeof h !== "string") throw new ChainError("RPC_ERROR", "Réponse RPC sans hash de transaction");
+  if (typeof h !== "string") throw new ChainError("RPC_ERROR", "RPC response without a transaction hash");
   return h;
 }
 
-/** Message d'erreur RPC nettoyé : jamais de clé (au cas où une bibliothèque en inclurait une). */
+/** Cleaned RPC error message: never a key (in case a library included one). */
 export function safeMessage(e: unknown): string {
   const m = e instanceof Error ? e.message : String(e);
   return m.replace(/ed25519:[1-9A-HJ-NP-Za-km-z]{40,}/g, "ed25519:[REDACTED]").slice(0, 400);
 }
 
-/** Collecte les messages d'échec d'une réponse de transaction (transaction et reçus). */
+/** Collects the failure messages of a transaction response (transaction and receipts). */
 function failureOf(res: AnyRec): string | null {
   const bad: unknown[] = [];
   if (res?.status && typeof res.status === "object" && "Failure" in res.status) bad.push(res.status.Failure);
@@ -72,7 +72,7 @@ function failureOf(res: AnyRec): string | null {
   return bad.length ? JSON.stringify(bad) : null;
 }
 
-/** Traduit un message RPC ou une panique de contrat en ChainError typée. */
+/** Translates an RPC message or a contract panic into a typed ChainError. */
 export function mapChainError(msg: string): ChainError {
   const m = msg;
   if (/ESCROW_EXISTS|TASK_ALREADY_RESERVED/.test(m)) return new ChainError("ESCROW_EXISTS", m);
@@ -89,19 +89,19 @@ export function mapChainError(msg: string): ChainError {
 }
 
 export async function loadNearApiBackend(rpcUrl: string): Promise<NearBackend> {
-  const specifier = "near-api-js"; // variable : TypeScript ne résout pas le paquet optionnel
+  const specifier = "near-api-js"; // variable: TypeScript does not resolve the optional package
   let lib: AnyRec;
   try {
     lib = (await import(specifier)) as AnyRec;
   } catch {
     throw new ChainError(
       "RPC_ERROR",
-      "near-api-js est introuvable (paquet optionnel). Installez-le avec Node >= 22.22.2 : `npm install near-api-js@7.4.0`.",
+      "near-api-js not found (optional package). Install it with Node >= 22.22.2: `npm install near-api-js@7.4.0`.",
     );
   }
-  // `rpcUrl` peut lister plusieurs fournisseurs séparés par des virgules (NEAR_RPC_URL) : bascule automatique
-  // (FailoverRpcProvider) quand l'un d'eux échoue ou limite le débit. nearcore n'accepte pas le JSON-RPC groupé
-  // (« batch ») : on réduit donc le nombre d'appels par un cache court des états de compte (voir getState).
+  // `rpcUrl` may list several providers separated by commas (NEAR_RPC_URL): automatic failover
+  // (FailoverRpcProvider) when one of them fails or rate-limits. nearcore does not accept batched JSON-RPC
+  // ("batch"): so we reduce the number of calls with a short cache of account states (see getState).
   const urls = rpcUrl.split(",").map((u) => u.trim()).filter(Boolean);
   const provider: AnyRec =
     urls.length > 1
@@ -109,17 +109,17 @@ export async function loadNearApiBackend(rpcUrl: string): Promise<NearBackend> {
       : new lib.JsonRpcProvider({ url: urls[0] ?? rpcUrl });
   const STATE_TTL_MS = Number(process.env.DARWIN_RPC_STATE_TTL_MS ?? 3000);
   const stateCache = new Map<string, { at: number; v: { total: bigint; available: bigint } | null }>();
-  const accounts = new Map<string, AnyRec>(); // une instance par compte (gestion des nonces)
+  const accounts = new Map<string, AnyRec>(); // one instance per account (nonce management)
   const acct = (s: NearSigner): AnyRec => {
-    const k = `${s.accountId}|${createHash("sha256").update(s.secretKey.reveal()).digest("hex").slice(0, 16)}`; // empreinte, jamais un fragment de clé
+    const k = `${s.accountId}|${createHash("sha256").update(s.secretKey.reveal()).digest("hex").slice(0, 16)}`; // fingerprint, never a key fragment
     const known = accounts.get(k);
     if (known) return known;
     const created: AnyRec = new lib.Account(s.accountId, provider, s.secretKey.reveal());
     accounts.set(k, created);
     return created;
   };
-  // Les RPC publics gratuits limitent le débit (HTTP/JSON-RPC 429) : on réessaie avec attente progressive
-  // (la requête est refusée avant traitement, donc le rejeu est sûr) avant d'échouer.
+  // Free public RPCs rate-limit (HTTP/JSON-RPC 429): we retry with progressive back-off
+  // (the request is refused before processing, so replaying is safe) before failing.
   const RATE_LIMIT_RE = /\b429\b|rate limit/i;
   const RATE_LIMIT_RETRIES = 6;
   const wrap = async <T>(fn: () => Promise<T>): Promise<T> => {
@@ -168,8 +168,8 @@ export async function loadNearApiBackend(rpcUrl: string): Promise<NearBackend> {
     createSubAccount: (signer, label, publicKey, fund, fc) =>
       written(wrap(async () => {
         if (!fc) return hashOf(await acct(signer).createSubAccount({ accountOrPrefix: label, publicKey, nearToTransfer: fund }));
-        // Une seule transaction : créer, financer, clé complète, clé function call. Ajouter la clé limitée après coup
-        // (signée par le nouveau compte) échouait : le RPC ne voyait pas encore la clé du compte (« access key does not exist »).
+        // A single transaction: create, fund, full key, function call key. Adding the limited key afterwards
+        // (signed by the new account) failed: the RPC did not yet see the account's key ("access key does not exist").
         const { actions, PublicKey } = lib;
         const a = acct(signer);
         return hashOf(

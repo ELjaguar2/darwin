@@ -1,10 +1,10 @@
-/** PRNG déterministe (mulberry32) : même graine = même simulation (tests reproductibles). */
+/** Deterministic PRNG (mulberry32): same seed = same simulation (reproducible tests). */
 export interface Rng {
-  /** Flottant dans [0,1). */
+  /** Float in [0,1). */
   next(): number;
   int(min: number, max: number): number;
   pick<T>(arr: readonly T[]): T;
-  /** Gaussienne approchée (Box-Muller). */
+  /** Approximate Gaussian (Box-Muller). */
   gauss(mean?: number, sd?: number): number;
 }
 

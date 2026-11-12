@@ -1,5 +1,5 @@
-// Lot L18 : le journal porte le pitch d'enchère (`bid.placed.data.bid.pitch`) et le contenu des livrables (`deliverable.produced.data.files[].content`).
-// Le replay doit les servir ; les anciens journaux (run5 à run9b) sans ces champs doivent continuer à se rejouer.
+// Lot L18: the journal carries the bid pitch (`bid.placed.data.bid.pitch`) and the deliverable content (`deliverable.produced.data.files[].content`).
+// Replay must serve them; old journals (run5 to run9b) without these fields must keep replaying.
 import { describe, expect, it } from "vitest";
 import { loadConfig } from "../shared/index.ts";
 import { createApp } from "./app.ts";
@@ -19,10 +19,10 @@ const task = {
   status: "posted", createdTick: 1, biddingEndsTick: 2, deadlineTick: 6, bidIds: [],
 };
 const SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4"/></svg>';
-const PITCH = "Je livre un texte net et relu, sans rien inventer.";
+const PITCH = "I deliver a clean, proofread text, without inventing anything.";
 const texte = { name: "texte.md", mime: "text/markdown", bytes: 23, content: "# Titre\n\nUn paragraphe." };
 
-/** Mission de visiteur complète ; `bid` et `files` sont ce que le run 9c écrira (ou, sans eux, ce que les anciens runs ont écrit). */
+/** Complete visitor mission; `bid` and `files` are what run 9c will write (or, without them, what the old runs wrote). */
 function journal(opts: { pitch?: string; files: unknown[] }): string {
   const bid = { id: "b-1", taskId: "t-1", agentId: "a-1", price: "40", etaTicks: 1, tick: 1, ...(opts.pitch ? { pitch: opts.pitch } : {}) };
   const rows: [number, string, unknown][] = [
@@ -33,7 +33,7 @@ function journal(opts: { pitch?: string; files: unknown[] }): string {
     [3, "escrow.locked", { taskId: "t-1", payer: "visiteur.testnet", amount: "40", tx: "TXLOCK" }],
     [4, "task.submitted", { taskId: "t-1", agentId: "a-1", resultHash: "h" }],
     [5, "task.validated", { taskId: "t-1", validation: { verdict: "accepted", score: 0.9, validator: "rule:writer", reason: "ok", resultHash: "h", tick: 2 } }],
-    // ordre réel du marché : le livrable est journalisé juste après la validation
+    // real market order: the deliverable is journalled right after validation
     [5, "deliverable.produced", { taskId: "t-1", profession: "writer", agentId: "a-1", files: opts.files, productionCostUsd: 0, judgeCostUsd: 0, resultHash: "h" }],
     [5, "escrow.released", { taskId: "t-1", payee: "a-1.master.testnet", amount: "40", tx: "TXPAY" }],
   ];
@@ -41,7 +41,7 @@ function journal(opts: { pitch?: string; files: unknown[] }): string {
 }
 
 function appOf(text: string) {
-  // horloge manuelle : on rejoue tout d'un coup via le minuteur capturé
+  // manual clock: everything is replayed at once through the captured timer
   const fns: (() => void)[] = [];
   const r = createReplay(parseReplay(text, "j.jsonl"), { speed: 5, setTimer: (fn) => { fns.push(fn); return 0; }, clearTimer: () => {} });
   for (let i = 0; i < 9; i++) fns.pop()?.();
@@ -49,8 +49,8 @@ function appOf(text: string) {
 }
 const json = async (r: Response | Promise<Response>) => (await r).json() as Promise<any>;
 
-describe("journal enrichi (L18) : pitch d'enchère et contenu des livrables", () => {
-  it("le pitch est rejoué dans /api/replay/missions, /api/tasks/:id et /api/events", async () => {
+describe("enriched journal (L18): bid pitch and deliverable content", () => {
+  it("the pitch is replayed in /api/replay/missions, /api/tasks/:id and /api/events", async () => {
     const app = appOf(journal({ pitch: PITCH, files: [texte] }));
     const m = await json(app.request("/api/replay/missions"));
     expect(m.missions[0].events.find((e: any) => e.type === "bid.placed").data.bid.pitch).toBe(PITCH);
@@ -58,7 +58,7 @@ describe("journal enrichi (L18) : pitch d'enchère et contenu des livrables", ()
     expect((await json(app.request("/api/events?since=0&limit=100"))).events.find((e: any) => e.type === "bid.placed").data.bid.pitch).toBe(PITCH);
   });
 
-  it("GET /api/tasks/:id/deliverable sert files[].content en replay (texte, SVG, drapeau truncated)", async () => {
+  it("GET /api/tasks/:id/deliverable serves files[].content in replay (text, SVG, truncated flag)", async () => {
     const app = appOf(journal({ files: [texte, { name: "logo-1.svg", mime: "image/svg+xml", bytes: 90000, content: SVG, truncated: true }] }));
     const r = await app.request("/api/tasks/t-1/deliverable");
     expect(r.status).toBe(200);
@@ -72,13 +72,13 @@ describe("journal enrichi (L18) : pitch d'enchère et contenu des livrables", ()
     expect(await f.text()).toBe(texte.content);
   });
 
-  it("/api/state et /api/tasks ne portent pas les contenus ; /api/events (comme le flux) les porte", async () => {
+  it("/api/state and /api/tasks do not carry the contents; /api/events (like the stream) does", async () => {
     const app = appOf(journal({ pitch: PITCH, files: [texte] }));
     for (const path of ["/api/state", "/api/tasks"]) expect(await (await app.request(path)).text()).not.toContain("Un paragraphe");
     expect(await (await app.request("/api/events?since=0&limit=100")).text()).toContain("Un paragraphe");
   });
 
-  it("rétrocompatibilité : sans pitch ni content (run5 à run9b) le journal se rejoue ; le livrable reste 404", async () => {
+  it("backward compatibility: without pitch or content (run5 to run9b) the journal replays; the deliverable stays 404", async () => {
     const app = appOf(journal({ files: [{ name: "texte.md", mime: "text/markdown", bytes: 23 }] }));
     const m = await json(app.request("/api/replay/missions"));
     expect(m.missions[0].events.find((e: any) => e.type === "bid.placed").data.bid.pitch).toBeUndefined();
@@ -86,7 +86,7 @@ describe("journal enrichi (L18) : pitch d'enchère et contenu des livrables", ()
     expect((await app.request("/api/tasks/t-1/deliverable")).status).toBe(404);
   });
 
-  it("fichiers dont un seul manque de contenu : pas de livrable servi (tout ou rien)", async () => {
+  it("files where just one lacks content: no deliverable served (all or nothing)", async () => {
     const app = appOf(journal({ files: [texte, { name: "b.md", mime: "text/markdown", bytes: 3 }] }));
     expect((await app.request("/api/tasks/t-1/deliverable")).status).toBe(404);
   });

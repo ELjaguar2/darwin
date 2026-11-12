@@ -1,4 +1,4 @@
-// Limiteur de débit en mémoire, fenêtre fixe par clé (IP). Suffisant pour un processus unique (D-010).
+// In-memory rate limiter, fixed window per key (IP). Enough for a single process (D-010).
 export class RateLimiter {
   private hits = new Map<string, { count: number; resetAt: number }>();
   private lastPrune = 0;
@@ -20,7 +20,7 @@ export class RateLimiter {
     return e && e.resetAt > t ? e : undefined;
   }
 
-  /** Compte un appel. `ok:false` si la limite de la fenêtre est dépassée. */
+  /** Counts a call. `ok:false` if the window limit is exceeded. */
   hit(key: string): { ok: boolean; retryAfterSec: number } {
     const t = this.now();
     this.prune(t);
@@ -33,7 +33,7 @@ export class RateLimiter {
     return { ok: e.count <= this.limit, retryAfterSec: Math.max(1, Math.ceil((e.resetAt - t) / 1000)) };
   }
 
-  /** Vrai si la clé a déjà atteint la limite (sans compter un appel de plus). */
+  /** True if the key has already reached the limit (without counting one more call). */
   blocked(key: string): { blocked: boolean; retryAfterSec: number } {
     const t = this.now();
     const e = this.entry(key, t);

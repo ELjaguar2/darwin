@@ -1,14 +1,14 @@
-// Façade « Runtime » du mode replay (L17) : même forme que le runtime live pour que createApp (routes, sécurité, SSE, statique)
-// serve le rejeu sans duplication. Rien ici ne touche une chaîne ou une IA : moteur, marché, chaîne et cerveau sont des
-// vues en lecture seule de ReplayState ; toute écriture lève une erreur (et les routes d'écriture refusent avant).
+// "Runtime" facade of replay mode (L17): same shape as the live runtime so that createApp (routes, security, SSE, static)
+// serves the replay without duplication. Nothing here touches a chain or an AI: engine, market, chain and brain are
+// read-only views of ReplayState; any write throws (and the write routes refuse beforehand).
 import type { Brain, Chain, Config, Engine, EventCatalog, MarketEvent, SimState } from "../shared/index.ts";
 import { MarketError, type TaskMarket } from "../market/index.ts";
 import { readVersion, type Runtime } from "./runtime.ts";
 import type { Replay } from "./replay.ts";
 
-export const REPLAY_READ_ONLY_MESSAGE = "mode rejeu : lecture seule, aucune tâche ne peut être publiée (rejeu d'un run réel enregistré)";
+export const REPLAY_READ_ONLY_MESSAGE = "replay mode: read-only, no task can be published (replay of a recorded real run)";
 
-/** Config publique du rejeu : jamais de clé (le mode « replay » ne lit aucun secret). */
+/** Public replay config: never a key (the "replay" mode reads no secret). */
 export function replayConfig(base: Config, replay: Replay): Config {
   const rec = replay.meta.recorded;
   return {

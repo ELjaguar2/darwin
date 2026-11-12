@@ -1,6 +1,6 @@
-// Démarrage du mode replay : `npm run replay`. Variables : DARWIN_REPLAY_FILE (défaut docs/preuves/run8-journal.jsonl),
-// DARWIN_REPLAY_SPEED (défaut 5), DARWIN_REPLAY_LOOP (1 = recommence après une pause), DARWIN_REPLAY_MAX_GAP_MS, DARWIN_REPLAY_LABEL.
-// Aucune clé n'est lue : les variables de secrets sont retirées de l'environnement passé à loadConfig.
+// Replay mode startup: `npm run replay`. Variables: DARWIN_REPLAY_FILE (default docs/preuves/run8-journal.jsonl),
+// DARWIN_REPLAY_SPEED (default 5), DARWIN_REPLAY_LOOP (1 = restart after a pause), DARWIN_REPLAY_MAX_GAP_MS, DARWIN_REPLAY_LABEL.
+// No key is read: secret variables are removed from the environment passed to loadConfig.
 import { serve } from "@hono/node-server";
 import type { Server } from "node:http";
 import { resolve } from "node:path";
@@ -13,18 +13,18 @@ import { createReplayRuntime } from "./replay-runtime.ts";
 
 export const DEFAULT_REPLAY_FILE = fileURLToPath(new URL("../docs/preuves/run8-journal.jsonl", import.meta.url));
 
-/** Environnement du rejeu : mock forcé, aucun secret. */
+/** Replay environment: mock forced, no secret. */
 export function replayEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const out: NodeJS.ProcessEnv = { ...env, DARWIN_MODE: "mock", DARWIN_CHAIN: "mock", DARWIN_BRAIN: "mock" };
   for (const k of Object.keys(out)) if (/(PRIVATE_KEY|API_KEY|JWT|SECRET)$/i.test(k)) delete out[k];
   return out;
 }
 
-/** Message d'erreur si DARWIN_REPLAY_CONTROL=locked est demandé sans DARWIN_ADMIN_TOKEN, sinon undefined. */
+/** Error message if DARWIN_REPLAY_CONTROL=locked is requested without DARWIN_ADMIN_TOKEN, otherwise undefined. */
 export function replayControlError(env: NodeJS.ProcessEnv, adminToken: string | undefined): string | undefined {
   const locked = /^locked$/i.test((env.DARWIN_REPLAY_CONTROL ?? "").trim());
   return locked && !adminToken
-    ? "DARWIN_REPLAY_CONTROL=locked exige DARWIN_ADMIN_TOKEN (24 caractères ou plus) : sans jeton le contrôle resterait ouvert. Définissez le jeton, ou videz DARWIN_REPLAY_CONTROL."
+    ? "DARWIN_REPLAY_CONTROL=locked requires DARWIN_ADMIN_TOKEN (24 characters or more): without a token the control would stay open. Set the token, or empty DARWIN_REPLAY_CONTROL."
     : undefined;
 }
 
@@ -38,7 +38,7 @@ export async function runReplayMode(io: { say: (m: string) => void; fail: (m: st
   try {
     config = loadConfig(replayEnv(env));
     assertSafeBinding(config.server.host, config.server.adminToken);
-    // Échec fermé : « locked » sans jeton laisserait le contrôle ouvert (le garde d'administration laisse tout passer sans jeton).
+    // Fail closed: "locked" without a token would leave the control open (the admin guard lets everything through without a token).
     const err = replayControlError(env, config.server.adminToken);
     if (err) throw new ReplayError("REPLAY_FILE_INVALID", err);
     const file = resolve(env.DARWIN_REPLAY_FILE?.trim() || DEFAULT_REPLAY_FILE);
@@ -61,18 +61,18 @@ export async function runReplayMode(io: { say: (m: string) => void; fail: (m: st
   const server = await new Promise<Server>((res, rej) => {
     const s = serve({ fetch: app.fetch, hostname: host, port }, () => res(s as Server));
     s.once("error", rej);
-  }).catch((e: NodeJS.ErrnoException) => fail(e.code === "EADDRINUSE" ? `port ${port} déjà utilisé (changez PORT)` : safeErrorMessage(e)));
+  }).catch((e: NodeJS.ErrnoException) => fail(e.code === "EADDRINUSE" ? `port ${port} already in use (change PORT)` : safeErrorMessage(e)));
 
   const st = replay.status();
-  say(`Darwin ${rt.version} : MODE REPLAY (${st.meta.events} événements de ${st.meta.file}, enregistrés le ${st.meta.recordedOn}, vitesse x${st.speed}${st.loop ? ", en boucle" : ""})`);
-  say("aucune clé, aucun réseau NEAR, aucun appel IA : lecture seule");
-  say(`écoute sur http://${host}:${port}  (flux : /api/stream, contrôle : /api/replay)`);
+  say(`Darwin ${rt.version}: REPLAY MODE (${st.meta.events} events from ${st.meta.file}, recorded on ${st.meta.recordedOn}, speed x${st.speed}${st.loop ? ", looping" : ""})`);
+  say("no key, no NEAR network, no AI call: read-only");
+  say(`listening on http://${host}:${port}  (stream: /api/stream, control: /api/replay)`);
 
   let closing = false;
   const shutdown = async (signal: string) => {
     if (closing) return;
     closing = true;
-    say(`${signal} reçu : arrêt...`);
+    say(`${signal} received: shutting down...`);
     server.closeAllConnections?.();
     await rt.shutdown();
     server.close(() => process.exit(0));
@@ -82,7 +82,7 @@ export async function runReplayMode(io: { say: (m: string) => void; fail: (m: st
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
   await rt.startSim();
   say(locked
-    ? "contrôle du rejeu verrouillé (DARWIN_REPLAY_CONTROL=locked) : jeton d'administration exigé"
-    : "contrôle du rejeu (vitesse, pause) ouvert à tout visiteur : vitesse partagée ; pour une démo publique, DARWIN_REPLAY_CONTROL=locked");
-  say("rejeu démarré");
+    ? "replay control locked (DARWIN_REPLAY_CONTROL=locked): admin token required"
+    : "replay control (speed, pause) open to any visitor: shared speed; for a public demo, DARWIN_REPLAY_CONTROL=locked");
+  say("replay started");
 }

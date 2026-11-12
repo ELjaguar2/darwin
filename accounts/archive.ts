@@ -1,5 +1,5 @@
-// Archivage à la mort : une ligne JSON par compte clos (compte, bénéficiaire, montant récupéré, tx, clés publiques retirées).
-// Jamais de clé privée. Fichier : <dataDir>/accounts-archive.jsonl (ignoré par git via data/).
+// Archive on death: one JSON line per closed account (account, beneficiary, recovered amount, tx, removed public keys).
+// Never a private key. File: <dataDir>/accounts-archive.jsonl (ignored by git through data/).
 import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
@@ -9,7 +9,7 @@ export interface ArchivedAccount {
   swept: string; // yocto
   closedAt: string; // ISO
   tx: string;
-  disposition: "deleted" | "frozen"; // frozen : suppression impossible (solde < réserve de gaz), clés retirées
+  disposition: "deleted" | "frozen"; // frozen: deletion impossible (balance < gas reserve), keys removed
   retiredPublicKeys: string[];
 }
 

@@ -1,5 +1,5 @@
-// Implémentation mock complète de 1Click : aucun réseau, déterministe, mêmes verrous que le client réel (hérités de BaseIntents).
-// Tout ce qui sort d'ici est étiqueté `mock:true` côté DepositQuote/DryQuote et la preuve porte `mock:true`.
+// Complete mock implementation of 1Click: no network, deterministic, same locks as the real client (inherited from BaseIntents).
+// Everything coming out of here is labelled `mock:true` on DepositQuote/DryQuote and the proof carries `mock:true`.
 import type { Config } from "../shared/index.ts";
 import { BaseIntents, type BaseOptions, type QuoteRequestBody } from "./base.ts";
 import { IntentsGuardError } from "./guard.ts";
@@ -18,13 +18,13 @@ interface MockSwap {
   memo?: string;
   deposit?: { txHash: string; amount: string; outcome: MockOutcome; submitted: boolean };
   step: number;
-  /** Altérations malveillantes simulées, pour tester la vérification de preuve. */
+  /** Simulated malicious tampering, to test proof verification. */
   tamper?: { amountOut?: string; recipient?: string };
 }
 
-// Compteur global : identifiants uniques entre instances (comme le vrai service).
+// Global counter: unique identifiers across instances (like the real service).
 let globalCounter = 0;
-const FEE_BPS = 25; // 0,25 % sans clé (fees.md)
+const FEE_BPS = 25; // 0.25% without a key (fees.md)
 
 export class MockIntents extends BaseIntents {
   readonly mock = true;
@@ -37,7 +37,7 @@ export class MockIntents extends BaseIntents {
   protected async postQuote(b: QuoteRequestBody): Promise<QuoteResponse> {
     const tin = MOCK_TOKENS.find((t) => t.assetId === b.originAsset);
     const tout = MOCK_TOKENS.find((t) => t.assetId === b.destinationAsset);
-    if (!tin || !tout) throw new IntentsGuardError("mock : actif inconnu (utiliser les assetId de listTokens).");
+    if (!tin || !tout) throw new IntentsGuardError("mock: unknown asset (use the assetIds from listTokens).");
     const amountIn = BigInt(b.amount);
     const scale = (p: number) => BigInt(Math.round(p * 1e6));
     const gross = (amountIn * scale(tin.price) * 10n ** BigInt(tout.decimals)) / (scale(tout.price) * 10n ** BigInt(tin.decimals));
@@ -63,20 +63,20 @@ export class MockIntents extends BaseIntents {
     return response;
   }
 
-  // --- pilotage des scénarios de test ---
+  // --- test scenario driving ---
 
-  /** Simule l'arrivée d'un dépôt on-chain à l'adresse du devis. */
+  /** Simulates the arrival of an on-chain deposit at the quote's address. */
   simulateDeposit(depositAddress: string, o: { txHash?: string; amount?: string; outcome?: MockOutcome } = {}): void {
     const s = this.must(depositAddress);
     s.deposit = { txHash: o.txHash ?? `mock-tx-${depositAddress}`, amount: o.amount ?? s.quote.quote.amountIn, outcome: o.outcome ?? "SUCCESS", submitted: false };
   }
 
-  /** Falsifie le résultat renvoyé (un serveur hostile ou un bug) : doit être rejeté par verifyDeposit. */
+  /** Tampers with the returned result (a hostile server or a bug): must be rejected by verifyDeposit. */
   tamper(depositAddress: string, t: { amountOut?: string; recipient?: string }): void { this.must(depositAddress).tamper = t; }
 
   private must(addr: string): MockSwap {
     const s = this.swaps.get(addr);
-    if (!s) throw new IntentsGuardError("mock : adresse de dépôt inconnue (404).");
+    if (!s) throw new IntentsGuardError("mock: unknown deposit address (404).");
     return s;
   }
 
@@ -109,7 +109,7 @@ export class MockIntents extends BaseIntents {
 
   protected async postSubmit(b: { txHash: string; depositAddress: string }): Promise<StatusResponse> {
     const s = this.must(b.depositAddress);
-    if (!s.deposit) throw new IntentsGuardError("mock : aucun dépôt simulé à cette adresse.");
+    if (!s.deposit) throw new IntentsGuardError("mock: no simulated deposit at this address.");
     s.deposit.submitted = true;
     return this.status(b.depositAddress, false);
   }

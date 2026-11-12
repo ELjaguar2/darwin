@@ -1,5 +1,5 @@
-// Client HTTP 1Click (https://1click.chaindefuser.com). Aucune signature, aucune clé privée : ce code ne déplace jamais de fonds.
-// Il demande des devis, annonce un hash de dépôt et lit des statuts. Les méthodes live sont verrouillées dans base.ts.
+// 1Click HTTP client (https://1click.chaindefuser.com). No signature, no private key: this code never moves funds.
+// It requests quotes, announces a deposit hash and reads statuses. The live methods are locked in base.ts.
 import type { Config } from "../shared/index.ts";
 import { BaseIntents, type BaseOptions, type QuoteRequestBody } from "./base.ts";
 import {
@@ -33,7 +33,7 @@ export class OneClickIntents extends BaseIntents {
   private async call(method: "GET" | "POST", path: string, body?: unknown): Promise<unknown> {
     const headers: Record<string, string> = { accept: "application/json" };
     if (body !== undefined) headers["content-type"] = "application/json";
-    // Doc authentication.md : le JWT partenaire s'envoie en `X-API-Key`. Jamais journalisé.
+    // Doc authentication.md: the partner JWT is sent as `X-API-Key`. Never logged.
     if (this.cfg.jwt) headers["x-api-key"] = this.cfg.jwt;
     let res: Response;
     try {
@@ -58,7 +58,7 @@ export class OneClickIntents extends BaseIntents {
   }
 
   protected async postQuote(body: QuoteRequestBody): Promise<QuoteResponse> {
-    return QuoteResponseSchema.parse(await this.call("POST", "/v0/quote", body)); // renvoie 201 en pratique
+    return QuoteResponseSchema.parse(await this.call("POST", "/v0/quote", body)); // returns 201 in practice
   }
 
   protected async postSubmit(body: { txHash: string; depositAddress: string; memo?: string; nearSenderAccount?: string }): Promise<StatusResponse> {

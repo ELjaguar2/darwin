@@ -1,10 +1,10 @@
-// Catalogue des événements du journal. Source de vérité : docs/ARCHITECTURE.md §8.
-// Le journal est append-only (JSONL), rejoué par SSE ; l'UI se reconstruit uniquement à partir de lui + /api/state.
+// Journal event catalogue. Source of truth: docs/ARCHITECTURE.md §8.
+// The journal is append-only (JSONL), replayed over SSE; the UI is rebuilt only from it + /api/state.
 import type { Yocto } from "./money.ts";
 import type { Agent, Bid, Genome, Letter, Profession, Task, Validation, CauseOfDeath } from "./types.ts";
 import type { DeliverableJournalFile, MarketEvent } from "./deliverable.ts";
 
-/** type -> charge utile (`data`). Ajouter un type = l'ajouter ici ET dans ARCHITECTURE.md §8. */
+/** type -> payload (`data`). Adding a type = adding it here AND in ARCHITECTURE.md §8. */
 export interface EventCatalog {
   // simulation
   "sim.started": { mode: "mock" | "testnet"; preset: string; seed: number; chain: string; brain: string };
@@ -12,12 +12,12 @@ export interface EventCatalog {
   "sim.resumed": Record<string, never>;
   "sim.stopped": { reason: "extinction" | "manual" | "max_ticks" | "error"; generations: number };
   "sim.tick": { alive: number; tasksOpen: number; totalBalance: Yocto };
-  // cycle de vie
+  // life cycle
   "agent.born": { agent: Agent; parentId: string | null; birthTx?: string };
   "agent.reproduced": { parentId: string; childId: string; transferred: Yocto; mutations: Record<string, [unknown, unknown]> };
   "agent.died": { agentId: string; cause: CauseOfDeath; finalBalance: Yocto; swept: Yocto; sweptTo?: string; tx?: string };
   "letter.written": { letter: Letter };
-  // marché
+  // market
   "task.posted": { task: Task };
   "bid.placed": { bid: Bid };
   "task.awarded": { taskId: string; bidId: string; winnerId: string; price: Yocto; bids: number };
@@ -29,19 +29,19 @@ export interface EventCatalog {
   "escrow.refunded": { taskId: string; payer: string; amount: Yocto; tx: string };
   "subcontract.created": { parentTaskId: string; childTaskId: string; byAgentId: string };
   "reputation.updated": { agentId: string; delta: number; total: number; taskId: string; tx?: string };
-  // freelance réel (L16)
+  // real freelance (L16)
   "deliverable.produced": { taskId: string; profession: Profession; agentId: string; files: DeliverableJournalFile[]; productionCostUsd: number; judgeCostUsd: number; resultHash: string };
   "market.event": { event: MarketEvent };
-  // économie / IA
+  // economy / AI
   "brain.charged": { agentId: string; purpose: string; model: string; promptTokens: number; completionTokens: number; reasoningTokens: number; cost: Yocto; costUsd: number; nearUsdRate: number; priceSource: "models" | "mock"; mock: boolean; tx?: string };
   "balance.changed": { agentId: string; balance: Yocto; delta: Yocto; reason: string };
   "funding.received": { to: string; amount: Yocto; source: "master" | "faucet" | "demo"; tx: string };
-  // chaîne / intents / technique
+  // chain / intents / technical
   "chain.tx": { kind: string; from?: string; to?: string; amount?: Yocto; hash: string; explorerUrl?: string };
   "intents.quote": { dry: true; originAsset: string; destinationAsset: string; amountIn: string; amountOut?: string; note?: string };
   "system.warning": { code: string; message: string };
   "system.error": { code: string; message: string };
-  // --- L16 moteur : indicateurs de spécialisation ---
+  // --- L16 engine: specialisation indicators ---
   "population.snapshot": { tick: number; byProfession: Record<Profession, number>; byGeneration: Record<string, Record<Profession, number>> };
 }
 
@@ -60,7 +60,7 @@ export const EVENT_TYPES = [
 
 export type DarwinEvent<T extends EventType = EventType> = {
   [K in T]: {
-    seq: number; // numéro croissant sans trou, sert de Last-Event-ID SSE
+    seq: number; // increasing number with no gap, serves as the SSE Last-Event-ID
     ts: string; // ISO UTC
     tick: number;
     type: K;

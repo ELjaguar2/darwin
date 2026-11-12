@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-/** JSON canonique (clés triées) pour des hash stables. */
+/** Canonical JSON (sorted keys) for stable hashes. */
 export function canonicalJson(v: unknown): string {
   if (v === null || typeof v !== "object") return JSON.stringify(v);
   if (Array.isArray(v)) return `[${v.map(canonicalJson).join(",")}]`;

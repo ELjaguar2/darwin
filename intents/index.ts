@@ -1,7 +1,7 @@
-// Point d'entrée du module Intents (lot L9).
-//  - INTENTS_ENABLED!=true (défaut) : stub désactivé, `enabled:false`, toute méthode lève IntentsDisabledError, aucun appel réseau.
-//  - activé + mode mock : MockIntents (aucun réseau).
-//  - activé + mode testnet : client 1Click réel ; dry:false/deposit-submit exigent en plus INTENTS_DRY_ONLY=false.
+// Entry point of the Intents module (lot L9).
+//  - INTENTS_ENABLED!=true (default): disabled stub, `enabled:false`, every method throws IntentsDisabledError, no network call.
+//  - enabled + mock mode: MockIntents (no network).
+//  - enabled + testnet mode: real 1Click client; dry:false/deposit-submit additionally require INTENTS_DRY_ONLY=false.
 import type { Config } from "../shared/index.ts";
 import { BaseIntents, type BaseOptions, type QuoteRequestBody } from "./base.ts";
 import { IntentsDisabledError } from "./guard.ts";
@@ -18,7 +18,7 @@ class DisabledIntents extends BaseIntents {
 }
 
 export interface CreateIntentsOptions extends OneClickOptions {
-  /** Force le mock même en mode testnet (tests). */
+  /** Forces the mock even in testnet mode (tests). */
   forceMock?: boolean;
 }
 

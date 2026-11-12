@@ -1,6 +1,6 @@
-// Registre, séquestre et réputation LOCAUX de NearChain en mode dégradé (D-016/D-022) : tant que le contrat
-// `contracts/darwin` (lot L3) n'est pas branché, ces trois fonctions vivent dans le journal local, pas on-chain.
-// Ils ne doivent JAMAIS être présentés comme « on-chain » ou « contrat intelligent » (D-022). Persistance JSON optionnelle.
+// LOCAL registry, escrow and reputation of NearChain in degraded mode (D-016/D-022): as long as the
+// `contracts/darwin` contract (lot L3) is not wired in, these three functions live in the local journal, not on-chain.
+// They must NEVER be presented as "on-chain" or "smart contract" (D-022). Optional JSON persistence.
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { AgentRecord } from "../shared/chain.ts";
@@ -9,20 +9,20 @@ export interface EscrowRow {
   taskId: string;
   payer: string;
   amount: string; // yocto
-  /** `releasing`/`refunding` : transfert décidé, pas encore confirmé (écrit AVANT le transfert, reprise par recover()). */
+  /** `releasing`/`refunding`: transfer decided, not yet confirmed (written BEFORE the transfer, resumed by recover()). */
   status: "locked" | "releasing" | "released" | "refunding" | "refunded";
-  escrowBefore?: string; // solde du compte escrow avant le transfert (sert à la reprise après plantage)
+  escrowBefore?: string; // balance of the escrow account before the transfer (used for recovery after a crash)
   payee?: string;
-  proofHash?: string; // result_hash de la preuve de libération
+  proofHash?: string; // result_hash of the release proof
   reason?: "rejected" | "expired";
 }
 
 interface LedgerData {
   records: Record<string, AgentRecord>;
   reputation: Record<string, number>;
-  reputationProofs: string[]; // `${agentId}|${taskId}` déjà comptés (pas de double crédit)
+  reputationProofs: string[]; // `${agentId}|${taskId}` already counted (no double credit)
   escrows: Record<string, EscrowRow>;
-  reservations: Record<string, string>; // taskId -> payeur (réservation opérateur, consommée au verrouillage)
+  reservations: Record<string, string>; // taskId -> payer (operator reservation, consumed on lock)
   closedAccounts: string[];
 }
 
@@ -41,7 +41,7 @@ export class LocalLedger {
     }
   }
 
-  /** Enregistre sur disque (écritures sérialisées, remplacement atomique). */
+  /** Saves to disk (serialised writes, atomic replacement). */
   async save(): Promise<void> {
     if (!this.path) return;
     const path = this.path;

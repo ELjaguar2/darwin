@@ -18,19 +18,19 @@ const N = parseNear;
 const Y = (x: string) => parseNear(x).toString();
 const proof = { resultHash: "h1", verdict: "accepted" as const, validator: "rule:len" };
 
-describe("base58 et clés", () => {
-  it("aller-retour base58, zéros de tête compris", () => {
+describe("base58 and keys", () => {
+  it("base58 round trip, leading zeros included", () => {
     for (const hex of ["00", "0000ff", "ff", "0102030405060708090a"]) {
       const b = Buffer.from(hex, "hex");
       expect(Buffer.from(base58Decode(base58Encode(b))).toString("hex")).toBe(hex);
     }
   });
-  it("clé générée : publicKeyOf cohérent, format NEAR (64 octets)", () => {
+  it("generated key: consistent publicKeyOf, NEAR format (64 bytes)", () => {
     const k = generateKey();
     expect(publicKeyOf(k.secretKey)).toBe(k.publicKey);
     expect(base58Decode(k.secretKey.reveal().slice(8))).toHaveLength(64);
   });
-  it("Secret ne fuit ni par toString, ni JSON, ni inspect", () => {
+  it("Secret leaks neither through toString, nor JSON, nor inspect", () => {
     const k = generateKey();
     const raw = k.secretKey.reveal();
     expect(`${k.secretKey}`).toBe("[SECRET]");
@@ -43,7 +43,7 @@ describe("base58 et clés", () => {
       expect((e as Error).message).not.toContain("abc");
     }
   });
-  it("FileKeyStore : fichier *.key, retrait, identifiant piégé refusé", async () => {
+  it("FileKeyStore: *.key file, removal, booby-trapped identifier refused", async () => {
     const dir = await mkdtemp(join(tmpdir(), "darwin-keys-"));
     const ks = new FileKeyStore(dir);
     const k = generateKey();
@@ -57,8 +57,8 @@ describe("base58 et clés", () => {
   });
 });
 
-describe("plafonds de dépense", () => {
-  it("par transaction et sur fenêtre glissante, maître exempté", () => {
+describe("spending caps", () => {
+  it("per transaction and over a sliding window, master exempt", () => {
     let t = 0;
     const p = new SpendPolicy({ defaultLimit: { perTx: 10n, perWindow: 15n, windowMs: 1000 }, exempt: ["m"] }, () => t);
     expect(() => p.check("a", 11n)).toThrow(/per_tx/);
@@ -71,7 +71,7 @@ describe("plafonds de dépense", () => {
     p.check("m", 10n ** 30n);
     expect(p.remaining("m")).toBeNull();
   });
-  it("l'erreur de plafond n'est pas INSUFFICIENT_FUNDS (ne tue pas un agent)", () => {
+  it("the cap error is not INSUFFICIENT_FUNDS (does not kill an agent)", () => {
     const p = new SpendPolicy({ defaultLimit: defaultSpendLimit(N("1")) });
     try {
       p.check("a", N("100"));
@@ -82,13 +82,13 @@ describe("plafonds de dépense", () => {
 });
 
 describe("createChain", () => {
-  it("mock par défaut, sans clé", () => {
+  it("mock by default, without a key", () => {
     expect(createChain(loadConfig({})).info().kind).toBe("mock");
   });
-  it("testnet sans clé maître : erreur claire sans secret", () => {
+  it("testnet without a master key: clear error without a secret", () => {
     expect(() => createChain(loadConfig({ DARWIN_MODE: "testnet" }))).toThrow(/NEAR_MASTER_ACCOUNT_ID/);
   });
-  it("testnet avec clé maître : NearChain (backend injecté)", () => {
+  it("testnet with a master key: NearChain (injected backend)", () => {
     const k = generateKey();
     const { backend } = FakeNearBackendFactory("m.testnet");
     const c = createChain(
@@ -108,7 +108,7 @@ describe("createChain", () => {
 });
 
 describe("NearChain, mode contrat (faux backend)", () => {
-  it("naissance : sous-compte, clé complète gardée, clé function call limitée au contrat", async () => {
+  it("birth: sub-account, full key kept, function call key limited to the contract", async () => {
     const { chain, backend, keystore } = newChain({ contract: true });
     const { accountId, tx } = await chain.createAccount({ label: "a-0001", initialFunding: Y("0.3") });
     expect(accountId).toBe("a-0001.darwin.testnet");
@@ -121,11 +121,11 @@ describe("NearChain, mode contrat (faux backend)", () => {
     expect(fc.allowance > 0n && fc.allowance <= N("0.1")).toBe(true);
     expect((await keystore.get(accountId, "full"))?.role).toBe("full");
     expect((await keystore.get(accountId, "fc"))?.publicKey).toBe(fc.publicKey);
-    await expect(chain.createAccount({ label: "a-0001", initialFunding: "1" })).rejects.toThrow(/déjà/);
-    await expect(chain.createAccount({ label: "Bad.Label", initialFunding: "1" })).rejects.toThrow(/invalide/);
+    await expect(chain.createAccount({ label: "a-0001", initialFunding: "1" })).rejects.toThrow(/already/);
+    await expect(chain.createAccount({ label: "Bad.Label", initialFunding: "1" })).rejects.toThrow(/invalid/i);
   });
 
-  it("naissance : la clé function call est dans la transaction de création (jamais ajoutée après coup)", async () => {
+  it("birth: the function call key is in the creation transaction (never added afterwards)", async () => {
     const { chain, backend, keystore } = newChain({ contract: true });
     let afterwards = 0;
     const orig = backend.addFunctionCallKey.bind(backend);
@@ -143,7 +143,7 @@ describe("NearChain, mode contrat (faux backend)", () => {
     expect((await keystore.get(accountId, "fc"))?.publicKey).toBe(backend.fcKeys[0]!.publicKey);
   });
 
-  it("échec de la création : les deux clés (complète et function call) sont retirées du keystore", async () => {
+  it("creation failure: both keys (full and function call) are removed from the keystore", async () => {
     const { chain, backend, keystore } = newChain({ contract: true });
     backend.createSubAccount = async () => {
       throw new Error("boom");
@@ -153,10 +153,10 @@ describe("NearChain, mode contrat (faux backend)", () => {
     expect(await keystore.get("a-0003.darwin.testnet", "fc")).toBeNull();
   });
 
-  it("naissance financée par le parent : le capital vient du parent, plafond appliqué", async () => {
+  it("birth funded by the parent: the capital comes from the parent, cap applied", async () => {
     const { chain } = newChain({ contract: true, birth: N("0.3") });
     const p = await chain.createAccount({ label: "p", initialFunding: Y("5") });
-    // plafond perTx = 4 x 0.3 = 1.2 : un enfant à 1.5 est refusé
+    // perTx cap = 4 x 0.3 = 1.2: a child at 1.5 is refused
     await expect(chain.createAccount({ label: "c1", initialFunding: Y("1.5"), fundFrom: p.accountId })).rejects.toThrow(/SPEND_CAP/);
     const before = BigInt(await chain.getBalance(p.accountId));
     const c = await chain.createAccount({ label: "c2", initialFunding: Y("0.5"), fundFrom: p.accountId });
@@ -164,7 +164,7 @@ describe("NearChain, mode contrat (faux backend)", () => {
     expect(await chain.getBalance(c.accountId)).toBe(N("0.5").toString());
   });
 
-  it("registre : envoie genome_json canonique + hash ; hash faux refusé ; lecture et lignée", async () => {
+  it("registry: sends canonical genome_json + hash; wrong hash refused; read and lineage", async () => {
     const { chain, backend } = newChain({ contract: true });
     await chain.registerAgent(rec("a-0001", "a-0001.darwin.testnet"));
     const sent = (backend.calls[0]!.args as { record: { genome_json: string; genome_hash: string } }).record;
@@ -189,7 +189,7 @@ describe("NearChain, mode contrat (faux backend)", () => {
     return { ...t, payer: payer.accountId, worker: worker.accountId };
   }
 
-  it("séquestre : le payeur signe et est débité ; libération puis réputation", async () => {
+  it("escrow: the payer signs and is debited; release then reputation", async () => {
     const { chain, backend, payer, worker } = await setup();
     await chain.lockEscrow({ taskId: "t-1", payer, amount: Y("0.2") });
     expect(backend.calls.find((c) => c.method === "lock_escrow")).toMatchObject({ signer: payer, deposit: N("0.2") });
@@ -203,13 +203,13 @@ describe("NearChain, mode contrat (faux backend)", () => {
     await expect(chain.addReputation({ agentId: "a-1", taskId: "t-1", delta: 1, proofHash: "autre" })).rejects.toMatchObject({ code: "PROOF_REQUIRED" });
     expect((await chain.addReputation({ agentId: "a-1", taskId: "t-1", delta: 2, proofHash: "h1" })).total).toBe(2);
     expect(await chain.getReputation("a-1")).toBe(2);
-    await expect(chain.addReputation({ agentId: "a-1", taskId: "t-1", delta: 0, proofHash: "h1" })).rejects.toThrow(/entier/);
+    await expect(chain.addReputation({ agentId: "a-1", taskId: "t-1", delta: 0, proofHash: "h1" })).rejects.toThrow(/integer/);
   });
 
-  it("remboursement : seulement rejected|expired ; malus après rejet", async () => {
+  it("refund: only rejected|expired; penalty after rejection", async () => {
     const { chain, payer } = await setup();
     await chain.lockEscrow({ taskId: "t-2", payer, amount: Y("0.1") });
-    await expect(chain.refundEscrow({ taskId: "t-2", reason: "bored" })).rejects.toThrow(/rejected et expired/);
+    await expect(chain.refundEscrow({ taskId: "t-2", reason: "bored" })).rejects.toThrow(/rejected and expired/);
     expect(refundReasonOf("Expired")).toBe("expired");
     await chain.refundEscrow({ taskId: "t-2", reason: "rejected" });
     expect(await chain.getBalance(payer)).toBe(N("1").toString());
@@ -217,16 +217,16 @@ describe("NearChain, mode contrat (faux backend)", () => {
     await expect(chain.lockEscrow({ taskId: "t-2", payer, amount: "1" })).rejects.toMatchObject({ code: "ESCROW_EXISTS" });
   });
 
-  it("statut transitoire : releasing attendu puis confirmé ; si jamais confirmé, erreur", async () => {
+  it("transient status: releasing awaited then confirmed; if never confirmed, error", async () => {
     const { chain, backend, payer, worker } = await setup(true);
     await chain.lockEscrow({ taskId: "t-3", payer, amount: Y("0.1") });
     const p = chain.releaseEscrow({ taskId: "t-3", payee: worker, proof });
-    // le callback arrive pendant l'attente (sleep injecté ci-dessous le déclenche)
+    // the callback arrives during the wait (the sleep injected below triggers it)
     await expect(p).resolves.toBeDefined();
     expect(backend.escrows.get("t-3")!.status).toBe("released");
   });
 
-  it("releasing vu comme locked par getEscrow", async () => {
+  it("releasing seen as locked by getEscrow", async () => {
     const { chain, backend, payer, worker } = await setup(true);
     await chain.lockEscrow({ taskId: "t-4", payer, amount: Y("0.1") });
     backend.escrows.get("t-4")!.status = "releasing";
@@ -234,7 +234,7 @@ describe("NearChain, mode contrat (faux backend)", () => {
     void worker;
   });
 
-  it("réservation : lockEscrow enchaîne reserve_task (opérateur) puis lock_escrow (payeur)", async () => {
+  it("reservation: lockEscrow chains reserve_task (operator) then lock_escrow (payer)", async () => {
     const { chain, backend, payer } = await setup();
     await chain.lockEscrow({ taskId: "t-5", payer, amount: Y("0.1") });
     const seq = backend.calls.filter((c) => c.args.task_id === "t-5").map((c) => `${c.method}:${c.signer}`);
@@ -242,13 +242,13 @@ describe("NearChain, mode contrat (faux backend)", () => {
     expect(backend.reservations.has("t-5")).toBe(false);
   });
 
-  it("réservation manquante refusée par le contrat (appel direct sans reserve_task)", async () => {
+  it("missing reservation refused by the contract (direct call without reserve_task)", async () => {
     const { backend, payer } = await setup();
     const signer = { accountId: payer, secretKey: generateKey().secretKey };
     await expect(backend.call(signer, "c", "lock_escrow", { task_id: "t-6", payer }, { deposit: 1n })).rejects.toThrow(/TASK_NOT_RESERVED/);
   });
 
-  it("id squatté refusé : réservé pour un autre payeur, ou déjà réservé", async () => {
+  it("squatted id refused: reserved for another payer, or already reserved", async () => {
     const { chain, backend, payer } = await setup();
     backend.reservations.set("t-7", "intrus.darwin.testnet");
     await expect(chain.lockEscrow({ taskId: "t-7", payer, amount: Y("0.1") })).rejects.toMatchObject({ code: "ESCROW_EXISTS" });
@@ -256,27 +256,27 @@ describe("NearChain, mode contrat (faux backend)", () => {
     await expect(
       backend.call({ accountId: "darwin.testnet", secretKey: generateKey().secretKey }, "c", "reserve_task", { task_id: "t-7", payer }),
     ).rejects.toMatchObject({ code: "ESCROW_EXISTS" });
-    // réservation identique laissée par un échec précédent : reprise sans nouvel appel reserve_task
+    // identical reservation left by a previous failure: resumed without a new reserve_task call
     backend.reservations.set("t-8", payer);
     await chain.lockEscrow({ taskId: "t-8", payer, amount: Y("0.1") });
     expect(backend.calls.filter((c) => c.method === "reserve_task" && c.args.task_id === "t-8")).toHaveLength(0);
   });
 
-  it("malus accepté après remboursement expired", async () => {
+  it("penalty accepted after an expired refund", async () => {
     const { chain, payer } = await setup();
     await chain.lockEscrow({ taskId: "t-10", payer, amount: Y("0.1") });
     await chain.refundEscrow({ taskId: "t-10", reason: "expired" });
     expect((await chain.addReputation({ agentId: "a-1", taskId: "t-10", delta: -2, proofHash: "x" })).total).toBe(-2);
   });
 
-  it("solde insuffisant : INSUFFICIENT_FUNDS, rien n'est débité", async () => {
+  it("insufficient balance: INSUFFICIENT_FUNDS, nothing is debited", async () => {
     const { chain, payer } = await setup();
     await expect(chain.transfer({ from: payer, to: "worker.darwin.testnet", amount: Y("50") })).rejects.toMatchObject({ code: "INSUFFICIENT_FUNDS" });
   });
 });
 
-describe("mort : fermeture et archivage", () => {
-  it("le solde revient au maître, clés retirées, archive sans clé privée", async () => {
+describe("death: closing and archiving", () => {
+  it("the balance returns to the master, keys removed, archive without a private key", async () => {
     const { chain, backend, keystore, archive } = newChain({ contract: true });
     const a = await chain.createAccount({ label: "a", initialFunding: Y("0.3") });
     const pub = (await keystore.get(a.accountId, "full"))!;
@@ -294,7 +294,7 @@ describe("mort : fermeture et archivage", () => {
     expect(JSON.stringify(rows)).not.toContain(secret);
     await expect(chain.getBalance(a.accountId)).rejects.toMatchObject({ code: "UNKNOWN_ACCOUNT" });
   });
-  it("suppression impossible : balayage et état « frozen »", async () => {
+  it("deletion impossible: sweep and \"frozen\" state", async () => {
     const { chain, backend, archive } = newChain({ contract: true });
     const a = await chain.createAccount({ label: "b", initialFunding: Y("0.3") });
     backend.failDelete = true;
@@ -302,12 +302,12 @@ describe("mort : fermeture et archivage", () => {
     expect(BigInt(r.swept) > 0n).toBe(true);
     expect((await archive.list())[0]!.disposition).toBe("frozen");
   });
-  it("bénéficiaire inexistant : refus (les fonds seraient détruits)", async () => {
+  it("non-existent beneficiary: refused (funds would be destroyed)", async () => {
     const { chain } = newChain({ contract: true });
     const a = await chain.createAccount({ label: "c", initialFunding: Y("0.3") });
     await expect(chain.closeAccount({ accountId: a.accountId, beneficiary: "ghost.testnet" })).rejects.toMatchObject({ code: "UNKNOWN_ACCOUNT" });
   });
-  it("FileArchive : une ligne JSON par compte", async () => {
+  it("FileArchive: one JSON line per account", async () => {
     const dir = await mkdtemp(join(tmpdir(), "darwin-arch-"));
     const fa = new FileArchive(join(dir, "a.jsonl"));
     await fa.add({ accountId: "x", beneficiary: "m", swept: "1", closedAt: "t", tx: "h", disposition: "deleted", retiredPublicKeys: [] });
@@ -316,8 +316,8 @@ describe("mort : fermeture et archivage", () => {
   });
 });
 
-describe("NearChain, mode dégradé (sans contrat, D-016)", () => {
-  it("séquestre par sous-compte escrow, registre et réputation locaux, mêmes règles que le contrat", async () => {
+describe("NearChain, degraded mode (no contract, D-016)", () => {
+  it("escrow via an escrow sub-account, local registry and reputation, same rules as the contract", async () => {
     const { chain, backend } = newChain({ contract: false });
     expect(chain.mode).toBe("degraded");
     const payer = await chain.createAccount({ label: "payer", initialFunding: Y("1") });
@@ -330,15 +330,15 @@ describe("NearChain, mode dégradé (sans contrat, D-016)", () => {
     await chain.releaseEscrow({ taskId: "t-1", payee: worker.accountId, proof });
     expect(await chain.getBalance(worker.accountId)).toBe(N("0.5").toString());
     expect((await chain.addReputation({ agentId: "a-1", taskId: "t-1", delta: 3, proofHash: "h1" })).total).toBe(3);
-    await expect(chain.addReputation({ agentId: "a-1", taskId: "t-1", delta: 3, proofHash: "h1" })).rejects.toThrow(/déjà/);
+    await expect(chain.addReputation({ agentId: "a-1", taskId: "t-1", delta: 3, proofHash: "h1" })).rejects.toThrow(/already/);
     await chain.lockEscrow({ taskId: "t-2", payer: payer.accountId, amount: Y("0.1") });
     await chain.refundEscrow({ taskId: "t-2", reason: "expired" });
     expect((await chain.getEscrow("t-2"))?.status).toBe("refunded");
-    expect((await chain.addReputation({ agentId: "a-1", taskId: "t-2", delta: -1, proofHash: "x" })).total).toBe(2); // malus après expiration
-    // même règle de réservation que le contrat
+    expect((await chain.addReputation({ agentId: "a-1", taskId: "t-2", delta: -1, proofHash: "x" })).total).toBe(2); // penalty after expiry
+    // same reservation rule as the contract
     await chain.lockEscrow({ taskId: "t-3", payer: payer.accountId, amount: Y("0.1") });
-    expect(chain.ledger.reservations["t-3"]).toBeUndefined(); // consommée
-    await expect(chain.addReputation({ agentId: "a-1", taskId: "t-3", delta: -1, proofHash: "x" })).rejects.toMatchObject({ code: "PROOF_REQUIRED" }); // pas remboursé
+    expect(chain.ledger.reservations["t-3"]).toBeUndefined(); // consumed
+    await expect(chain.addReputation({ agentId: "a-1", taskId: "t-3", delta: -1, proofHash: "x" })).rejects.toMatchObject({ code: "PROOF_REQUIRED" }); // not refunded
     chain.ledger.reservations["t-9"] = "autre.darwin.testnet";
     await expect(chain.lockEscrow({ taskId: "t-9", payer: payer.accountId, amount: Y("0.1") })).rejects.toMatchObject({ code: "ESCROW_EXISTS" });
     await chain.markAgentDead({ agentId: "a-1", deathTick: 5, cause: "manual" });
@@ -347,7 +347,7 @@ describe("NearChain, mode dégradé (sans contrat, D-016)", () => {
   });
 });
 
-describe("mode dégradé : règlement sûr du séquestre (statut avant transfert, verrou, reprise)", () => {
+describe("degraded mode: safe escrow settlement (status before transfer, lock, recovery)", () => {
   async function degraded() {
     const t = newChain({ contract: false });
     const payer = await t.chain.createAccount({ label: "payer", initialFunding: Y("1") });
@@ -356,7 +356,7 @@ describe("mode dégradé : règlement sûr du séquestre (statut avant transfert
     return { ...t, payer: payer.accountId, worker: worker.accountId, esc: "escrow.darwin.testnet" };
   }
 
-  it("le statut releasing est écrit (et sauvegardé) AVANT le transfert", async () => {
+  it("the releasing status is written (and saved) BEFORE the transfer", async () => {
     const { chain, backend, worker, esc } = await degraded();
     const seen: string[] = [];
     backend.onTransfer = (from) => {
@@ -367,7 +367,7 @@ describe("mode dégradé : règlement sûr du séquestre (statut avant transfert
     expect(chain.ledger.escrows["t-1"]!.status).toBe("released");
   });
 
-  it("appels concurrents : un seul paiement, l'autre refusé", async () => {
+  it("concurrent calls: a single payment, the other refused", async () => {
     const { chain, backend, worker, esc } = await degraded();
     let paid = 0;
     backend.onTransfer = (from) => {
@@ -384,13 +384,13 @@ describe("mode dégradé : règlement sûr du séquestre (statut avant transfert
     expect(await chain.getBalance(worker)).toBe(Y("0.5"));
   });
 
-  it("double libération séquentielle refusée", async () => {
+  it("sequential double release refused", async () => {
     const { chain, worker } = await degraded();
     await chain.releaseEscrow({ taskId: "t-1", payee: worker, proof });
     await expect(chain.releaseEscrow({ taskId: "t-1", payee: worker, proof })).rejects.toMatchObject({ code: "ESCROW_SETTLED" });
   });
 
-  it("transfert en échec : retour à locked, nouvel essai possible, aucun montant perdu", async () => {
+  it("failed transfer: back to locked, retry possible, no amount lost", async () => {
     const { chain, backend, worker, esc } = await degraded();
     backend.failTransfersFrom = { accountId: esc, times: 1 };
     await expect(chain.releaseEscrow({ taskId: "t-1", payee: worker, proof })).rejects.toThrow(/transfer failed/);
@@ -401,9 +401,9 @@ describe("mode dégradé : règlement sûr du séquestre (statut avant transfert
     expect((await chain.getEscrow("t-1"))?.status).toBe("refunded");
   });
 
-  it("reprise après plantage : transfert effectué -> état final ; non effectué -> locked", async () => {
+  it("recovery after a crash: transfer done -> final state; not done -> locked", async () => {
     const a = await degraded();
-    // plantage APRÈS le transfert : statut resté releasing, solde escrow déjà baissé
+    // crash AFTER the transfer: status stayed releasing, escrow balance already lowered
     const rowA = a.chain.ledger.escrows["t-1"]!;
     const before = await a.chain.getBalance(a.esc);
     rowA.status = "releasing";
@@ -411,12 +411,12 @@ describe("mode dégradé : règlement sûr du séquestre (statut avant transfert
     rowA.proofHash = "h1";
     rowA.escrowBefore = before;
     await a.backend.transfer({ accountId: a.esc, secretKey: generateKey().secretKey }, a.worker, BigInt(rowA.amount));
-    await expect(a.chain.releaseEscrow({ taskId: "t-1", payee: a.worker, proof })).rejects.toMatchObject({ code: "ESCROW_SETTLED" }); // en cours : pas de second paiement
+    await expect(a.chain.releaseEscrow({ taskId: "t-1", payee: a.worker, proof })).rejects.toMatchObject({ code: "ESCROW_SETTLED" }); // in progress: no second payment
     expect((await a.chain.getEscrow("t-1"))?.status).toBe("locked");
     expect(await a.chain.recover()).toEqual(["t-1"]);
     expect(a.chain.ledger.escrows["t-1"]).toMatchObject({ status: "released", payee: a.worker });
 
-    // plantage AVANT le transfert : solde inchangé -> retour à locked, puis paiement possible
+    // crash BEFORE the transfer: balance unchanged -> back to locked, then payment possible
     const b = await degraded();
     const rowB = b.chain.ledger.escrows["t-1"]!;
     rowB.status = "refunding";

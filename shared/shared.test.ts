@@ -6,7 +6,7 @@ import {
 
 const genome = {
   profession: "marketing", model: "mock/small", askRatio: 0.7, risk: 0.5, reproThreshold: 2,
-  generosity: 0.2, cooperation: 0.5, personality: "Sérieux et économe.",
+  generosity: 0.2, cooperation: 0.5, personality: "Serious and thrifty.",
 } as const;
 
 describe("money", () => {
@@ -15,7 +15,7 @@ describe("money", () => {
     expect(formatNear(parseNear("0.25"))).toBe("0.25");
     expect(() => parseNear("abc")).toThrow();
   });
-  it("coût IA : tokens de raisonnement comptés, arrondi au supérieur", () => {
+  it("AI cost: reasoning tokens counted, rounded up", () => {
     const price = { usdPerMTokIn: 1, usdPerMTokOut: 2 };
     const a = costYocto({ promptTokens: 1000, completionTokens: 500, reasoningTokens: 0, totalTokens: 1500 }, price, 2);
     const b = costYocto({ promptTokens: 1000, completionTokens: 500, reasoningTokens: 300, totalTokens: 1800 }, price, 2);
@@ -26,12 +26,12 @@ describe("money", () => {
     const base = { promptTokens: 100, completionTokens: 50, reasoningTokens: 0, totalTokens: 150 };
     expect(billableCompletionTokens(base)).toBe(50);
     expect(billableCompletionTokens({ ...base, totalTokens: 400 })).toBe(300);
-    // total_tokens absent (0) : le raisonnement seul fait foi
+    // total_tokens absent (0): reasoning alone counts
     expect(billableCompletionTokens({ ...base, totalTokens: 0, reasoningTokens: 120 })).toBe(120);
     expect(billableCompletionTokens({ ...base, totalTokens: Number.NaN })).toBe(50);
     expect(billableCompletionTokens({ promptTokens: 10, completionTokens: 0, reasoningTokens: 0, totalTokens: 0 })).toBe(0);
   });
-  it("prix inconnu ou invalide : erreur, jamais un coût nul silencieux", () => {
+  it("unknown or invalid price: error, never a silent zero cost", () => {
     const u = { promptTokens: 10, completionTokens: 10, reasoningTokens: 0, totalTokens: 20 };
     expect(() => costYocto(u, undefined as never, 2)).toThrow();
     expect(() => costYocto(u, { usdPerMTokIn: Number.NaN, usdPerMTokOut: 1 }, 2)).toThrow();
@@ -39,19 +39,19 @@ describe("money", () => {
 });
 
 describe("config", () => {
-  it("défaut = mock sans clé", () => {
+  it("default = mock without a key", () => {
     const c = loadConfig({});
     expect(c.mode).toBe("mock");
     expect(c.chain).toBe("mock");
     expect(c.brain).toBe("mock");
   });
-  it("testnet sans clé IA = cerveau mock ; avec clé = nearai ; secrets masqués", () => {
+  it("testnet without an AI key = mock brain; with a key = nearai; secrets masked", () => {
     expect(loadConfig({ DARWIN_MODE: "testnet" }).brain).toBe("mock");
     const c = loadConfig({ DARWIN_MODE: "testnet", NEARAI_API_KEY: "secret-xyz", NEAR_MASTER_PRIVATE_KEY: "ed25519:abc" });
     expect(c.brain).toBe("nearai");
     expect(JSON.stringify(redactConfig(c))).not.toMatch(/secret-xyz|ed25519:abc/);
   });
-  it("plafonds USD du cerveau : absents = undefined, valides = nombres, invalides = erreur", () => {
+  it("brain USD caps: absent = undefined, valid = numbers, invalid = error", () => {
     const d = loadConfig({});
     expect(d.nearai.maxUsdPerRun).toBeUndefined();
     expect(d.nearai.maxUsdPerHour).toBeUndefined();
@@ -61,18 +61,18 @@ describe("config", () => {
     expect(() => loadConfig({ NEARAI_MAX_USD_PER_RUN: "0" })).toThrow(/NEARAI_MAX_USD_PER_RUN/);
     expect(() => loadConfig({ NEARAI_MAX_USD_PER_HOUR: "abc" })).toThrow(/NEARAI_MAX_USD_PER_HOUR/);
   });
-  it("DARWIN_ALLOWED_HOSTS : liste normalisée, vide par défaut", () => {
+  it("DARWIN_ALLOWED_HOSTS: normalised list, empty by default", () => {
     expect(loadConfig({}).server.allowedHosts).toEqual([]);
     expect(loadConfig({ DARWIN_ALLOWED_HOSTS: " Demo.Example.org, ,b.test:8080 " }).server.allowedHosts).toEqual(["demo.example.org", "b.test:8080"]);
   });
-  it("presets cohérents (minVital < capital)", () => {
+  it("consistent presets (minVital < capital)", () => {
     for (const m of ["mock", "testnet"] as const)
       for (const p of ["normal", "demo"] as const) expect(PRESETS[m][p].minVital).toBeLessThan(PRESETS[m][p].birthCapital);
   });
 });
 
 describe("MockChain", () => {
-  it("cycle complet : naissance, séquestre avec preuve, mort ; conservation de la masse", async () => {
+  it("full cycle: birth, escrow with proof, death; conservation of mass", async () => {
     const chain = new MockChain();
     const supply = chain.totalSupply();
     const cap = parseNear("10").toString();
@@ -87,7 +87,7 @@ describe("MockChain", () => {
 
     const budget = parseNear("2").toString();
     await chain.lockEscrow({ taskId: "t-1", payer: client.accountId, amount: budget });
-    // pas de crédit sans preuve vérifiée
+    // no credit without a verified proof
     await expect(
       chain.releaseEscrow({ taskId: "t-1", payee: parent.accountId, proof: { resultHash: "", verdict: "rejected" as never, validator: "" } }),
     ).rejects.toMatchObject({ code: "PROOF_REQUIRED" });
@@ -98,10 +98,10 @@ describe("MockChain", () => {
     await chain.markAgentDead({ agentId: "a-0001", deathTick: 9, cause: "starvation" });
     const closed = await chain.closeAccount({ accountId: parent.accountId, beneficiary: chain.masterId });
     expect(closed.swept).toBe(parseNear("12").toString());
-    expect((await chain.getAgentRecord("a-0001"))?.alive).toBe(false); // lignée conservée
+    expect((await chain.getAgentRecord("a-0001"))?.alive).toBe(false); // lineage kept
     expect(chain.totalSupply()).toBe(supply);
   });
-  it("règles du contrat : motifs de remboursement, réputation liée au séquestre, une écriture par (tâche, agent)", async () => {
+  it("contract rules: refund reasons, reputation tied to the escrow, one write per (task, agent)", async () => {
     const chain = new MockChain();
     const cap = parseNear("10").toString();
     const a = await chain.createAccount({ label: "a-0001", initialFunding: cap });
@@ -113,13 +113,13 @@ describe("MockChain", () => {
 
     await chain.lockEscrow({ taskId: "t-1", payer: client.accountId, amount });
     await expect(chain.refundEscrow({ taskId: "t-1", reason: "deadline" })).rejects.toMatchObject({ code: "RPC_ERROR" });
-    await expect(rep("t-1", 1, "h1")).rejects.toMatchObject({ code: "PROOF_REQUIRED" }); // pas encore libéré
+    await expect(rep("t-1", 1, "h1")).rejects.toMatchObject({ code: "PROOF_REQUIRED" }); // not yet released
     await expect(rep("inconnu", 1, "h1")).rejects.toMatchObject({ code: "ESCROW_UNKNOWN" });
     await chain.releaseEscrow({ taskId: "t-1", payee: a.accountId, proof });
     await expect(rep("t-1", 1, "autre")).rejects.toMatchObject({ code: "PROOF_REQUIRED" });
     await expect(rep("t-1", 1.5, "h1")).rejects.toMatchObject({ code: "RPC_ERROR" });
     await expect(rep("t-1", 101, "h1")).rejects.toMatchObject({ code: "RPC_ERROR" });
-    await expect(rep("t-1", -1, "h1")).rejects.toMatchObject({ code: "PROOF_REQUIRED" }); // malus seulement après remboursement
+    await expect(rep("t-1", -1, "h1")).rejects.toMatchObject({ code: "PROOF_REQUIRED" }); // penalty only after a refund
     expect((await rep("t-1", 2, "h1")).total).toBe(2);
     await expect(rep("t-1", 2, "h1")).rejects.toMatchObject({ code: "REPUTATION_EXISTS" });
 
@@ -129,7 +129,7 @@ describe("MockChain", () => {
     expect((await rep("t-2", -1, "h")).total).toBe(1);
     await expect(chain.lockEscrow({ taskId: "t-2", payer: client.accountId, amount })).rejects.toMatchObject({ code: "ESCROW_EXISTS" });
   });
-  it("solde insuffisant refusé", async () => {
+  it("insufficient balance refused", async () => {
     const chain = new MockChain();
     const a = await chain.createAccount({ label: "a", initialFunding: "1" });
     await expect(chain.transfer({ from: a.accountId, to: chain.masterId, amount: "2" })).rejects.toMatchObject({ code: "INSUFFICIENT_FUNDS" });
@@ -137,9 +137,9 @@ describe("MockChain", () => {
 });
 
 describe("MockBrain", () => {
-  it("déterministe, usage renseigné, modèle inconnu refusé", async () => {
+  it("deterministic, usage filled in, unknown model refused", async () => {
     const brain = new MockBrain();
-    const req = { agentId: "a-1", purpose: "execute_task", model: MOCK_MODELS[0]!.id, messages: [{ role: "user", content: "Écris un haïku." }] } as const;
+    const req = { agentId: "a-1", purpose: "execute_task", model: MOCK_MODELS[0]!.id, messages: [{ role: "user", content: "Write a haiku." }] } as const;
     const r1 = await brain.complete(req);
     const r2 = await brain.complete(req);
     expect(r1.text).toBe(r2.text);
@@ -149,8 +149,8 @@ describe("MockBrain", () => {
   });
 });
 
-describe("journal, rng, génome", () => {
-  it("journal numéroté sans trou, rejeu since()", () => {
+describe("journal, rng, genome", () => {
+  it("journal numbered with no gap, since() replay", () => {
     const j = createJournal();
     const seen: number[] = [];
     j.subscribe((e) => seen.push(e.seq));

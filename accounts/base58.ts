@@ -1,4 +1,4 @@
-// Base58 (alphabet Bitcoin, celui de NEAR pour les clés `ed25519:...`). Sans dépendance.
+// Base58 (Bitcoin alphabet, the one NEAR uses for `ed25519:...` keys). No dependency.
 const ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
 export function base58Encode(bytes: Uint8Array): string {
@@ -20,7 +20,7 @@ export function base58Decode(s: string): Uint8Array {
   let n = 0n;
   for (const c of s) {
     const i = ALPHABET.indexOf(c);
-    if (i < 0) throw new Error("base58 invalide");
+    if (i < 0) throw new Error("invalid base58");
     n = n * 58n + BigInt(i);
   }
   const bytes: number[] = [];

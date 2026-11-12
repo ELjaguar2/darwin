@@ -1,5 +1,5 @@
-// Composition root (D-010) : chain + brain + market + engine + journal dans un seul processus.
-// Aucune règle métier ici : on branche les modules, le journal, la persistance et les plafonds.
+// Composition root (D-010): chain + brain + market + engine + journal in a single process.
+// No business rule here: we wire the modules, the journal, persistence and the caps.
 import { readFileSync } from "node:fs";
 import { NearChain, createChain, type CreateChainExtras } from "../accounts/index.ts";
 import { createBrain, type Guardrails } from "../brain/index.ts";
@@ -15,16 +15,16 @@ import type { Replay } from "./replay.ts";
 import type { Store } from "./store.ts";
 
 export interface RuntimeOptions {
-  /** Persistance data/ (absente dans la plupart des tests). */
+  /** data/ persistence (absent from most tests). */
   store?: Store;
   now?: () => Date;
-  /** false : le moteur n'a pas d'horloge (tests : `engine.tick()` à la main). */
+  /** false: the engine has no clock (tests: `engine.tick()` by hand). */
   autoRun?: boolean;
   /** Tests : faux backend NEAR, etc. */
   chainExtra?: CreateChainExtras;
   brain?: Brain;
   log?: (msg: string) => void;
-  /** Période d'écriture de l'instantané d'état (ms). */
+  /** Period for writing the state snapshot (ms). */
   snapshotEveryMs?: number;
 }
 
@@ -37,21 +37,21 @@ export interface Runtime {
   engine: Engine;
   version: string;
   startedAt: string;
-  /** Offres d'une tâche, reconstruites depuis le journal (le marché n'expose pas `getBid`). */
+  /** Bids of a task, rebuilt from the journal (the market does not expose `getBid`). */
   bidsOf(taskId: string): Bid[];
-  /** Événements de marché actifs au tick courant (déduits du journal `market.event`). */
+  /** Market events active at the current tick (derived from the `market.event` journal). */
   activeMarketEvents(): MarketEvent[];
-  /** Dernière `population.snapshot` du moteur, undefined avant le premier tick. */
+  /** Last engine `population.snapshot`, undefined before the first tick. */
   lastPopulation(): EventCatalog["population.snapshot"] | undefined;
-  /** `chain.mode` de NearChain, sinon `mock`. */
+  /** `chain.mode` of NearChain, otherwise `mock`. */
   escrowMode(): "contract" | "operator-account";
-  /** Présent uniquement en mode replay (L17) : lecteur de journal ; le marché, le moteur et la chaîne sont alors des façades en lecture seule. */
+  /** Present only in replay mode (L17): journal reader; the market, engine and chain are then read-only facades. */
   replay?: Replay;
-  /** Vérifications de démarrage (testnet : RPC et compte maître). Lève une erreur claire sinon. */
+  /** Startup checks (testnet: RPC and master account). Throws a clear error otherwise. */
   checkReady(): Promise<void>;
-  /** Lance la simulation (fondateurs puis boucle). */
+  /** Starts the simulation (founders then loop). */
   startSim(): Promise<void>;
-  /** Arrêt propre : moteur, dernier instantané. */
+  /** Graceful shutdown: engine, last snapshot. */
   shutdown(): Promise<void>;
 }
 
@@ -66,10 +66,10 @@ export function readVersion(): string {
 }
 
 /**
- * Décalage de départ des numéros d'agents et de tâches. Sur une vraie chaîne, les sous-comptes et le registre du contrat
- * persistent d'un run à l'autre : repartir de 1 provoquerait « Compte déjà existant » ou ESCROW_EXISTS. Sans variable
- * explicite, on part donc d'un nombre croissant avec l'horloge (secondes depuis le 2026-11-01 x `perSecond`) : deux runs
- * espacés de quelques minutes ne se chevauchent pas, sans lecture du registre. Mock : 0 (ids lisibles, tests stables).
+  * Starting offset for agent and task numbers. On a real chain, sub-accounts and the contract registry
+  * persist from one run to the next: restarting at 1 would cause "Account already exists" or ESCROW_EXISTS. Without an
+  * explicit variable, we start from a number that grows with the clock (seconds since 2026-11-01 x `perSecond`): two runs
+  * a few minutes apart do not overlap, with no registry read. Mock: 0 (readable ids, stable tests).
  */
 export function idOffset(envName: string, chainKind: string, perSecond: number, now: () => Date, env: NodeJS.ProcessEnv = process.env): number {
   const explicit = env[envName];
@@ -84,7 +84,7 @@ export function createRuntime(config: Config, opts: RuntimeOptions = {}): Runtim
   const log = opts.log ?? (() => {});
   const store = opts.store;
 
-  // Journal : persistance JSONL + masquage des messages d'erreur avant tout abonné (SSE comprise).
+  // Journal: JSONL persistence + masking of error messages before any subscriber (SSE included).
   const journal = createJournal({
     now,
     onAppend: (ev: DarwinEvent) => {
@@ -96,7 +96,7 @@ export function createRuntime(config: Config, opts: RuntimeOptions = {}): Runtim
     journal.emit({ type: "system.warning", data: { code, message: redactText(message).slice(0, 300) } });
   };
 
-  // Chaîne : en testnet NearChain émet chain.tx via onTx ; en mock c'est le moteur (emitChainTx, D-027), donc pas d'onTx en double.
+  // Chain: in testnet NearChain emits chain.tx via onTx; in mock it is the engine (emitChainTx, D-027), hence no duplicate onTx.
   const chain = createChain(config, {
     ...opts.chainExtra,
     onTx: (r, d) => {
@@ -106,19 +106,19 @@ export function createRuntime(config: Config, opts: RuntimeOptions = {}): Runtim
   });
   const emitChainTx = chain.info().kind === "mock";
 
-  // Cerveau : plafonds USD globaux (clé de plateforme = crédit réel). On ne passe que les valeurs définies (défauts du cerveau sinon).
+  // Brain: global USD caps (platform key = real credit). Only defined values are passed (brain defaults otherwise).
   const guardrails: Partial<Guardrails> = {};
   if (config.nearai.maxUsdPerRun !== undefined) guardrails.maxUsdPerRun = config.nearai.maxUsdPerRun;
   if (config.nearai.maxUsdPerHour !== undefined) guardrails.maxUsdPerHour = config.nearai.maxUsdPerHour;
   if (config.mode === "testnet" && config.brain === "mock" && !config.nearai.apiKey) {
-    warn("BRAIN_NO_KEY", "NEARAI_API_KEY absente : cerveau mock (IA simulée, appels étiquetés mock)");
+    warn("BRAIN_NO_KEY", "NEARAI_API_KEY missing: mock brain (simulated AI, calls labelled mock)");
   }
-  // Budget IA global atteint : arrêt propre de la simulation (le moteur finit son tick, règle les dettes, émet sim.stopped).
+  // Global AI budget reached: graceful simulation stop (the engine finishes its tick, settles debts, emits sim.stopped).
   let stopEngine: (() => void) | undefined;
   const brain = opts.brain ?? createBrain(config, {
     onWarning: (w) => warn(w.code, w.message), guardrails,
     onBudgetExhausted: (i) => {
-      warn("BRAIN_BUDGET_STOP", `budget IA atteint (${i.spentEur.toFixed(2)} EUR, arrêt à ${i.stopEur} EUR) : arrêt propre de la simulation`);
+      warn("BRAIN_BUDGET_STOP", `AI budget reached (${i.spentEur.toFixed(2)} EUR, stop at ${i.stopEur} EUR): graceful simulation stop`);
       setImmediate(() => stopEngine?.());
     },
   });
@@ -129,7 +129,7 @@ export function createRuntime(config: Config, opts: RuntimeOptions = {}): Runtim
   const engine = createEngine(deps, market, { simulatedClient, emitChainTx, autoRun: opts.autoRun ?? true, agentSeqStart: idOffset("DARWIN_AGENT_SEQ_START", chain.info().kind, 0.25, now) });
   stopEngine = () => { void engine.stop().catch(() => {}); };
 
-  // Index des offres (le journal fait foi pour l'historique).
+  // Bid index (the journal is authoritative for history).
   const bids = new Map<string, Bid[]>();
   let dirty = false;
   const marketEvents: MarketEvent[] = [];
@@ -173,7 +173,7 @@ export function createRuntime(config: Config, opts: RuntimeOptions = {}): Runtim
         try {
           await chain.checkReady();
         } catch (e) {
-          throw new Error(`Démarrage testnet impossible : ${safeErrorMessage(e)}`);
+          throw new Error(`Testnet startup impossible: ${safeErrorMessage(e)}`);
         }
       }
     },
@@ -187,7 +187,7 @@ export function createRuntime(config: Config, opts: RuntimeOptions = {}): Runtim
       try {
         if (engine.getState().running) await engine.stop();
       } catch (e) {
-        log(`arrêt du moteur : ${safeErrorMessage(e)}`);
+        log(`engine shutdown: ${safeErrorMessage(e)}`);
       }
       dirty = true;
       snapshot();

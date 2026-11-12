@@ -1,29 +1,29 @@
-// Plafonds de dépense par compte. Le compte maître est exempté (c'est l'opérateur) ; les plafonds protègent
-// contre un agent (ou un bug du moteur) qui viderait son compte ou celui d'un tiers d'un coup.
+// Per-account spending caps. The master account is exempt (it is the operator); the caps protect
+// against an agent (or an engine bug) that would drain its account or a third party's in one go.
 import { ChainError } from "../shared/chain.ts";
 
 export interface SpendLimit {
-  /** Montant maximal d'une sortie unique (yocto). */
+  /** Maximum amount of a single outflow (yocto). */
   perTx: bigint;
-  /** Total maximal sorti sur la fenêtre glissante (yocto). */
+  /** Maximum total sent out over the sliding window (yocto). */
   perWindow: bigint;
   windowMs: number;
 }
 
 export class SpendCapError extends ChainError {
   constructor(public capKind: "per_tx" | "per_window", message: string) {
-    // Code dédié de shared/ (D-031) : distinct d'INSUFFICIENT_FUNDS pour ne pas faire mourir un agent.
+    // Dedicated code from shared/ (D-031): distinct from INSUFFICIENT_FUNDS so that an agent does not die from it.
     super("SPEND_CAP_EXCEEDED", `SPEND_CAP_EXCEEDED(${capKind}): ${message}`);
     this.name = "SpendCapError";
   }
 }
 
 export interface SpendPolicyOptions {
-  /** Plafond par défaut (tous comptes non exemptés). `null` = aucun plafond. */
+  /** Default cap (all non-exempt accounts). `null` = no cap. */
   defaultLimit: SpendLimit | null;
-  /** Surcharges par compte (ex. `visitors.<maître>`). `null` = exempté. */
+  /** Per-account overrides (e.g. `visitors.<master>`). `null` = exempt. */
   perAccount?: Record<string, SpendLimit | null>;
-  exempt?: string[]; // ex. compte maître
+  exempt?: string[]; // e.g. master account
 }
 
 export class SpendPolicy {
@@ -44,18 +44,18 @@ export class SpendPolicy {
     return rows.reduce((a, r) => a + r.amount, 0n);
   }
 
-  /** Vérifie sans enregistrer. Lève SpendCapError si le plafond serait dépassé. */
+  /** Checks without recording. Throws SpendCapError if the cap would be exceeded. */
   check(accountId: string, amount: bigint): void {
     const lim = this.limitFor(accountId);
     if (!lim) return;
-    if (amount > lim.perTx) throw new SpendCapError("per_tx", `${accountId} : sortie de ${amount} > plafond par transaction ${lim.perTx}`);
+    if (amount > lim.perTx) throw new SpendCapError("per_tx", `${accountId}: outflow of ${amount} > per-transaction cap ${lim.perTx}`);
     const total = this.windowTotal(accountId, lim.windowMs);
     if (total + amount > lim.perWindow) {
-      throw new SpendCapError("per_window", `${accountId} : ${total + amount} > plafond sur ${lim.windowMs} ms (${lim.perWindow})`);
+      throw new SpendCapError("per_window", `${accountId}: ${total + amount} > cap over ${lim.windowMs} ms (${lim.perWindow})`);
     }
   }
 
-  /** À appeler une fois la sortie effectuée. */
+  /** To call once the outflow is done. */
   record(accountId: string, amount: bigint): void {
     if (!this.limitFor(accountId)) return;
     const rows = this.spent.get(accountId) ?? [];
@@ -63,7 +63,7 @@ export class SpendPolicy {
     this.spent.set(accountId, rows);
   }
 
-  /** Dépense restante sur la fenêtre (null = pas de plafond). */
+  /** Remaining spend over the window (null = no cap). */
   remaining(accountId: string): bigint | null {
     const lim = this.limitFor(accountId);
     if (!lim) return null;
@@ -72,7 +72,7 @@ export class SpendPolicy {
   }
 }
 
-/** Plafond par défaut dérivé du capital de naissance : 4x par sortie, 50x par heure. Réglable par l'appelant. */
+/** Default cap derived from the birth capital: 4x per outflow, 50x per hour. Adjustable by the caller. */
 export function defaultSpendLimit(birthCapital: bigint): SpendLimit {
   return { perTx: birthCapital * 4n, perWindow: birthCapital * 50n, windowMs: 3_600_000 };
 }
