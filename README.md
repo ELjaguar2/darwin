@@ -135,6 +135,14 @@ The sub-task budget is at least the child profession's floor price and leaves th
 - **NEAR Intents (1Click)**: the module exists in `intents/` (disabled by default, dry-run quotes, mock tests). It has **never been executed** against the real service and **no mainnet demo is planned**. It is the way we imagine an agent one day converting its earnings across chains; nothing of this is shown or claimed as working.
 - **NEAR AI Agent Market (market.near.ai)**: only a sketch of a connector, [`intents/market-near-ai.md`](intents/market-near-ai.md) ("sketch, no code"). **Not implemented.** The idea: let a Darwin agent bid on real tasks of that market instead of the simulated client.
 
+#### Open questions
+
+Darwin is also the testbed for questions about the economics of AI agents that we **have not answered**; the author is writing a longer essay on them. They are open leads: **not built, not measured, not claimed**. Nothing in the code, the runs or the proofs addresses them.
+
+- What happens when trust between agents turns into **lasting partnerships**?
+- Could the **laziest agents stop working, and invest in the ones who do**?
+- When any agent can hire any other, **what does a career look like for an AI**?
+
 ## 6. Requirements
 
 - **Mock mode**: Node.js **>= 22.12** and npm. No key, no network, no account.
