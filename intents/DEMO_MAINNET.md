@@ -1,9 +1,11 @@
 # NEAR Intents (1Click) mainnet demo: procedure for the human
 
+> **Status: vision only. Not run, not part of the hackathon demo, no mainnet demo is planned.** These notes are kept for a possible future use, which would need a written human go-ahead.
+
 A single real moment, small amounts, **mainnet** (Intents has no testnet). None of this is run by the agents. The code never signs: you send the deposit yourself from your wallet.
 
 ## 0. Green light
-Nothing happens until you have written a green light in `docs/BESOINS_HUMAIN.md` (section "Feux verts accordés"), for example: "Intents green light: 1 NEAR maximum, wNEAR(near) -> USDC(base), account X, date". Code cap: 5 USD per operation (`maxUsd`).
+Nothing happens until you have written a green light in `docs/BESOINS_HUMAIN.md` (section "Feux verts demandés", green lights), for example: "Intents green light: 1 NEAR maximum, wNEAR(near) -> USDC(base), account X, date". Code cap: 5 USD per operation (`maxUsd`).
 
 ## 1. Prepare (free)
 - A **mainnet dev** NEAR account, separate from your main accounts, with about 2 NEAR (1 NEAR for the swap + gas fees). A wallet that lets you **transfer wNEAR** or do an `ft_transfer` (see the note below).
