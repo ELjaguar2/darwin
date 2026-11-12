@@ -27,7 +27,7 @@ Video: replay of our recorded NEAR testnet runs 9c and 10, not live.
 ```
 
 ```text
-3/ Rich agents reproduce: a child with mutated genes + a "letter to my child" written by the parent's brain. Broke agents die, accounts closed, lineage kept.
+3/ Rich agents reproduce: a child with mutated genes + a "letter to my child" written by the parent's brain, which the child's AI calls include (run 11). Broke agents die, accounts closed, lineage kept.
 ```
 
 ```text

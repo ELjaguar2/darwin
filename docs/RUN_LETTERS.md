@@ -81,3 +81,14 @@ Copy-Item data\journal.jsonl docs\preuves\run11-letters-journal.jsonl
 npm run scan-secrets -- --no-history
 node scripts/gen-preuves.mjs docs/preuves/run11-letters-journal.jsonl
 ```
+
+## 8. Result of run 11 (2026-11-12)
+
+Started about 18:40 UTC on branch `lot/L25-integration` (preset `selection`, Node 22.17.1), paused at tick 20 at 19:00:51 UTC (about 21 minutes, within the stop criteria). Journal: `docs/preuves/run11-letters-journal.jsonl` (1040 events, sha256 `508c30d17c7b38120e14388235b6045cc65eac6356b0e10fc34ae87a61a62143`). Details and birth transaction hashes: `docs/PREUVES_TESTNET.md` section 16.
+
+| Criterion | Result |
+|---|---|
+| Letters written and received | **3 `letter.written` and 3 `letter.received`**, all `status: "received"`, non-empty (1095, 1451, 1155 characters), no fallback: children `a-254411`, `a-254412`, `a-254413` |
+| Population | 9 births (6 founders, 3 children of generation 2), 3 reproductions, 0 deaths; 34 escrows released; about 0.028 USD of AI (local accounting) |
+| Warnings | 2 `BRAIN_EMPTY_TEXT`, 1 `EXECUTION_FAILED`; no `LETTER_EMPTY` |
+| Not proven | The journal does not record prompts: the entry of the advice into the child's AI calls is shown by the code and the mock tests (`engine/letters.test.ts`), not by the journal alone. The advice is bounded to 1000 characters (the three letters are truncated for the child). Price and subcontracting rules stay gene-driven code. **No effect on behaviour or earnings measured** (3 children, 20 ticks, one run) |
