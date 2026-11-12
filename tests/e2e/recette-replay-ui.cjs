@@ -1,7 +1,7 @@
-// Recette QA 2026-11-12 : pilote l'interface L17 contre npm run replay (port 3000). Usage : NODE_PATH=<node_modules avec playwright> node tests/e2e/recette-replay-ui.cjs <dossier> <prefixe>
+// QA recipe 2026-11-12: drives the L17 UI against npm run replay. Usage: BASE=http://127.0.0.1:PORT NODE_PATH=<node_modules with playwright> node tests/e2e/recette-replay-ui.cjs <dir> <prefix>
 const { chromium } = require("playwright");
 const out = process.argv[2], tag = process.argv[3];
-const BASE = "http://127.0.0.1:3000";
+const BASE = process.env.BASE || "http://127.0.0.1:3000";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 (async () => {
   const b = await chromium.launch();

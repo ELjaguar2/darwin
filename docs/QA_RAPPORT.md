@@ -217,3 +217,38 @@ Temps réels : replay prêt en moins de 8 s ; mock prêt en moins de 7 s ; premi
 - **E-2 (section 9, étape 11)** : « your visitor task (1 of 50) » faux si l'on attend : à 1 minute la tâche visiteur n'est plus dans `?limit=50` (69 tâches). Correction : « ... and your visitor task (visible in the last 50 only in the first ~30 seconds; use `?limit=1000` to find it) ».
 - **E-3 (section 9, étape 13)** : le README annonce 15 morts / 5 générations à tick 238 ; vu 10 morts / 3 générations à tick 209 (même graine, preset demo, mais la boucle dépend du timing). Correction : « Dead agents with `"causeOfDeath":"starvation"` (about 10 to 15 dead and 3 to 5 generations after 90 s; the exact count varies) ».
 - Remarque (non écart) : l'étape 14 du paragraphe d'intro de la section 9 dit que la page n'a pas été ouverte dans un navigateur : c'est désormais fait (ce rapport), la phrase peut être mise à jour.
+
+
+## Clone neuf, English pass, 2026-11-12
+
+- **Procedure**: `git clone C:\Users\aymer\Darwin` into an empty scratchpad folder (HEAD 90c6bc0, no `.env`, no `data/`), Windows 11, Node 22.17.1, headless Chromium (Playwright). Ports 3311 to 3324 (not 3000). No network call, no key. Scripts: `tests/e2e/recette-replay-ui.cjs` (now takes `BASE=`), `tests/e2e/recette-mock-ui.cjs` (new).
+- **Captures**: all old captures were deleted (French, from the fake dev server or from before the translation: `l17-testnet-degrade`, `l17-rejeu-*`, `l17-recette-tn-*`, `l17-mission-flux`, etc.) and regenerated in English: `docs/captures/l17-recette-r8-*.png`, `l17-recette-r9b-*.png`, `docs/captures/clone-neuf-1112/*` (mock, replay, classic, mobile). The degraded-testnet capture was not regenerated (needs testnet mode). Several were read with `Read`.
+- **Verdict: GO.** No blocking bug. 3 non-blocking findings.
+
+| Step | Expected | Seen | Verdict |
+|---|---|---|---|
+| `npm ci` | installs | OK (npm audit warnings only) | OK |
+| `npm test` | 387 tests | 27 files, 387 passed | OK (README step 15 still says 26 files / 381: see N-1) |
+| `npm run typecheck` | no error | none | OK |
+| `npm run scan-secrets` | OK | 127 commits, "no secret detected" | OK |
+| `npm run replay` (run8) | 5 `[darwin]` lines, 1819 events | identical to README (port differs) | OK |
+| replay run9b | journal loads | "377 events from run9b-journal.jsonl, recorded on 2026-11-11" | OK |
+| `DARWIN_MODE=testnet npm run start:demo` | stays mock | "mode mock (chain mock, brain mock, preset demo)"; health `mode:mock` | OK |
+| README steps 2 to 13 (mock) | as described | health, config, 4 founders, SSE (`retry: 3000`, `sim.started`), 201 task, 400 INVALID_INPUT (exact message), pause/resume, founder letter 404, 47 starved dead after about 2 min, `/classique` 200 | OK |
+| UI mock, default page | pill MOCK, tabs Mission / Lineage / Proof, placeholder "Describe your mission…" | exactly that | OK |
+| UI mock, mission sent (marketing, budget 1) | thread to "paid ✓" | bids, winner, subcontracting, deliverable, judge "Accepted ✓ 80%", "paid ✓ 0.960 NEAR → Darwin" after 3 s | OK |
+| UI mock, node panel, Proof tab | genome, letter, counters | panel with English personality and "[mock] Dear child..." letter; Proof counters, flows, TEE "not applicable", transactions, building blocks marked SIMULATED | OK |
+| UI replay run8 | banner "Replay of a real testnet run from November 10, 2026", x1/x5/x20, no token, missions disabled, "Replay finished" | all seen; input disabled; 12 nodes, 7 dead, 34 nearblocks links, no other link | OK |
+| UI replay run9b | same, banner Nov 11 | all seen; 6 nodes, 6 dead, "Replay finished · No living agent left · generation 1" | OK |
+| Mobile 375 px (mock, r8, r9b) | no horizontal scroll | scrollWidth 375 = innerWidth on the 3 tabs, 3 runs | OK |
+| Console / CSP | no error | none in replay (desktop and mobile) and in mock after a valid send; the only errors were the expected 400 / 429 responses to deliberately rejected submissions | OK |
+| English in mock API (`/api/events`, `/api/tasks`, letters) | English | letters, pitches, verdicts, simulated-client titles ("Logo for ...", "Product presentation text"), events, badges: English | OK, except N-2 and N-3 |
+
+Findings (non blocking):
+- **N-1**: README section 9 step 15 says "26 test files and 381 tests"; actual is 27 files and 387 tests.
+- **N-2 (French residue visible)**: deliverable file names are French: `texte.md`, `analyse.md` (also `architecture.md`, `schema.mmd`, `logo-N.svg` are fine). Seen in the UI deliverable card (mock-mission-paid.png, "texte.md") and in the API. Source: `shared/catalogue.ts` and `market/deliverable.ts`.
+- **N-3**: the "Translation FR to EN" simulated tasks carry French source sentences in the prompt ("« Merci de votre patience ... »"). Intended (the task is to translate French), noted only so nobody mistakes it for a leak.
+- **N-4 (UX)**: the composer's default budget is 0.024 NEAR for every profession; sending it with Marketing copy gives HTTP 400 "minimum budget for Marketing copywriting: 0.96 NEAR" (the hint `#budgetMin` was empty after changing profession in the mock page). A judge who types a mission and clicks send without touching the budget sees a rejection. README step 6 uses budget 1, so it is unaffected. Also, in one run a page showed about 100 console 429 responses after the per-IP limit (6 posts per minute) had been hit by my own earlier requests; not reproduced on a fresh server, so not confirmed.
+- `/api/letters` does not exist (404 `NOT_FOUND`); letters are in `/api/agents/:id/letter` and in `letter.written` events (as the README says).
+- Visible French (replay, historical, expected): task titles and prompts ("Analyse de rentabilité...", "Résume en deux phrases..."), agent personalities ("Tu es un graphiste freelance...") and old profession labels (Writing, Summary, Analysis) in run8/run9b.
+- `docs/SECURITE.md` line 357 cites captures that no longer exist (`l17-testnet-degrade`, `l17-recette-tn-preuves-t100`, `l17-rejeu-preuves-mobile`); owner: securite.
