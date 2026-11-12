@@ -225,7 +225,10 @@ export function createMarket(deps: Deps, opts: MarketOptions = {}): TaskMarket {
     tasks.set(task.id, task);
     emit({ type: "task.posted", tick, data: { task: clone(task) } });
     if (requester.kind === "agent" && task.parentTaskId)
-      emit({ type: "subcontract.created", tick, data: { parentTaskId: task.parentTaskId, childTaskId: task.id, byAgentId: requester.agentId } });
+      emit({ type: "subcontract.created", tick, data: {
+        parentTaskId: task.parentTaskId, childTaskId: task.id, byAgentId: requester.agentId, profession: task.profession, budget: task.budget,
+        parentPrice: winningPrice(tasks.get(task.parentTaskId)!).toString(), commission: (winningPrice(tasks.get(task.parentTaskId)!) - budget).toString(),
+      } });
     return clone(task);
   }
 

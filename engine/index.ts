@@ -7,6 +7,7 @@ import { executeMessages } from "../brain/prompts.ts";
 import { bal, type Ctx, type EngineOptions } from "./context.ts";
 import { chargeBrain, debit, flushAll, resolveModel, syncBalances, warnOnce } from "./economy.ts";
 import { canReproduce, createFounders, die, reproduce } from "./lifecycle.ts";
+import { simTemplate } from "../market/templates.ts";
 import { decideBid, decideSubcontract } from "./policy.ts";
 import { makePitch } from "./pitch.ts";
 
@@ -54,6 +55,7 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
   let ticking = false;
   const stats = { tasksSettled: 0 };
   const bidsPlaced = new Set<string>();
+  const wonPrices = new Map<string, bigint>(); // agentId|taskId -> price of the bid placed (= winning price once awarded)
 
   // The engine learns earnings and reputation through the journal (market events), never by crediting itself.
   journal.subscribe((e) => {
@@ -126,6 +128,7 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
       }
       if (!best) continue;
       bidsPlaced.add(`${a.id}|${best.task.id}`);
+      wonPrices.set(`${a.id}|${best.task.id}`, best.price);
       try {
         const pitch = await makePitch(ctx, a, best.task, best.price);
         await market.placeBid({ taskId: best.task.id, agentId: a.id, price: best.price.toString(), etaTicks: best.etaTicks, ...(pitch ? { pitch } : {}) });
@@ -144,12 +147,15 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
         messages: executeMessages(a.genome, { title: t.title, prompt: t.prompt, profession: t.profession }),
       });
       await chargeBrain(ctx, a, "execute_task", resp, price);
-      const sub = decideSubcontract(ctx, a, BigInt(t.budget));
+      const wonPrice = wonPrices.get(`${a.id}|${t.id}`);
+      const sub = wonPrice !== undefined ? decideSubcontract(ctx, a, wonPrice) : null;
       if (sub !== null) {
         try {
+          // Valid title+prompt for the child profession (simulated-client templates). The child is an independently paid and validated task.
+          const tpl = simTemplate(sub.profession, rng);
           await market.postTask({
-            requester: { kind: "agent", agentId: a.id }, profession: rng.pick(PROFESSIONS), parentTaskId: t.id,
-            title: `Subcontract of ${t.id}`, prompt: t.prompt, budget: sub.toString(),
+            requester: { kind: "agent", agentId: a.id }, profession: sub.profession, parentTaskId: t.id,
+            title: `Subcontract of ${t.id}: ${sub.profession} sub-task`, prompt: tpl.prompt, budget: sub.budget.toString(),
           });
         } catch (e) {
           warnOnce(ctx, "SUBCONTRACT_FAILED", (e as Error).message);

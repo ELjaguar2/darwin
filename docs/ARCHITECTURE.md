@@ -173,7 +173,7 @@ Append-only journal, `seq` increasing without gaps. Adding a type requires modif
 | `task.validated` | market | taskId, validation |
 | `escrow.released` | market | taskId, payee, amount, tx |
 | `escrow.refunded` | market | taskId, payer, amount, tx |
-| `subcontract.created` | market | parentTaskId, childTaskId, byAgentId |
+| `subcontract.created` | market | parentTaskId, childTaskId, byAgentId, profession?, budget?, parentPrice?, commission? (optional since L21; commission = parentPrice - budget, yocto) |
 | `reputation.updated` | market | agentId, delta, total, taskId, tx |
 | `brain.charged` | engine | agentId, purpose, model, promptTokens, completionTokens, reasoningTokens, cost, costUsd, nearUsdRate, priceSource (`models`/`mock`), mock, tx |
 | `balance.changed` | engine | agentId, balance, delta, reason (metabolism/brain/task/birth/...) |

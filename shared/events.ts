@@ -27,7 +27,7 @@ export interface EventCatalog {
   "task.validated": { taskId: string; validation: Validation };
   "escrow.released": { taskId: string; payee: string; amount: Yocto; tx: string };
   "escrow.refunded": { taskId: string; payer: string; amount: Yocto; tx: string };
-  "subcontract.created": { parentTaskId: string; childTaskId: string; byAgentId: string };
+  "subcontract.created": { parentTaskId: string; childTaskId: string; byAgentId: string; profession?: Profession; budget?: Yocto; parentPrice?: Yocto; commission?: Yocto };
   "reputation.updated": { agentId: string; delta: number; total: number; taskId: string; tx?: string };
   // real freelance (L16)
   "deliverable.produced": { taskId: string; profession: Profession; agentId: string; files: DeliverableJournalFile[]; productionCostUsd: number; judgeCostUsd: number; resultHash: string };

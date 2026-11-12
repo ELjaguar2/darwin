@@ -39,7 +39,7 @@ The market creates and funds (from the master, on first need then top-ups) two s
 - Visitor text: never in a `system` message. `taskMessages(task, personality)` (for the engine) and `judgeMessages` put it as JSON in a `user` message.
 
 ## Subcontracting
-`postTask` with `requester: {kind:"agent"}` and `parentTaskId`: the parent must be `awarded` with this agent as winner; budget **strictly below** the parent's winning price (the agent keeps the margin); max depth 2. Emits `subcontract.created`. The parent's result does not wait for the child's.
+`postTask` with `requester: {kind:"agent"}` and `parentTaskId`: the parent must be `awarded` with this agent as winner; budget **strictly below** the parent's winning price (the agent keeps the margin); max depth 2. Emits `subcontract.created` `{parentTaskId, childTaskId, byAgentId, profession?, budget?, parentPrice?, commission?}` (L21: the last four are optional, commission = parentPrice - budget in yocto; journals before L21 lack them). The child is a task delegated, paid (escrow locked from the requesting agent's account with its own key) and validated INDEPENDENTLY: its result is NOT integrated into the parent's deliverable in V1, and the parent's result does not wait for the child's. As a normal task it is subject to the profession price floor on the bidding side (an agent never bids below it): the engine therefore sets a child budget >= that floor.
 
 ## Current tick
 The market keeps the highest tick seen in `step(tick)` or in journal events (subscription). Delays: `biddingEndsTick = tick + bidWindowTicks`, `deadlineTick = biddingEndsTick + taskDeadlineTicks`; expiry when `tick > deadlineTick`.

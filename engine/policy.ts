@@ -1,5 +1,5 @@
 // Decision policy of an agent: bid (price, risk), subcontract. Pure, deterministic, no side effects.
-import { costYocto, type Agent, type Task } from "../shared/index.ts";
+import { costYocto, PROFESSIONS, type Agent, type Profession, type Task } from "../shared/index.ts";
 import { scaledPrice } from "../shared/catalogue.ts";
 import { bal, type Ctx } from "./context.ts";
 import { resolveModel } from "./economy.ts";
@@ -36,10 +36,32 @@ export function decideBid(ctx: Ctx, a: Agent, task: Task): { price: bigint; etaT
   return { price, etaTicks: 1 };
 }
 
-/** Subcontracts with probability cooperation/2 if the agent can afford it. Budget = 25% of the price earned. */
-export function decideSubcontract(ctx: Ctx, a: Agent, price: bigint): bigint | null {
+/** The agent always keeps at least 15% of the price it won (basis points of the price). */
+export const MIN_KEEP_BP = 1500n;
+/** Delegated share of the earned price, in basis points: 30% (cooperation 0) to 80% (cooperation 1). More cooperative = delegates more, keeps a smaller commission. */
+export function delegatedShareBp(cooperation: number): bigint {
+  const c = Math.min(1, Math.max(0, cooperation));
+  return BigInt(3000 + Math.round(c * 5000));
+}
+
+export interface SubcontractDecision { profession: Profession; budget: bigint; parentPrice: bigint; commission: bigint }
+
+/**
+ * Subcontracts with probability cooperation/2. The child profession differs from the agent's own and its price floor
+ * (catalogue x priceScale) must leave the agent at least 15% of the price won; budget = max(share x price, floor of the
+ * child profession), strictly below the price won. Otherwise (or if the agent would dip under its reserve): no subcontracting.
+ */
+export function decideSubcontract(ctx: Ctx, a: Agent, price: bigint): SubcontractDecision | null {
   if (ctx.deps.rng.next() >= a.genome.cooperation / 2) return null;
-  const budget = price / 4n;
-  if (budget <= 0n || bal(a) - budget < reserve(ctx, a)) return null;
-  return budget;
+  const maxBudget = (price * (10000n - MIN_KEEP_BP)) / 10000n;
+  const scale = ctx.deps.config.sim.priceScale;
+  const candidates = PROFESSIONS.filter((p) => p !== a.genome.profession && scaledPrice(p, scale) <= maxBudget);
+  if (!candidates.length) return null;
+  const profession = ctx.deps.rng.pick(candidates);
+  let budget = (price * delegatedShareBp(a.genome.cooperation)) / 10000n;
+  const floor = scaledPrice(profession, scale);
+  if (budget < floor) budget = floor;
+  if (budget > maxBudget) budget = maxBudget;
+  if (budget <= 0n || budget >= price || bal(a) - budget < reserve(ctx, a)) return null;
+  return { profession, budget, parentPrice: price, commission: price - budget };
 }
