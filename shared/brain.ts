@@ -1,15 +1,15 @@
-// Interface Brain : le « cerveau » payant des agents. Deux implémentations :
-//  - MockBrain     (shared/mock/mock-brain.ts) : texte déterministe, usage simulé, sans clé.
+// Brain interface: the agents' paid "brain". Two implementations:
+//  - MockBrain     (shared/mock/mock-brain.ts): deterministic text, simulated usage, no key.
 //  - NearAiBrain   (brain/near-ai-brain.ts, lot L5) : POST {NEARAI_BASE_URL}/chat/completions, auth Bearer.
-// Le Brain ne débite RIEN : il renvoie `usage` ; l'engine calcule le coût (shared/money.ts costYocto) et le débite.
+// The Brain debits NOTHING: it returns `usage`; the engine computes the cost (shared/money.ts costYocto) and debits it.
 import type { ModelPrice, Usage } from "./money.ts";
 
 export type BrainPurpose =
-  | "execute_task" // exécuter une tâche gagnée
-  | "validate" // valider un résultat (si validateur IA)
-  | "bid" // décision d'enchère / pitch
+  | "execute_task" // execute a won task
+  | "validate" // validate a result (if AI validator)
+  | "bid" // bidding / pitch decision
   | "letter" // lettre parent -> enfant
-  | "mutate" // suggestion de personnalité mutée (optionnel)
+  | "mutate" // suggestion of a mutated personality (optional)
   | "other";
 
 export interface ChatMessage {
@@ -20,7 +20,7 @@ export interface ChatMessage {
 export interface BrainRequest {
   agentId: string;
   purpose: BrainPurpose;
-  model: string; // id de modèle (gène)
+  model: string; // model id (gene)
   messages: readonly ChatMessage[];
   maxTokens?: number;
   temperature?: number;
@@ -29,16 +29,16 @@ export interface BrainRequest {
 export interface BrainResponse {
   text: string;
   usage: Usage;
-  model: string; // modèle réellement servi
-  mock: boolean; // vrai pour MockBrain : l'UI et le journal l'affichent
-  /** id de réponse (chat_id) pour attestation/signature éventuelle. */
+  model: string; // model actually served
+  mock: boolean; // true for MockBrain: the UI and the journal display it
+  /** Response id (chat_id) for possible attestation/signature. */
   responseId?: string;
 }
 
 export interface ModelInfo extends ModelPrice {
   id: string;
   contextLength?: number;
-  /** vrai si `/v1/models` l'a confirmé (NearAiBrain) ; MockBrain : toujours vrai pour ses ids. */
+  /** true if `/v1/models` confirmed it (NearAiBrain); MockBrain: always true for its ids. */
   verified: boolean;
 }
 
@@ -55,9 +55,9 @@ export class BrainError extends Error {
 
 export interface Brain {
   readonly kind: "mock" | "nearai";
-  /** Modèles disponibles avec prix (GET /v1/models pour la réelle). Mis en cache par l'implémentation. */
+  /** Available models with prices (GET /v1/models for the real one). Cached by the implementation. */
   listModels(): Promise<ModelInfo[]>;
-  /** Modèle par défaut vérifié (config NEARAI_MODEL sinon premier modèle valide). */
+  /** Verified default model (NEARAI_MODEL config, otherwise the first valid model). */
   defaultModel(): Promise<string>;
   complete(req: BrainRequest): Promise<BrainResponse>;
 }

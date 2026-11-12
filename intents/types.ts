@@ -1,5 +1,5 @@
-// Types du module Intents (lot L9). Formats vérifiés le 2026-11-09 sur
-// https://1click.chaindefuser.com/docs/v0/openapi.yaml et par un devis dry:true réel (sans clé, sans dépense).
+// Types of the Intents module (lot L9). Formats checked on 2026-11-09 against
+// https://1click.chaindefuser.com/docs/v0/openapi.yaml and by a real dry:true quote (no key, no spending).
 import { z } from "zod";
 import type { Intents } from "../shared/index.ts";
 
@@ -20,15 +20,15 @@ export type SwapStatus = (typeof STATUSES)[number];
 export const TERMINAL_STATUSES: readonly SwapStatus[] = ["SUCCESS", "FAILED", "REFUNDED", "INCOMPLETE_DEPOSIT"];
 
 export interface QuoteParams {
-  originAsset: string; // assetId renvoyé par /v0/tokens (jamais construit à la main)
+  originAsset: string; // assetId returned by /v0/tokens (never built by hand)
   destinationAsset: string;
-  amountIn: string; // entier décimal, plus petite unité de l'actif d'origine
-  /** Adresse de remboursement sur la chaîne d'origine. */
+  amountIn: string; // decimal integer, smallest unit of the origin asset
+  /** Refund address on the origin chain. */
   refundTo: string;
-  /** Destinataire sur la chaîne de destination. */
+  /** Recipient on the destination chain. */
   recipient: string;
-  slippageBps?: number; // défaut 100 (1 %)
-  deadlineMinutes?: number; // défaut 15
+  slippageBps?: number; // default 100 (1%)
+  deadlineMinutes?: number; // default 15
 }
 
 const QuoteRequestSchema = z.object({
@@ -90,16 +90,16 @@ export const StatusResponseSchema = z.object({
 }).passthrough();
 export type StatusResponse = z.infer<typeof StatusResponseSchema>;
 
-/** Résultat d'un devis dry:true, enrichi (frais lisibles). */
+/** Result of a dry:true quote, enriched (readable fees). */
 export interface DryQuote {
   params: QuoteParams;
   response: QuoteResponse;
-  /** Somme des appFees déclarés dans quoteRequest, en points de base (observé : 20 sans clé, 2026-11-09). */
+  /** Sum of the appFees declared in quoteRequest, in basis points (observed: 20 without a key, 2026-11-09). */
   appFeeBps: number;
   mock: boolean;
 }
 
-/** Devis dry:false : contient une adresse de dépôt valable ~ jusqu'à `quote.deadline`. */
+/** dry:false quote: contains a deposit address valid ~ until `quote.deadline`. */
 export interface DepositQuote {
   params: QuoteParams;
   response: QuoteResponse;
@@ -109,8 +109,8 @@ export interface DepositQuote {
 }
 
 /**
- * Preuve de dépôt VÉRIFIÉE. Seule `verifyDeposit` peut en fabriquer une ;
- * `DepositLedger.credit` n'accepte que ce type : pas de crédit sans preuve.
+  * VERIFIED deposit proof. Only `verifyDeposit` can build one;
+  * `DepositLedger.credit` only accepts this type: no credit without a proof.
  */
 declare const verifiedBrand: unique symbol;
 export interface VerifiedDeposit {
@@ -119,7 +119,7 @@ export interface VerifiedDeposit {
   readonly correlationId: string;
   readonly recipient: string;
   readonly destinationAsset: string;
-  /** Montant effectivement reçu à destination (plus petite unité). */
+  /** Amount actually received at destination (smallest unit). */
   readonly amountOut: string;
   readonly txHashes: readonly string[];
   readonly mock: boolean;
@@ -127,17 +127,17 @@ export interface VerifiedDeposit {
 
 export type ProofResult = { accepted: true; proof: VerifiedDeposit } | { accepted: false; reason: string };
 
-/** Extension de `Intents` (shared) : le client complet. Les méthodes live sont verrouillées (guard.ts). */
+/** Extension of `Intents` (shared): the full client. Lock live methods (guard.ts). */
 export interface IntentsClient extends Intents {
   readonly mock: boolean;
   listTokens(): Promise<Token[]>;
-  /** Devis dry:true : aucun effet, peut être appelé sans clé. */
+  /** dry:true quote: no effect, can be called without a key. */
   dryQuote(params: QuoteParams): Promise<DryQuote>;
-  /** Devis dry:false (adresse de dépôt). Exige un dry:true identique avant + verrou live. */
+  /** dry:false quote (deposit address). Requires an identical dry:true beforehand + live lock. */
   requestDepositQuote(params: QuoteParams): Promise<DepositQuote>;
-  /** Informe 1Click du hash de dépôt (le dépôt lui-même est fait par l'humain, jamais par ce code). Verrou live. */
+  /** Tells 1Click about the deposit hash (the deposit itself is made by the human, never by this code). Live lock. */
   submitDeposit(q: DepositQuote, txHash: string, opts?: { nearSenderAccount?: string }): Promise<StatusResponse>;
   getStatus(depositAddress: string, depositMemo?: string): Promise<StatusResponse>;
-  /** Interroge /v0/status jusqu'à un état terminal (ou expiration). */
+  /** Polls /v0/status until a terminal state (or expiry). */
   waitForTerminal(q: DepositQuote, opts?: { timeoutMs?: number; intervalMs?: number; sleep?: (ms: number) => Promise<void> }): Promise<StatusResponse>;
 }

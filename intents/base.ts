@@ -1,5 +1,5 @@
-// Logique commune au client réel et au mock : verrous, « dry avant live », plafond USD, attente de statut.
-// Les sous-classes ne fournissent que le transport (4 appels). Tout verrou est donc testé une seule fois, mock compris.
+// Logic shared by the real client and the mock: locks, "dry before live", USD cap, status waiting.
+// Subclasses only provide the transport (4 calls). Every lock is therefore tested once, mock included.
 import type { Config, Journal } from "../shared/index.ts";
 import { DEFAULT_MAX_USD, IntentsGuardError, assertEnabled, assertLive, quoteKey } from "./guard.ts";
 import {
@@ -9,13 +9,13 @@ import {
 
 export interface BaseOptions {
   journal?: Journal;
-  /** Plafond par opération, en USD (défaut 5). Appliqué au devis dry:true précédant le dry:false. */
+  /** Cap per operation, in USD (default 5). Applied to the dry:true quote preceding the dry:false. */
   maxUsd?: number;
-  /** Comptes utilisés par `quoteDry` (interface shared, qui n'a pas d'adresses). Devis seulement, jamais de dépôt. */
+  /** Accounts used by `quoteDry` (shared interface, which has no addresses). Quote only, never a deposit. */
   defaultRefundTo?: string;
   defaultRecipient?: string;
   now?: () => Date;
-  /** Durée de validité du devis dry:true préalable (défaut 5 min). */
+  /** Validity period of the prior dry:true quote (default 5 min). */
   dryTtlMs?: number;
 }
 
@@ -35,8 +35,8 @@ export interface QuoteRequestBody {
 }
 
 export function buildQuoteRequest(p: QuoteParams, dry: boolean, now: Date): QuoteRequestBody {
-  if (!/^[1-9]\d*$/.test(p.amountIn)) throw new IntentsGuardError("amountIn doit être un entier décimal > 0 (plus petite unité).");
-  if (!p.refundTo || !p.recipient) throw new IntentsGuardError("refundTo et recipient sont obligatoires.");
+  if (!/^[1-9]\d*$/.test(p.amountIn)) throw new IntentsGuardError("amountIn must be a decimal integer > 0 (smallest unit).");
+  if (!p.refundTo || !p.recipient) throw new IntentsGuardError("refundTo and recipient are required.");
   return {
     dry,
     swapType: "EXACT_INPUT",
@@ -53,7 +53,7 @@ export function buildQuoteRequest(p: QuoteParams, dry: boolean, now: Date): Quot
   };
 }
 
-/** Trouve un actif dans la liste renvoyée par /v0/tokens (on ne construit jamais un assetId à la main). */
+/** Finds an asset in the list returned by /v0/tokens (an assetId is never built by hand). */
 export function findToken(tokens: Token[], symbol: string, blockchain: string): Token | undefined {
   return tokens.find((t) => t.symbol.toUpperCase() === symbol.toUpperCase() && t.blockchain === blockchain);
 }
@@ -72,7 +72,7 @@ export abstract class BaseIntents implements IntentsClient {
     this.now = opts.now ?? (() => new Date());
   }
 
-  // --- transport (à fournir) ---
+  // --- transport (to be provided) ---
   protected abstract fetchTokens(): Promise<Token[]>;
   protected abstract postQuote(body: QuoteRequestBody): Promise<QuoteResponse>;
   protected abstract postSubmit(body: { txHash: string; depositAddress: string; memo?: string; nearSenderAccount?: string }): Promise<StatusResponse>;
@@ -111,32 +111,32 @@ export abstract class BaseIntents implements IntentsClient {
   async requestDepositQuote(params: QuoteParams): Promise<DepositQuote> {
     assertLive(this.cfg);
     const key = quoteKey(params);
-    if (!this.dryUsd.has(key)) throw new IntentsGuardError("Un devis dry:true identique doit précéder le devis dry:false.");
+    if (!this.dryUsd.has(key)) throw new IntentsGuardError("An identical dry:true quote must precede the dry:false quote.");
     const { usd, at } = this.dryUsd.get(key)!;
-    this.dryUsd.delete(key); // usage unique : un dry:true ne sert qu'un seul dry:false
-    if (this.now().getTime() - at > (this.opts.dryTtlMs ?? 300_000)) throw new IntentsGuardError("Devis dry:true expiré : refaire un dry:true.");
-    if (!Number.isFinite(usd)) throw new IntentsGuardError("Valeur USD du devis dry illisible : refus par prudence.");
-    if (usd > this.maxUsd) throw new IntentsGuardError(`Montant ${usd} USD > plafond ${this.maxUsd} USD.`);
+    this.dryUsd.delete(key); // single use: a dry:true serves only one dry:false
+    if (this.now().getTime() - at > (this.opts.dryTtlMs ?? 300_000)) throw new IntentsGuardError("dry:true quote expired: redo a dry:true.");
+    if (!Number.isFinite(usd)) throw new IntentsGuardError("USD value of the dry quote unreadable: refused as a precaution.");
+    if (usd > this.maxUsd) throw new IntentsGuardError(`Amount ${usd} USD > cap ${this.maxUsd} USD.`);
     const response = await this.postQuote(buildQuoteRequest(params, false, this.now()));
-    // Le devis réel doit correspondre strictement à la demande et respecter le plafond lui aussi.
+    // The live quote must strictly match the request and also respect the cap.
     const rq = response.quoteRequest;
     if (rq.dry !== false || rq.originAsset !== params.originAsset || rq.destinationAsset !== params.destinationAsset
       || rq.amount !== params.amountIn || rq.recipient !== params.recipient || rq.refundTo !== params.refundTo
       || response.quote.amountIn !== params.amountIn) {
-      throw new IntentsGuardError("Le devis dry:false ne correspond pas à la demande (actifs, montant, destinataire).");
+      throw new IntentsGuardError("The dry:false quote does not match the request (assets, amount, recipient).");
     }
     const liveUsd = Number(response.quote.amountInUsd);
-    if (!Number.isFinite(liveUsd)) throw new IntentsGuardError("Valeur USD du devis dry:false illisible : refus par prudence.");
-    if (liveUsd > this.maxUsd) throw new IntentsGuardError(`Devis réel ${liveUsd} USD > plafond ${this.maxUsd} USD.`);
+    if (!Number.isFinite(liveUsd)) throw new IntentsGuardError("USD value of the dry:false quote unreadable: refused as a precaution.");
+    if (liveUsd > this.maxUsd) throw new IntentsGuardError(`Live quote ${liveUsd} USD > cap ${this.maxUsd} USD.`);
     const depositAddress = response.quote.depositAddress;
-    if (!depositAddress) throw new IntentsGuardError("Réponse dry:false sans depositAddress.");
+    if (!depositAddress) throw new IntentsGuardError("dry:false response without depositAddress.");
     this.issuedAddresses.add(depositAddress);
     return { params, response, depositAddress, depositMemo: response.quote.depositMemo, mock: this.mock };
   }
 
   async submitDeposit(q: DepositQuote, txHash: string, o: { nearSenderAccount?: string } = {}): Promise<StatusResponse> {
     assertLive(this.cfg);
-    if (!this.issuedAddresses.has(q.depositAddress)) throw new IntentsGuardError("Adresse de dépôt inconnue de cette instance.");
+    if (!this.issuedAddresses.has(q.depositAddress)) throw new IntentsGuardError("Deposit address unknown to this instance.");
     if (!txHash.trim()) throw new IntentsGuardError("txHash vide.");
     return this.postSubmit({ txHash: txHash.trim(), depositAddress: q.depositAddress, ...(q.depositMemo ? { memo: q.depositMemo } : {}), ...(o.nearSenderAccount ? { nearSenderAccount: o.nearSenderAccount } : {}) });
   }
@@ -156,7 +156,7 @@ export abstract class BaseIntents implements IntentsClient {
     for (;;) {
       const s = await this.getStatus(q.depositAddress, q.depositMemo);
       if (TERMINAL_STATUSES.includes(s.status)) return s;
-      if (this.now().getTime() >= deadline) throw new IntentsGuardError(`Délai dépassé, dernier statut ${s.status}.`);
+      if (this.now().getTime() >= deadline) throw new IntentsGuardError(`Timeout exceeded, last status ${s.status}.`);
       await sleep(interval);
     }
   }

@@ -1,8 +1,8 @@
-// Garde des clés. Règles : jamais en clair dans le dépôt, jamais journalisées, jamais dans un message d'erreur.
-//  - `Secret` masque la valeur (toString, JSON, util.inspect) : il faut appeler reveal() explicitement.
-//  - `MemoryKeyStore` : tests et mode mock (rien sur disque).
-//  - `FileKeyStore` : un fichier `*.key` par clé dans un dossier ignoré par git (par défaut `<dataDir>/keys` ; `data/` et `*.key`
-//    sont dans .gitignore), permissions 0600 (effectives sous POSIX ; sous Windows, protéger le dossier par ACL utilisateur).
+// Key custody. Rules: never in clear text in the repository, never logged, never in an error message.
+//  - `Secret` masks the value (toString, JSON, util.inspect): reveal() must be called explicitly.
+//  - `MemoryKeyStore`: tests and mock mode (nothing on disk).
+//  - `FileKeyStore`: one `*.key` file per key in a git-ignored folder (default `<dataDir>/keys`; `data/` and `*.key`
+//    are in .gitignore), 0600 permissions (effective on POSIX; on Windows, protect the folder with a user ACL).
 import { createPrivateKey, createPublicKey, generateKeyPairSync } from "node:crypto";
 import { chmod, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -30,10 +30,10 @@ export class Secret {
 
 export interface GeneratedKey {
   publicKey: string; // "ed25519:<base58>"
-  secretKey: Secret; // "ed25519:<base58 de seed||pub, 64 octets>" (format KeyPairString de near-api-js)
+  secretKey: Secret; // "ed25519:<base58 of seed||pub, 64 bytes>" (KeyPairString format of near-api-js)
 }
 
-/** Génère une paire ed25519 au format NEAR. */
+/** Generates an ed25519 key pair in NEAR format. */
 export function generateKey(): GeneratedKey {
   const { privateKey } = generateKeyPairSync("ed25519");
   const jwk = privateKey.export({ format: "jwk" });
@@ -45,17 +45,17 @@ export function generateKey(): GeneratedKey {
   };
 }
 
-/** Clé publique d'une clé secrète NEAR (vérifier la clé fournie par l'humain). Message d'erreur sans la clé. */
+/** Public key of a NEAR secret key (to check the key supplied by the human). Error message without the key. */
 export function publicKeyOf(secretKey: Secret): string {
   const raw = secretKey.reveal();
-  if (!raw.startsWith("ed25519:")) throw new Error("Format de clé non supporté (ed25519: attendu)");
+  if (!raw.startsWith("ed25519:")) throw new Error("Unsupported key format (ed25519: expected)");
   let bytes: Uint8Array;
   try {
     bytes = base58Decode(raw.slice(8));
   } catch {
-    throw new Error("Clé secrète ed25519 invalide");
+    throw new Error("Invalid ed25519 secret key");
   }
-  if (bytes.length !== 64) throw new Error("Clé secrète ed25519 invalide");
+  if (bytes.length !== 64) throw new Error("Invalid ed25519 secret key");
   const priv = createPrivateKey({
     key: { kty: "OKP", crv: "Ed25519", d: Buffer.from(bytes.subarray(0, 32)).toString("base64url"), x: Buffer.from(bytes.subarray(32)).toString("base64url") },
     format: "jwk",
@@ -64,7 +64,7 @@ export function publicKeyOf(secretKey: Secret): string {
   return `ed25519:${base58Encode(Buffer.from(jwk.x as string, "base64url"))}`;
 }
 
-/** `full` : accès complet (virements, suppression à la mort). `fc` : function call à droits limités. */
+/** `full`: full access (transfers, deletion on death). `fc`: function call with limited rights. */
 export type KeyRole = "full" | "fc";
 
 export interface StoredKey {
@@ -77,9 +77,9 @@ export interface StoredKey {
 export interface KeyStore {
   put(accountId: string, role: KeyRole, key: GeneratedKey): Promise<void>;
   get(accountId: string, role: KeyRole): Promise<StoredKey | null>;
-  /** Supprime les clés du compte (toutes, ou un seul rôle). */
+  /** Removes the account's keys (all of them, or a single role). */
   remove(accountId: string, role?: KeyRole): Promise<void>;
-  /** Informations publiques seulement. */
+  /** Public information only. */
   list(): Promise<Array<{ accountId: string; role: KeyRole; publicKey: string }>>;
 }
 
@@ -105,7 +105,7 @@ export class FileKeyStore implements KeyStore {
   constructor(private dir: string) {}
 
   private path(accountId: string, role: KeyRole): string {
-    if (!ACCOUNT_RE.test(accountId) || accountId.includes("..")) throw new Error("Identifiant de compte invalide pour le stockage des clés");
+    if (!ACCOUNT_RE.test(accountId) || accountId.includes("..")) throw new Error("Invalid account identifier for key storage");
     return join(this.dir, `${accountId}.${role}.key`);
   }
 
@@ -122,7 +122,7 @@ export class FileKeyStore implements KeyStore {
       return { accountId, role, publicKey: j.publicKey, secretKey: new Secret(j.secretKey) };
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code === "ENOENT") return null;
-      throw new Error(`Lecture de la clé impossible pour ${accountId} (${role})`); // sans contenu du fichier
+      throw new Error(`Cannot read the key for ${accountId} (${role})`); // without the file content
     }
   }
 
@@ -143,7 +143,7 @@ export class FileKeyStore implements KeyStore {
         const j = JSON.parse(await readFile(join(this.dir, n), "utf8")) as { accountId: string; role: KeyRole; publicKey: string };
         out.push({ accountId: j.accountId, role: j.role, publicKey: j.publicKey });
       } catch {
-        /* fichier illisible ignoré */
+        /* unreadable file ignored */
       }
     }
     return out;

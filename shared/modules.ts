@@ -1,5 +1,5 @@
-// Contrats entre modules (en plus de Chain/Brain). Chaque module exporte une fabrique `createX(deps)` qui renvoie ces interfaces.
-// Frontières : engine -> market -> chain ; engine -> brain ; backend compose le tout. Voir docs/ARCHITECTURE.md §4.
+// Contracts between modules (besides Chain/Brain). Each module exports a `createX(deps)` factory that returns these interfaces.
+// Boundaries: engine -> market -> chain; engine -> brain; backend composes everything. See docs/ARCHITECTURE.md §4.
 import type { Journal } from "./bus.ts";
 import type { Brain } from "./brain.ts";
 import type { Chain } from "./chain.ts";
@@ -9,7 +9,7 @@ import type { Rng } from "./rng.ts";
 import type { Deliverable } from "./deliverable.ts";
 import type { Agent, Bid, Letter, Profession, Requester, Task, Validation } from "./types.ts";
 
-/** Dépendances injectées partout (aucun module ne construit lui-même Chain, Brain, Journal ni ne lit process.env). */
+/** Dependencies injected everywhere (no module builds Chain, Brain or Journal itself nor reads process.env). */
 export interface Deps {
   config: Config;
   chain: Chain;
@@ -19,25 +19,25 @@ export interface Deps {
   now: () => Date;
 }
 
-/** Marché des tâches (dev-marche, dossier market/). Lui seul parle au séquestre et à la réputation. */
+/** Task market (dev-marche, market/ folder). Only it talks to escrow and reputation. */
 export interface Market {
-  /** Publie une tâche et ouvre les enchères. Les fonds du payeur sont verrouillés à l'attribution (lockEscrow). */
+  /** Publishes a task and opens bidding. The payer's funds are locked at award time (lockEscrow). */
   postTask(input: { requester: Requester; profession: Profession; title: string; prompt: string; budget: Yocto; parentTaskId?: string }): Promise<Task>;
   placeBid(input: { taskId: string; agentId: string; price: Yocto; etaTicks: number; pitch?: string }): Promise<Bid>;
-  /** Avance le marché d'un tick : clôture les enchères (attribue au meilleur prix/réputation), verrouille le séquestre, expire. */
+  /** Advances the market by one tick: closes bidding (awards to the best price/reputation), locks escrow, expires. */
   step(tick: number): Promise<void>;
-  /** Remet le résultat du gagnant ; déclenche validation puis libération (avec preuve) ou remboursement. */
+  /** Hands in the winner's result; triggers validation then release (with proof) or refund. */
   submitResult(input: { taskId: string; agentId: string; text: string }): Promise<{ task: Task; validation: Validation }>;
   getTask(id: string): Task | undefined;
   listTasks(filter?: { status?: Task["status"]; profession?: Profession }): Task[];
-  /** Tâches ouvertes aux offres pour une profession. */
+  /** Tasks open to bids for a profession. */
   openTasks(profession?: Profession): Task[];
-  /** Livrable extrait du résultat remis (L16), en mémoire ; undefined si la tâche n'a pas (encore) de livrable valide. */
+  /** Deliverable extracted from the handed-in result (L16), in memory; undefined if the task has no (yet) valid deliverable. */
   getDeliverable(taskId: string): Deliverable | undefined;
   listDeliverables(): Deliverable[];
 }
 
-/** Instantané complet servi par GET /api/state (l'UI s'y initialise puis suit le flux SSE). */
+/** Full snapshot served by GET /api/state (the UI initialises from it then follows the SSE stream). */
 export interface SimState {
   running: boolean;
   paused: boolean;
@@ -46,36 +46,36 @@ export interface SimState {
   mode: "mock" | "testnet";
   chain: { kind: "mock" | "near"; masterId: string; contractId?: string };
   brain: { kind: "mock" | "nearai" };
-  generations: number; // plus haute génération atteinte
-  agents: Agent[]; // vivants et morts
-  tasks: Task[]; // les N dernières
+  generations: number; // highest generation reached
+  agents: Agent[]; // alive and dead
+  tasks: Task[]; // the last N
   letters: Letter[];
-  lastSeq: number; // dernier événement pris en compte (pour reprendre le SSE sans trou)
+  lastSeq: number; // last event taken into account (to resume SSE with no gap)
   totals: { alive: number; dead: number; born: number; tasksSettled: number; totalBalance: Yocto };
 }
 
-/** Options du moteur (D-027). En mock, `emitChainTx: true` : le moteur émet lui-même `chain.tx` pour ses transferts (MockChain n'a pas de journal) ; avec NearChain (accounts/ émet déjà), laisser false. */
+/** Engine options (D-027). In mock, `emitChainTx: true`: the engine itself emits `chain.tx` for its transfers (MockChain has no journal); with NearChain (accounts/ already emits), leave false. */
 export interface EngineOptions {
   emitChainTx?: boolean;
   agentSeqStart?: number;
 }
 
-/** Moteur d'évolution (dev-moteur-evolution, dossier engine/) : boucle de ticks, cycle de vie, économie des agents. */
+/** Evolution engine (dev-moteur-evolution, engine/ folder): tick loop, life cycle, agent economy. */
 export interface Engine {
-  start(): Promise<void>; // crée les fondateurs puis lance la boucle (période config.sim.tickMs)
+  start(): Promise<void>; // creates the founders then starts the loop (period config.sim.tickMs)
   pause(): void;
   resume(): void;
   stop(reason?: "manual"): Promise<void>;
-  /** Exécute exactement un tick (utilisé par les tests : simulation sans horloge). */
+  /** Runs exactly one tick (used by tests: simulation without a clock). */
   tick(): Promise<void>;
   getState(): SimState;
   getAgent(id: string): Agent | undefined;
   getLetter(id: string): Letter | undefined;
 }
 
-/** Module Intents (dev-intents, dossier intents/). V2 : jamais d'appel `dry:false` sans feu vert écrit. */
+/** Intents module (dev-intents, intents/ folder). V2: never a `dry:false` call without a written green light. */
 export interface Intents {
   readonly enabled: boolean;
-  /** Seul appel autorisé par défaut : devis `dry:true`, aucune dépense. */
+  /** The only call allowed by default: `dry:true` quote, no spending. */
   quoteDry(input: { originAsset: string; destinationAsset: string; amountIn: string }): Promise<{ amountOut?: string; raw: unknown }>;
 }

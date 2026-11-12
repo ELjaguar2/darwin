@@ -1,39 +1,39 @@
-// Configuration unique de Darwin, lue depuis les variables d'environnement. Source de vérité : docs/ARCHITECTURE.md §9-10.
-// Aucun module ne lit process.env directement : tous reçoivent un `Config` (testable, sans effet de bord).
+// Single Darwin configuration, read from environment variables. Source of truth: docs/ARCHITECTURE.md §9-10.
+// No module reads process.env directly: all receive a `Config` (testable, no side effects).
 import { parseNear } from "./money.ts";
 
 export type Preset = "normal" | "demo" | "selection";
 
-/** Paramètres de simulation (montants déjà en yocto, durées en ticks). */
+/** Simulation parameters (amounts already in yocto, durations in ticks). */
 export interface SimParams {
-  tickMs: number; // durée réelle d'un tick
-  founders: number; // agents de génération 1
-  maxPopulation: number; // plafond : au-delà, pas de reproduction
-  maxTicks: number; // arrêt automatique (0 = illimité)
-  birthCapital: bigint; // capital minimal donné à un enfant (et aux fondateurs)
-  metabolism: bigint; // coût de vie débité par tick et par agent
-  minVital: bigint; // solde sous ce seuil = mort
+  tickMs: number; // real duration of a tick
+  founders: number; // generation-1 agents
+  maxPopulation: number; // cap: beyond it, no reproduction
+  maxTicks: number; // automatic stop (0 = unlimited)
+  birthCapital: bigint; // minimum capital given to a child (and to the founders)
+  metabolism: bigint; // cost of living debited per tick and per agent
+  minVital: bigint; // balance under this threshold = death
   reproCooldownTicks: number;
-  simClientRatePerTick: number; // espérance de tâches du client simulé par tick
+  simClientRatePerTick: number; // expected number of simulated-client tasks per tick
   taskBudgetMin: bigint;
   taskBudgetMax: bigint;
   bidWindowTicks: number;
   taskDeadlineTicks: number;
-  mutationRate: number; // probabilité de mutation par gène
-  mutationSd: number; // écart-type relatif des mutations numériques
-  nearUsdRate: number; // USD pour 1 NEAR (conversion des coûts IA ; paramètre, pas un cours réel)
+  mutationRate: number; // mutation probability per gene
+  mutationSd: number; // relative standard deviation of numeric mutations
+  nearUsdRate: number; // USD for 1 NEAR (AI cost conversion; a parameter, not a real market rate)
   maxTokensPerCall: number;
-  settleEveryTicks: number; // regroupement des débits on-chain (métabolisme, coûts IA) tous les N ticks
-  visitorBidWindowTicks?: number; // fenêtre d'enchères d'une commande de visiteur (défaut : bidWindowTicks)
-  visitorTaskDeadlineTicks?: number; // délai de livraison d'une commande de visiteur (défaut : taskDeadlineTicks)
-  priceScale: number; // multiplicateur des prix du catalogue (mock : unités « confortables » x40 ; testnet : 1 = prix réels du catalogue)
-  visitorHourlyCap: bigint; // plafond de dépense par heure (horloge réelle) du compte `visitors` ; au-delà, POST /api/tasks = 429 (D-025)
+  settleEveryTicks: number; // grouping of on-chain debits (metabolism, AI costs) every N ticks
+  visitorBidWindowTicks?: number; // bidding window of a visitor order (default: bidWindowTicks)
+  visitorTaskDeadlineTicks?: number; // delivery deadline of a visitor order (default: taskDeadlineTicks)
+  priceScale: number; // multiplier of catalogue prices (mock: "comfortable" units x40; testnet: 1 = real catalogue prices)
+  visitorHourlyCap: bigint; // spending cap per hour (real clock) of the `visitors` account; beyond it, POST /api/tasks = 429 (D-025)
 }
 
 const N = parseNear;
 
 export const PRESETS: Record<"mock" | "testnet", Record<Preset, SimParams>> = {
-  // Mock : montants « confortables », pensés pour que 3 générations tiennent en ~3-5 min en `demo`.
+  // Mock: "comfortable" amounts, designed so that 3 generations fit in ~3-5 min in `demo`.
   mock: {
     normal: {
       tickMs: 1000, founders: 4, maxPopulation: 24, maxTicks: 0,
@@ -47,7 +47,7 @@ export const PRESETS: Record<"mock" | "testnet", Record<Preset, SimParams>> = {
       birthCapital: N("10"), metabolism: N("0.08"), minVital: N("1.5"), reproCooldownTicks: 10,
       simClientRatePerTick: 1.5, taskBudgetMin: N("0.5"), taskBudgetMax: N("4"),
       bidWindowTicks: 1, taskDeadlineTicks: 5, mutationRate: 0.4, mutationSd: 0.2,
-      // D-028 : taux bas = coût IA visible (un appel `mock/large` ~0,07 NEAR, `mock/small` ~0,01 NEAR) ; sans effet sur un taux réel.
+      // D-028: low rate = visible AI cost (a `mock/large` call ~0.07 NEAR, `mock/small` ~0.01 NEAR); no effect on a real rate.
       nearUsdRate: 0.01, maxTokensPerCall: 300, settleEveryTicks: 1, visitorHourlyCap: N("30"), priceScale: 40,
     },
     selection: {
@@ -58,7 +58,7 @@ export const PRESETS: Record<"mock" | "testnet", Record<Preset, SimParams>> = {
       nearUsdRate: 0.01, maxTokensPerCall: 300, settleEveryTicks: 1, visitorHourlyCap: N("30"), priceScale: 40,
     },
   },
-  // Testnet : montants minuscules (le testnet est limité par faucet), ticks lents (latence des transactions).
+  // Testnet: tiny amounts (the testnet is faucet-limited), slow ticks (transaction latency).
   testnet: {
     normal: {
       tickMs: 4000, founders: 3, maxPopulation: 10, maxTicks: 0,
@@ -74,13 +74,13 @@ export const PRESETS: Record<"mock" | "testnet", Record<Preset, SimParams>> = {
       bidWindowTicks: 1, taskDeadlineTicks: 4, mutationRate: 0.4, mutationSd: 0.2,
       nearUsdRate: 3, maxTokensPerCall: 300, settleEveryTicks: 4, visitorHourlyCap: N("0.5"), priceScale: 1, visitorBidWindowTicks: 3, visitorTaskDeadlineTicks: 6,
     },
-    // « selection » : la sélection est visible en un seul run réel (morts ET génération 3). Population plafonnée large,
-    // capital de naissance modeste, métabolisme fort (un agent sans contrat meurt en une dizaine de ticks), gains
-    // supérieurs au métabolisme pour les bons agents (ils se reproduisent), reproduction rapide. Ticks de 10 s :
-    // la latence RPC testnet fait qu'un tick réel dure environ une minute.
+    // "selection": selection is visible in a single real run (deaths AND generation 3). Population cap set wide,
+    // modest birth capital, strong metabolism (an agent without a contract dies in about ten ticks), earnings
+    // above metabolism for good agents (they reproduce), fast reproduction. 10 s ticks:
+    // testnet RPC latency means a real tick lasts about a minute.
     selection: {
       tickMs: 10000, founders: 6, maxPopulation: 18, maxTicks: 0,
-      // L17 (D-043) : calibre en mock par `scripts/calibrate-selection.ts` (avant : capital 0,1, metabolisme 0,005, client 1,5/tick).
+      // L17 (D-043): calibrated in mock by `scripts/calibrate-selection.ts` (before: capital 0.1, metabolism 0.005, client 1.5/tick).
       birthCapital: N("0.12"), metabolism: N("0.0035"), minVital: N("0.03"), reproCooldownTicks: 4,
       simClientRatePerTick: 2, taskBudgetMin: N("0.02"), taskBudgetMax: N("0.1"),
       bidWindowTicks: 1, taskDeadlineTicks: 4, mutationRate: 0.4, mutationSd: 0.2,
@@ -96,19 +96,19 @@ export interface Config {
   brain: "mock" | "nearai";
   seed: number;
   sim: SimParams;
-  server: { host: string; port: number; dataDir: string; adminToken: string | undefined; allowedHosts: string[] }; // allowedHosts : noms d'hôte supplémentaires acceptés dans l'en-tête Host (anti rebond DNS) ; "*" = tous
+  server: { host: string; port: number; dataDir: string; adminToken: string | undefined; allowedHosts: string[] }; // allowedHosts: extra host names accepted in the Host header (anti DNS rebinding); "*" = all
   near: {
     network: "testnet";
     rpcUrl: string;
     masterAccountId: string | undefined;
-    masterPrivateKey: string | undefined; // SECRET : ne jamais journaliser (utiliser redactConfig)
+    masterPrivateKey: string | undefined; // SECRET: never log (use redactConfig)
     contractId: string | undefined;
   };
-  nearai: { baseUrl: string; apiKey: string | undefined; model: string | undefined; timeoutMs: number; maxUsdPerRun: number | undefined; maxUsdPerHour: number | undefined }; // apiKey SECRET ; plafonds USD globaux (undefined = défauts du cerveau)
+  nearai: { baseUrl: string; apiKey: string | undefined; model: string | undefined; timeoutMs: number; maxUsdPerRun: number | undefined; maxUsdPerHour: number | undefined }; // apiKey SECRET; global USD caps (undefined = brain defaults)
   /**
-   * Budget IA réel (L11). Plafond dur `budgetEurStop` (EUR) : une fois atteint, tout appel est refusé (BrainError BUDGET_EXHAUSTED) et la
-   * simulation s'arrête proprement. `eurUsdRate` = USD pour 1 EUR (défaut prudent : sous le cours réel => coût en EUR surestimé).
-   * `fallback` : fournisseur OpenAI-compatible de secours (AI_BASE_URL / AI_API_KEY / AI_MODEL), apiKey SECRET.
+    * Real AI budget (L11). Hard cap `budgetEurStop` (EUR): once reached, every call is refused (BrainError BUDGET_EXHAUSTED) and the
+    * simulation stops cleanly. `eurUsdRate` = USD for 1 EUR (cautious default: below the real rate => EUR cost overestimated).
+    * `fallback`: OpenAI-compatible fallback provider (AI_BASE_URL / AI_API_KEY / AI_MODEL), apiKey SECRET.
    */
   ai: {
     budgetEurTotal: number;
@@ -125,37 +125,37 @@ function num(env: Env, key: string, fallback: number): number {
   const v = env[key];
   if (v === undefined || v.trim() === "") return fallback;
   const n = Number(v);
-  if (!Number.isFinite(n)) throw new Error(`Variable ${key} invalide : nombre attendu`);
+  if (!Number.isFinite(n)) throw new Error(`Variable ${key} invalid: number expected`);
   return n;
 }
-/** Nombre optionnel strictement positif (plafonds USD) : absent = undefined, invalide ou <= 0 = erreur claire. */
+/** Optional strictly positive number (USD caps): absent = undefined, invalid or <= 0 = clear error. */
 function optNum(env: Env, key: string): number | undefined {
   const v = env[key];
   if (v === undefined || v.trim() === "") return undefined;
   const n = Number(v);
-  if (!Number.isFinite(n) || n <= 0) throw new Error(`Variable ${key} invalide : nombre > 0 attendu`);
+  if (!Number.isFinite(n) || n <= 0) throw new Error(`Variable ${key} invalid: number > 0 expected`);
   return n;
 }
 const str = (env: Env, key: string): string | undefined => (env[key]?.trim() ? env[key]!.trim() : undefined);
 const near = (env: Env, key: string, fallback: bigint): bigint => (str(env, key) ? parseNear(str(env, key)!) : fallback);
 
 /**
- * Règles de résolution :
- *  - DARWIN_MODE=mock (défaut) : chaîne mock + cerveau mock, aucune clé.
- *  - DARWIN_MODE=testnet : chaîne near (exige NEAR_MASTER_*), cerveau nearai si NEARAI_API_KEY, sinon mock + avertissement.
- *  - DARWIN_CHAIN / DARWIN_BRAIN forcent un choix (ex. testnet + cerveau mock).
+  * Resolution rules:
+  *  - DARWIN_MODE=mock (default): mock chain + mock brain, no key.
+  *  - DARWIN_MODE=testnet: near chain (requires NEAR_MASTER_*), nearai brain if NEARAI_API_KEY, otherwise mock + warning.
+  *  - DARWIN_CHAIN / DARWIN_BRAIN force a choice (e.g. testnet + mock brain).
  */
 export function loadConfig(env: Env = process.env): Config {
   const mode = (str(env, "DARWIN_MODE") ?? "mock") as Config["mode"];
-  if (mode !== "mock" && mode !== "testnet") throw new Error(`DARWIN_MODE invalide : ${mode} (mock|testnet)`);
+  if (mode !== "mock" && mode !== "testnet") throw new Error(`Invalid DARWIN_MODE: ${mode} (mock|testnet)`);
   const preset = (str(env, "DARWIN_PRESET") ?? "normal") as Preset;
-  if (preset !== "normal" && preset !== "demo" && preset !== "selection") throw new Error(`DARWIN_PRESET invalide : ${preset} (normal|demo|selection)`);
+  if (preset !== "normal" && preset !== "demo" && preset !== "selection") throw new Error(`Invalid DARWIN_PRESET: ${preset} (normal|demo|selection)`);
 
   const apiKey = str(env, "NEARAI_API_KEY");
   const chain = (str(env, "DARWIN_CHAIN") ?? (mode === "testnet" ? "near" : "mock")) as Config["chain"];
   const brain = (str(env, "DARWIN_BRAIN") ?? (mode === "testnet" && (apiKey || (str(env, "AI_API_KEY") && str(env, "AI_BASE_URL") && str(env, "AI_MODEL"))) ? "nearai" : "mock")) as Config["brain"];
-  if (chain !== "mock" && chain !== "near") throw new Error(`DARWIN_CHAIN invalide : ${chain}`);
-  if (brain !== "mock" && brain !== "nearai") throw new Error(`DARWIN_BRAIN invalide : ${brain}`);
+  if (chain !== "mock" && chain !== "near") throw new Error(`Invalid DARWIN_CHAIN: ${chain}`);
+  if (brain !== "mock" && brain !== "nearai") throw new Error(`Invalid DARWIN_BRAIN: ${brain}`);
 
   const fbKey = str(env, "AI_API_KEY");
   const fbUrl = str(env, "AI_BASE_URL");
@@ -163,14 +163,14 @@ export function loadConfig(env: Env = process.env): Config {
   const fallback = fbKey && fbUrl && fbModel
     ? {
         baseUrl: fbUrl, apiKey: fbKey, model: fbModel,
-        // Prix inconnus d'un fournisseur tiers : valeurs volontairement pessimistes (USD/M tokens) tant que non renseignées.
+        // Unknown prices of a third-party provider: deliberately pessimistic values (USD/M tokens) as long as not filled in.
         usdPerMTokIn: optNum(env, "AI_PRICE_IN_USD_PER_M") ?? 1,
         usdPerMTokOut: optNum(env, "AI_PRICE_OUT_USD_PER_M") ?? 5,
       }
     : undefined;
   const budgetEurTotal = optNum(env, "DARWIN_AI_BUDGET_EUR_TOTAL") ?? 10;
   const budgetEurStop = optNum(env, "DARWIN_AI_BUDGET_EUR_STOP") ?? 8;
-  if (budgetEurStop > budgetEurTotal) throw new Error("DARWIN_AI_BUDGET_EUR_STOP doit être <= DARWIN_AI_BUDGET_EUR_TOTAL");
+  if (budgetEurStop > budgetEurTotal) throw new Error("DARWIN_AI_BUDGET_EUR_STOP must be <= DARWIN_AI_BUDGET_EUR_TOTAL");
 
   const base = PRESETS[mode][preset];
   const sim: SimParams = {
@@ -197,8 +197,8 @@ export function loadConfig(env: Env = process.env): Config {
     visitorBidWindowTicks: optNum(env, "DARWIN_VISITOR_BID_WINDOW_TICKS") ?? base.visitorBidWindowTicks,
     visitorTaskDeadlineTicks: optNum(env, "DARWIN_VISITOR_TASK_DEADLINE_TICKS") ?? base.visitorTaskDeadlineTicks,
   };
-  if (sim.minVital >= sim.birthCapital) throw new Error("DARWIN_MIN_VITAL doit être < DARWIN_BIRTH_CAPITAL");
-  if (sim.taskBudgetMin > sim.taskBudgetMax) throw new Error("DARWIN_TASK_BUDGET_MIN doit être <= DARWIN_TASK_BUDGET_MAX");
+  if (sim.minVital >= sim.birthCapital) throw new Error("DARWIN_MIN_VITAL must be < DARWIN_BIRTH_CAPITAL");
+  if (sim.taskBudgetMin > sim.taskBudgetMax) throw new Error("DARWIN_TASK_BUDGET_MIN must be <= DARWIN_TASK_BUDGET_MAX");
 
   return {
     mode, preset, chain, brain,
@@ -236,7 +236,7 @@ export function loadConfig(env: Env = process.env): Config {
   };
 }
 
-/** Copie journalisable : secrets masqués. À utiliser pour tout log ou endpoint /api/config. */
+/** Loggable copy: secrets masked. To use for any log or /api/config endpoint. */
 export function redactConfig(c: Config): unknown {
   const mask = (v: string | undefined) => (v ? "***" : undefined);
   return JSON.parse(

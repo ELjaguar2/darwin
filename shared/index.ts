@@ -1,4 +1,4 @@
-// Point d'entrée des interfaces partagées : `import { ... } from "../shared/index.ts"`.
+// Entry point of the shared interfaces: `import { ... } from "../shared/index.ts"`.
 export * from "./money.ts";
 export * from "./rng.ts";
 export * from "./hash.ts";

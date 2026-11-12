@@ -1,15 +1,15 @@
 #!/usr/bin/env node
-// Rotation de la cle du compte maitre TESTNET. Proprietaire : agent securite.
-// Usage : node scripts/rotate-master-key.mjs [--env <chemin .env>] [--backup-dir <dossier hors depot>]
+// Rotation of the TESTNET master account key. Owner: security agent.
+// Usage: node scripts/rotate-master-key.mjs [--env <.env path>] [--backup-dir <folder outside the repo>]
 //                                            [--rpc <url[,url2]>] [--apply] [--keep-old]
-//   Sans --apply : DRY-RUN (lecture seule : verifie l'ancienne cle on-chain, n'ecrit rien, ne signe rien).
-//   Avec --apply : (a) sauvegarde du .env, (b) nouvelle paire ed25519 sauvegardee hors depot AVANT toute transaction,
-//     (c) AddKey full access signee par l'ancienne cle, (d) verification RPC, (e) mise a jour du .env,
-//     (f) transaction de controle signee par la NOUVELLE cle seule, (g) DeleteKey de l'ancienne (sauf --keep-old),
-//     verification de sa disparition et nouvelle transaction de controle.
-//   Au moindre echec : arret, rien n'est supprime. Les cles ne sont JAMAIS affichees (fragments de 4 caracteres de la cle PUBLIQUE).
-//   Refuse tout reseau autre que testnet et tout compte qui ne se termine pas par .testnet.
-// near-api-js (optionnel) est resolu depuis le dossier courant ou celui du script : lancer depuis un dossier ou il est installe.
+//   Without --apply: DRY-RUN (read-only: checks the old key on-chain, writes nothing, signs nothing).
+//   With --apply: (a) .env backup, (b) new ed25519 pair saved outside the repository BEFORE any transaction,
+//     (c) full-access AddKey signed by the old key, (d) RPC verification, (e) .env update,
+//     (f) control transaction signed by the NEW key alone, (g) DeleteKey of the old one (unless --keep-old),
+//     verification that it is gone and a new control transaction.
+//   On the slightest failure: stop, nothing is deleted. Keys are NEVER displayed (4-character fragments of the PUBLIC key).
+//   Refuses any network other than testnet and any account that does not end with .testnet.
+// near-api-js (optional) is resolved from the current folder or the script's folder: run from a folder where it is installed.
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync, renameSync, copyFileSync, mkdirSync, existsSync, chmodSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -21,20 +21,20 @@ const argv = process.argv.slice(2);
 const opt = (n, d) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : d; };
 const APPLY = argv.includes("--apply");
 const KEEP_OLD = argv.includes("--keep-old");
-const RESUME = opt("--resume", null); // fichier new-master-key-*.json : reprise apres un arret
+const RESUME = opt("--resume", null); // new-master-key-*.json file: resume after a stop
 const envPath = resolve(opt("--env", ".env"));
 const backupDir = resolve(opt("--backup-dir", join(homedir(), ".darwin-secure")));
-// Masquage des messages d'erreur (memes motifs que backend/redact.ts) : une erreur RPC ne doit jamais afficher une cle.
+// Masking of error messages (same patterns as backend/redact.ts): an RPC error must never display a key.
 const redactText = (s) =>
   String(s)
     .replace(/\b(ed25519|secp256k1):[A-Za-z0-9+/=_-]{16,}/g, "$1:[masque]")
     .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/gi, "Bearer [masque]")
-    .replace(/\bsk-[A-Za-z0-9_-]{16,}/g, "[cle masquee]")
+    .replace(/\bsk-[A-Za-z0-9_-]{16,}/g, "[key masked]")
     .replace(/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{5,}/g, "[jwt masque]")
-    .replace(/(?<![1-9A-HJ-NP-Za-km-z])[1-9A-HJ-NP-Za-km-z]{86,90}(?![1-9A-HJ-NP-Za-km-z])/g, (m) => (/[A-Z]/.test(m) && /[a-z]/.test(m) && /\d/.test(m) ? "[cle masquee]" : m));
+    .replace(/(?<![1-9A-HJ-NP-Za-km-z])[1-9A-HJ-NP-Za-km-z]{86,90}(?![1-9A-HJ-NP-Za-km-z])/g, (m) => (/[A-Z]/.test(m) && /[a-z]/.test(m) && /\d/.test(m) ? "[key masked]" : m));
 const safeMsg = (e, max) => redactText(e?.message || e).slice(0, max);
 
-/** Vrai si le dossier (existant ou a creer) est dans l'arbre de travail d'un depot git : la cle en clair y serait committable. */
+/** True if the folder (existing or to be created) is inside a repository's working tree: the clear-text key would be committable there. */
 function insideGitTree(dir) {
   let d = dir;
   while (!existsSync(d)) {
@@ -45,28 +45,28 @@ function insideGitTree(dir) {
   try {
     return execFileSync("git", ["-C", d, "rev-parse", "--is-inside-work-tree"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim() === "true";
   } catch {
-    return false; // git absent ou hors depot
+    return false; // not installed or outside a repository
   }
 }
 
 const ts = new Date().toISOString().replace(/[:.]/g, "-");
 const log = (...a) => console.log("[rotate-master-key]", ...a);
-const fail = (m) => { console.error("[rotate-master-key] ECHEC :", m); process.exit(1); };
-const frag = (pk) => `${String(pk).slice(0, 12)}...${String(pk).slice(-4)}`; // cle PUBLIQUE seulement
+const fail = (m) => { console.error("[rotate-master-key] FAILURE:", m); process.exit(1); };
+const frag = (pk) => `${String(pk).slice(0, 12)}...${String(pk).slice(-4)}`; // PUBLIC key only
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-if (insideGitTree(backupDir)) fail(`--backup-dir (${backupDir}) est dans un depot git : la nouvelle cle en clair y serait committable. Choisissez un dossier hors de tout depot (defaut : ~/.darwin-secure).`);
+if (insideGitTree(backupDir)) fail(`--backup-dir (${backupDir}) is inside a repository: the new clear-text key would be committable there. Choose a folder outside any repository (default: ~/.darwin-secure).`);
 
 function loadNear() {
   for (const base of [join(process.cwd(), "package.json"), fileURLToPath(import.meta.url)]) {
     try { return createRequire(base)("near-api-js"); } catch { /* suivant */ }
   }
-  fail("near-api-js introuvable (npm install near-api-js@7.4.0, Node >= 22.22.2).");
+  fail("near-api-js not found (npm install near-api-js@7.4.0, Node >= 22.22.2).");
 }
 const near = loadNear();
 
-// --- .env (parse minimal, sans rien afficher) ---
-if (!existsSync(envPath)) fail(`.env introuvable : ${envPath}`);
+// --- .env (minimal parse, displays nothing) ---
+if (!existsSync(envPath)) fail(`.env not found: ${envPath}`);
 const envText = readFileSync(envPath, "utf8");
 const envGet = (k) => {
   const m = new RegExp(`^${k}=(.*)$`, "m").exec(envText);
@@ -76,16 +76,16 @@ const network = envGet("NEAR_NETWORK") || "testnet";
 const accountId = envGet("NEAR_MASTER_ACCOUNT_ID");
 const oldSecret = envGet("NEAR_MASTER_PRIVATE_KEY");
 if (network !== "testnet") fail("NEAR_NETWORK doit valoir testnet.");
-if (!accountId.endsWith(".testnet")) fail("NEAR_MASTER_ACCOUNT_ID doit se terminer par .testnet.");
-if (!oldSecret) fail("NEAR_MASTER_PRIVATE_KEY vide dans le .env.");
+if (!accountId.endsWith(".testnet")) fail("NEAR_MASTER_ACCOUNT_ID must end with .testnet.");
+if (!oldSecret) fail("NEAR_MASTER_PRIVATE_KEY is empty in the .env.");
 const rpcUrls = (opt("--rpc", process.env.NEAR_RPC_URL || envGet("NEAR_RPC_URL") || "https://test.rpc.fastnear.com"))
   .split(",").map((s) => s.trim()).filter(Boolean);
-if (!rpcUrls.every((u) => u.startsWith("https://"))) fail("Les URL RPC doivent etre en https.");
+if (!rpcUrls.every((u) => u.startsWith("https://"))) fail("RPC URLs must use https.");
 let oldPair;
-try { oldPair = near.KeyPair.fromString(oldSecret); } catch { fail("NEAR_MASTER_PRIVATE_KEY illisible (ed25519: attendu)."); }
+try { oldPair = near.KeyPair.fromString(oldSecret); } catch { fail("NEAR_MASTER_PRIVATE_KEY unreadable (ed25519: expected)."); }
 const oldPub = oldPair.getPublicKey().toString();
 
-// --- RPC avec reessais (429, reseau) et bascule entre fournisseurs ---
+// --- RPC with retries (429, network) and failover between providers ---
 const providers = rpcUrls.map((url) => new near.JsonRpcProvider({ url }));
 async function withRetry(label, fn, tries = 8) {
   let delay = 1500, last;
@@ -95,127 +95,127 @@ async function withRetry(label, fn, tries = 8) {
       last = e;
       const msg = safeMsg(e, 160);
       if (e?.__fatal) throw e;
-      log(`${label}: tentative ${i + 1}/${tries} echouee (${msg}); nouvel essai dans ${delay} ms`);
+      log(`${label}: attempt ${i + 1}/${tries} failed (${msg}); retrying in ${delay} ms`);
       await sleep(delay); delay = Math.min(delay * 2, 20000);
     }
   }
   throw last;
 }
-const listKeys = () => withRetry("liste des cles", (p) => p.viewAccessKeyList({ accountId, finalityQuery: { finality: "final" } }))
+const listKeys = () => withRetry("key list", (p) => p.viewAccessKeyList({ accountId, finalityQuery: { finality: "final" } }))
   .then((r) => r.keys.map((k) => ({ pub: k.public_key ?? k.publicKey, full: (k.access_key ?? k.accessKey).permission === "FullAccess" })));
-const txHash = (r) => r?.transaction?.hash ?? r?.transaction_outcome?.id ?? "(hash indisponible)";
+const txHash = (r) => r?.transaction?.hash ?? r?.transaction_outcome?.id ?? "(hash unavailable)";
 const okOutcome = (r) => {
   const s = r?.status;
   return s && typeof s === "object" && "SuccessValue" in s;
 };
-// transaction de controle : 1 yoctoNEAR du compte vers lui-meme, signee par `pair`
+// control transaction: 1 yoctoNEAR from the account to itself, signed by `pair`
 async function selfTransfer(pair, tag) {
   const signer = near.KeyPairSigner ? new near.KeyPairSigner(pair) : pair.toString();
   const r = await withRetry(`controle ${tag}`, (p) => new near.Account(accountId, p, signer).transfer({ receiverId: accountId, amount: 1n }), 4);
-  if (!okOutcome(r)) fail(`transaction de controle ${tag} non confirmee.`);
-  log(`transaction de controle (${tag}) OK : ${txHash(r)}`);
+  if (!okOutcome(r)) fail(`control transaction ${tag} not confirmed.`);
+  log(`control transaction (${tag}) OK: ${txHash(r)}`);
   return txHash(r);
 }
 
 log(`compte ${accountId} | reseau ${network} | RPC ${rpcUrls.join(", ")} | mode ${APPLY ? "APPLY" : "DRY-RUN"}`);
 const before = await listKeys();
-log(`cles d'acces avant : ${before.map((k) => `${frag(k.pub)}${k.full ? "(full)" : "(fc)"}`).join(", ")}`);
+log(`access keys before: ${before.map((k) => `${frag(k.pub)}${k.full ? "(full)" : "(fc)"}`).join(", ")}`);
 const oldEntry = before.find((k) => k.pub === oldPub);
-if (!oldEntry) fail(`la cle publique du .env (${frag(oldPub)}) ne figure pas parmi les cles du compte.`);
-if (!oldEntry.full) fail("la cle du .env n'est pas full access.");
-if (before.filter((k) => k.full).length > 1) log("AVERTISSEMENT : plusieurs cles full access existent deja ; seule celle du .env sera supprimee.");
+if (!oldEntry) fail(`the .env public key (${frag(oldPub)}) is not among the account's keys.`);
+if (!oldEntry.full) fail("the .env key is not full access.");
+if (before.filter((k) => k.full).length > 1) log("WARNING: several full-access keys already exist; only the .env one will be deleted.");
 
 if (!APPLY) {
-  log("DRY-RUN : etapes qui seraient executees :");
-  log(` a) copie du .env vers ${backupDir} (0600)`);
-  log(" b) nouvelle paire ed25519, sauvegardee dans le meme dossier avant toute transaction");
-  log(` c) AddKey full access signee par ${frag(oldPub)}`);
-  log(" d) verification RPC de la nouvelle cle  e) mise a jour de NEAR_MASTER_PRIVATE_KEY dans le .env");
-  log(" f) transfert de 1 yoctoNEAR (compte vers lui-meme) signe par la nouvelle cle seule");
-  log(KEEP_OLD ? " g) --keep-old : l'ancienne cle ne serait PAS supprimee" : " g) DeleteKey de l'ancienne cle, verification, nouvelle transaction de controle");
-  log("Rien n'a ete modifie. Relancer avec --apply pour executer.");
+  log("DRY-RUN: steps that would be executed:");
+  log(` a) copy of the .env to ${backupDir} (0600)`);
+  log(" b) new ed25519 pair, saved in the same folder before any transaction");
+  log(` c) full-access AddKey signed by ${frag(oldPub)}`);
+  log(" d) RPC verification of the new key  e) update of NEAR_MASTER_PRIVATE_KEY in the .env");
+  log(" f) transfer of 1 yoctoNEAR (account to itself) signed by the new key alone");
+  log(KEEP_OLD ? " g) --keep-old: the old key would NOT be deleted" : " g) DeleteKey of the old key, verification, new control transaction");
+  log("Nothing was modified. Re-run with --apply to execute.");
   process.exit(0);
 }
 
-// (a) sauvegarde du .env
+// (a) .env backup
 mkdirSync(backupDir, { recursive: true });
 const envBackup = join(backupDir, `env-backup-${ts}`);
 copyFileSync(envPath, envBackup);
 try { chmodSync(envBackup, 0o600); } catch { /* Windows */ }
 log(`(a) .env sauvegarde : ${envBackup}`);
 
-// (b) nouvelle paire, sauvegardee AVANT toute transaction
-// (--resume : reprise d'une paire deja sauvegardee, eventuellement deja ajoutee on-chain)
+// (b) new pair, saved BEFORE any transaction
+// (--resume: resuming an already saved pair, possibly already added on-chain)
 let newPair;
 if (RESUME) {
   const saved = JSON.parse(readFileSync(resolve(RESUME), "utf8"));
-  if (saved.accountId !== accountId) fail("--resume : le fichier concerne un autre compte.");
+  if (saved.accountId !== accountId) fail("--resume: the file concerns another account.");
   newPair = near.KeyPair.fromString(saved.secretKey);
-  log(`(b) reprise de la cle sauvegardee ${frag(newPair.getPublicKey().toString())}`);
+  log(`(b) resuming the saved key ${frag(newPair.getPublicKey().toString())}`);
 } else {
   newPair = near.KeyPair.fromRandom("ed25519");
   const keyBackup = join(backupDir, `new-master-key-${ts}.json`);
   writeFileSync(keyBackup, JSON.stringify({ accountId, publicKey: newPair.getPublicKey().toString(), secretKey: newPair.toString(), createdAt: ts }), { mode: 0o600 });
   try { chmodSync(keyBackup, 0o600); } catch { /* Windows */ }
-  log(`(b) nouvelle cle generee (${frag(newPair.getPublicKey().toString())}), sauvegardee : ${keyBackup}`);
+  log(`(b) new key generated (${frag(newPair.getPublicKey().toString())}), saved: ${keyBackup}`);
 }
 const newPub = newPair.getPublicKey().toString();
 const newSecret = newPair.toString();
 
-// (c) AddKey signee par l'ancienne cle (sautee si la cle est deja on-chain)
+// (c) AddKey signed by the old key (skipped if the key is already on-chain)
 const oldSigner = near.KeyPairSigner ? new near.KeyPairSigner(oldPair) : oldPair.toString();
-let addHash = "(deja presente)";
+let addHash = "(already present)";
 if (!before.some((k) => k.pub === newPub)) {
   try {
     const r = await withRetry("AddKey", (p) => new near.Account(accountId, p, oldSigner).addFullAccessKey(newPub), 4);
-    if (!okOutcome(r)) throw new Error("AddKey non confirmee");
+    if (!okOutcome(r)) throw new Error("AddKey not confirmed");
     addHash = txHash(r);
   } catch (e) {
-    log(`(c) erreur sur AddKey (${safeMsg(e, 120)}) : verification de l'etat on-chain avant de conclure...`);
+    log(`(c) error on AddKey (${safeMsg(e, 120)}): checking the on-chain state before concluding...`);
   }
 }
-// (d) verification (la finalite du RPC a quelques secondes de retard : interrogation jusqu'a 60 s)
+// (d) verification (RPC finality lags by a few seconds: polling for up to 60 s)
 let newEntry;
 for (let i = 0; i < 12 && !newEntry; i++) {
   if (i) await sleep(5000);
   newEntry = (await listKeys()).find((k) => k.pub === newPub);
 }
-if (!newEntry || !newEntry.full) fail("(d) la nouvelle cle ne figure pas en full access sur le compte : STOP, rien supprime, .env intact.");
+if (!newEntry || !newEntry.full) fail("(d) the new key is not listed as full access on the account: STOP, nothing deleted, .env intact.");
 log(`(c) AddKey OK : ${addHash}`);
-log(`(d) nouvelle cle ${frag(newPub)} presente en full access`);
+log(`(d) new key ${frag(newPub)} present with full access`);
 
-// (e) .env : remplacement atomique de la seule ligne NEAR_MASTER_PRIVATE_KEY
+// (e) .env: atomic replacement of the NEAR_MASTER_PRIVATE_KEY line only
 const re = /^NEAR_MASTER_PRIVATE_KEY=.*$/m;
-if (!re.test(envText)) fail("(e) ligne NEAR_MASTER_PRIVATE_KEY absente du .env.");
+if (!re.test(envText)) fail("(e) NEAR_MASTER_PRIVATE_KEY line missing from the .env.");
 const tmp = `${envPath}.tmp-${process.pid}`;
 writeFileSync(tmp, envText.replace(re, () => `NEAR_MASTER_PRIVATE_KEY=${newSecret}`), { mode: 0o600 });
 renameSync(tmp, envPath);
-if (!readFileSync(envPath, "utf8").includes(`NEAR_MASTER_PRIVATE_KEY=${newSecret}`)) fail("(e) relecture du .env incoherente (restaurer la sauvegarde).");
-log("(e) .env mis a jour (valeur non affichee)");
+if (!readFileSync(envPath, "utf8").includes(`NEAR_MASTER_PRIVATE_KEY=${newSecret}`)) fail("(e) inconsistent .env re-read (restore the backup).");
+log("(e) .env updated (value not displayed)");
 
-// (f) controle avec la NOUVELLE cle seule (relue depuis le .env)
+// (f) control with the NEW key alone (re-read from the .env)
 const reread = near.KeyPair.fromString(new RegExp("^NEAR_MASTER_PRIVATE_KEY=(.*)$", "m").exec(readFileSync(envPath, "utf8"))[1].trim());
-if (reread.getPublicKey().toString() !== newPub) fail("(f) la cle du .env ne correspond pas a la nouvelle cle publique.");
-const ctl1 = await selfTransfer(reread, "nouvelle cle seule");
+if (reread.getPublicKey().toString() !== newPub) fail("(f) the .env key does not match the new public key.");
+const ctl1 = await selfTransfer(reread, "new key alone");
 
-if (KEEP_OLD) { log("--keep-old : suppression de l'ancienne cle sautee."); process.exit(0); }
+if (KEEP_OLD) { log("--keep-old: deletion of the old key skipped."); process.exit(0); }
 
-// (g) suppression de l'ancienne cle, signee par la NOUVELLE
+// (g) deletion of the old key, signed by the NEW one
 const newSigner = near.KeyPairSigner ? new near.KeyPairSigner(reread) : reread.toString();
-let delHash = "(non confirme)";
+let delHash = "(not confirmed)";
 try {
   const r = await withRetry("DeleteKey", (p) => new near.Account(accountId, p, newSigner).deleteKey(oldPub), 4);
-  if (!okOutcome(r)) throw new Error("DeleteKey non confirmee");
+  if (!okOutcome(r)) throw new Error("DeleteKey not confirmed");
   delHash = txHash(r);
 } catch (e) {
-  log(`(g) erreur sur DeleteKey (${safeMsg(e, 120)}) : verification de l'etat on-chain...`);
+  log(`(g) error on DeleteKey (${safeMsg(e, 120)}): checking the on-chain state...`);
 }
 let afterDel = await listKeys();
 for (let i = 0; i < 12 && afterDel.some((k) => k.pub === oldPub); i++) { await sleep(5000); afterDel = await listKeys(); }
-if (afterDel.some((k) => k.pub === oldPub)) fail("(g) l'ancienne cle figure encore sur le compte (le compte reste utilisable avec la nouvelle).");
-if (!afterDel.some((k) => k.pub === newPub && k.full)) fail("(g) ALERTE : la nouvelle cle n'est plus en full access !");
+if (afterDel.some((k) => k.pub === oldPub)) fail("(g) the old key is still listed on the account (the account stays usable with the new one).");
+if (!afterDel.some((k) => k.pub === newPub && k.full)) fail("(g) ALERT: the new key is no longer full access!");
 log(`(g) DeleteKey OK : ${delHash}`);
-log(`    cles d'acces apres : ${afterDel.map((k) => `${frag(k.pub)}${k.full ? "(full)" : "(fc)"}`).join(", ")}`);
+log(`    access keys after: ${afterDel.map((k) => `${frag(k.pub)}${k.full ? "(full)" : "(fc)"}`).join(", ")}`);
 const ctl2 = await selfTransfer(reread, "apres suppression");
 log(`TERMINE. AddKey ${addHash} | controle ${ctl1} | DeleteKey ${delHash} | controle ${ctl2}`);
-log(`Sauvegardes hors depot dans ${backupDir} : les supprimer une fois la rotation validee.`);
+log(`Backups outside the repository in ${backupDir}: delete them once the rotation is validated.`);

@@ -1,4 +1,4 @@
-// Aides de test : NearChain branchée sur le faux backend, sans réseau ni clé réelle.
+// Test helpers: NearChain wired to the fake backend, with no network or real key.
 import { parseNear } from "../shared/money.ts";
 import { MemoryArchive } from "./archive.ts";
 import { FakeNearBackend } from "./fake-backend.ts";
@@ -23,7 +23,7 @@ export function newChain(o: { contract: boolean; birth?: bigint }) {
     keystore,
     archive,
     policy: new SpendPolicy({ defaultLimit: defaultSpendLimit(o.birth ?? parseNear("100")), exempt: [master] }),
-    sleep: async () => backend.settle(), // le « callback » arrive pendant l'attente
+    sleep: async () => backend.settle(), // the "callback" arrives during the wait
     settlePollMs: 0,
   });
   return { chain, backend, keystore, archive };

@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// Genere les tableaux Markdown de preuves testnet a partir d'un journal Darwin (data/journal.jsonl ou data/archive/*.jsonl).
-// Usage : node scripts/gen-preuves.mjs <journal.jsonl> [--cycles N]
-// Aucune valeur secrete n'est lue ni ecrite : seuls des identifiants publics de transactions sont reproduits.
+// Generates the Markdown testnet proof tables from a Darwin journal (data/journal.jsonl or data/archive/*.jsonl).
+// Usage: node scripts/gen-preuves.mjs <journal.jsonl> [--cycles N]
+// No secret value is read or written: only public transaction identifiers are reproduced.
 import { readFileSync } from "node:fs";
 
 const file = process.argv[2];
 if (!file) {
-  console.error("Usage : node scripts/gen-preuves.mjs <journal.jsonl> [--cycles N]");
+  console.error("Usage: node scripts/gen-preuves.mjs <journal.jsonl> [--cycles N]");
   process.exit(2);
 }
 const ci = process.argv.indexOf("--cycles");
@@ -25,33 +25,33 @@ const born = of("agent.born").map((e) => e.data.agent);
 const maxGen = Math.max(0, ...born.map((a) => a.generation));
 
 const out = [];
-out.push(`Journal : \`${file}\` (${ev.length} événements, du ${ev[0]?.ts} au ${ev.at(-1)?.ts}).\n`);
-out.push(`Génération maximale née : **${maxGen}** ; naissances : ${born.length} ; reproductions : ${counts["agent.reproduced"] || 0} ; lettres : ${counts["letter.written"] || 0} ; morts : ${counts["agent.died"] || 0}.`);
-out.push(`Transactions par type : ${Object.entries(kinds).map(([k, v]) => `${k} ${v}`).join(", ")}.\n`);
+out.push(`Journal: \`${file}\` (${ev.length} events, from ${ev[0]?.ts} to ${ev.at(-1)?.ts}).\n`);
+out.push(`Maximum generation born: **${maxGen}**; births: ${born.length}; reproductions: ${counts["agent.reproduced"] || 0}; letters: ${counts["letter.written"] || 0}; deaths: ${counts["agent.died"] || 0}.`);
+out.push(`Transactions by type: ${Object.entries(kinds).map(([k, v]) => `${k} ${v}`).join(", ")}.\n`);
 
-out.push("### Naissances\n");
-out.push("| Agent | Génération | Parent | Compte | Tx de création |");
+out.push("### Births\n");
+out.push("| Agent | Generation | Parent | Account | Creation tx |");
 out.push("|---|---|---|---|---|");
 for (const a of born) out.push(`| ${a.id} | ${a.generation} | ${a.parentId ?? "—"} | \`${a.accountId}\` | ${link(a.birthTx)} |`);
 
 out.push("\n### Reproductions\n");
-out.push("| Parent | Enfant | Transféré (NEAR) |");
+out.push("| Parent | Child | Transferred (NEAR) |");
 out.push("|---|---|---|");
 for (const e of of("agent.reproduced")) out.push(`| ${e.data.parentId} | ${e.data.childId} | ${near(e.data.transferred)} |`);
 
-out.push("\n### Morts\n");
-out.push("| Agent | Cause | Solde final (NEAR) | Récupéré par le maître (NEAR) | Tx de clôture |");
+out.push("\n### Deaths\n");
+out.push("| Agent | Cause | Final balance (NEAR) | Recovered by the master (NEAR) | Closing tx |");
 out.push("|---|---|---|---|---|");
 for (const e of of("agent.died")) out.push(`| ${e.data.agentId} | ${e.data.cause} | ${near(e.data.finalBalance)} | ${near(e.data.swept)} | ${link(e.data.tx)} |`);
 const markDead = of("chain.tx").filter((e) => e.data.kind === "mark_dead").map((e) => link(e.data.hash));
-if (markDead.length) out.push(`\nInscription de la mort dans le registre du contrat (\`mark_dead\`) : ${markDead.join(", ")}.`);
+if (markDead.length) out.push(`\nDeath recorded in the contract registry (\`mark_dead\`): ${markDead.join(", ")}.`);
 
 const locked = new Map(of("escrow.locked").map((e) => [e.data.taskId, e.data]));
 const released = new Map(of("escrow.released").map((e) => [e.data.taskId, e.data]));
 const rep = new Map(of("reputation.updated").map((e) => [e.data.taskId, e.data]));
 const cycles = [...released.keys()].filter((t) => locked.has(t));
-out.push(`\n### Séquestres : ${locked.size} verrouillés, ${released.size} libérés, ${rep.size} réputations écrites (${maxCycles} premiers cycles listés)\n`);
-out.push("| Tâche | Payeur | Bénéficiaire | Montant (NEAR) | Verrouillage | Libération | Réputation |");
+out.push(`\n### Escrows: ${locked.size} locked, ${released.size} released, ${rep.size} reputations written (first ${maxCycles} cycles listed)\n`);
+out.push("| Task | Payer | Beneficiary | Amount (NEAR) | Lock | Release | Reputation |");
 out.push("|---|---|---|---|---|---|---|");
 for (const t of cycles.slice(0, maxCycles)) {
   const l = locked.get(t), r = released.get(t), p = rep.get(t);
@@ -62,6 +62,6 @@ const brain = of("brain.charged");
 const usd = brain.reduce((s, e) => s + (e.data.costUsd || 0), 0);
 const byModel = {};
 for (const e of brain) byModel[e.data.model] = (byModel[e.data.model] || 0) + 1;
-out.push(`\n### Cerveau (débits dans ce journal)\n`);
-out.push(`${brain.length} appels facturés aux agents (${brain.filter((e) => e.data.mock).length} mock), coût réel cumulé ${usd.toFixed(5)} USD. Par modèle : ${Object.entries(byModel).map(([k, v]) => `${k} ×${v}`).join(", ")}.`);
+out.push(`\n### Brain (debits in this journal)\n`);
+out.push(`${brain.length} calls billed to the agents (${brain.filter((e) => e.data.mock).length} mock), cumulative real cost ${usd.toFixed(5)} USD. By model: ${Object.entries(byModel).map(([k, v]) => `${k} ×${v}`).join(", ")}.`);
 console.log(out.join("\n"));

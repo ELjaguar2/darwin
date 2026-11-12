@@ -1,11 +1,11 @@
-// Flux temps réel SSE (D-008). Format de chaque message : `id: <seq>`, `event: <type>`, `data: <DarwinEvent JSON>`.
-// Reprise : en-tête `Last-Event-ID` (ou `?since=<seq>`). Commentaire `: ping` toutes les 15 s.
+// SSE real-time stream (D-008). Format of each message: `id: <seq>`, `event: <type>`, `data: <DarwinEvent JSON>`.
+// Resume: `Last-Event-ID` header (or `?since=<seq>`). `: ping` comment every 15 s.
 import type { Context } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { DarwinEvent, Journal } from "../shared/index.ts";
 
 export const PING_MS = 15_000;
-/** Au-delà, le client est trop lent : on ferme, il reprend avec Last-Event-ID. */
+/** Beyond this, the client is too slow: we close, it resumes with Last-Event-ID. */
 const MAX_QUEUE = 5_000;
 
 export function parseSince(v: string | undefined): number {
@@ -28,13 +28,13 @@ export function sseHandler(journal: Journal & { subscribeReset?: (fn: () => void
         wake?.();
       };
       stream.onAbort(stop);
-      // On s'abonne AVANT le rejeu : rien ne se perd, les doublons sont écartés par `lastSent`.
+      // We subscribe BEFORE the replay: nothing is lost, duplicates are dropped via `lastSent`.
       const unsubscribe = journal.subscribe((ev) => {
         if (queue.length >= MAX_QUEUE) return stop();
         queue.push(ev);
         wake?.();
       });
-      // Replay (L17) : le rejeu repart de zéro ; le client vide son affichage puis reçoit les événements depuis seq 1.
+      // Replay (L17): the replay restarts from zero; the client clears its display then receives events from seq 1.
       const unsubReset = journal.subscribeReset?.(() => {
         queue.length = 0;
         queue.push("reset");
@@ -43,7 +43,7 @@ export function sseHandler(journal: Journal & { subscribeReset?: (fn: () => void
       try {
         await stream.write("retry: 3000\n\n");
         if (since > journal.lastSeq) {
-          // Le serveur a redémarré (la simulation repart de zéro) : l'identifiant du client ne correspond plus à rien.
+          // The server restarted (the simulation restarts from zero): the client's id no longer matches anything.
           await stream.writeSSE({ event: "reset", data: JSON.stringify({ lastSeq: journal.lastSeq }) });
           since = 0;
         }

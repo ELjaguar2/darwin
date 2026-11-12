@@ -1,16 +1,16 @@
-// NearChain : implémentation testnet de `Chain` (comptes, registre, séquestre, réputation).
-// Ne touche jamais near-api-js directement : tout passe par `NearBackend` (near-backend.ts, import dynamique).
+// NearChain: testnet implementation of `Chain` (accounts, registry, escrow, reputation).
+// Never touches near-api-js directly: everything goes through `NearBackend` (near-backend.ts, dynamic import).
 //
-// Deux modes pour registre / séquestre / réputation :
-//  - "contract"  (contractId fourni) : appels au contrat `contracts/darwin` (lot L3), avec ses écarts documentés :
-//      * register_agent reçoit `genome_json` (JSON canonique) + `genome_hash` ;
-//      * refund_escrow n'accepte que `rejected` ou `expired` ;
-//      * add_reputation exige un séquestre libéré (ou remboursé, rejected ou expired, pour un malus) avec preuve identique ;
-//      * lock_escrow exige une réservation de l'id par l'opérateur (`reserve_task`, enchaîné dans lockEscrow) ;
-//      * statuts transitoires `releasing`/`refunding` : on attend le callback, sinon on les voit comme « locked » ;
-//      * lock_escrow débite le compte qui signe : on signe avec la clé du payeur.
-//  - "degraded"  (pas de contrat, D-016/D-022) : séquestre = sous-compte `escrow.<maître>` piloté par le moteur
-//    (vrais transferts testnet), registre et réputation dans `LocalLedger`. Jamais à présenter comme « on-chain ».
+// Two modes for registry / escrow / reputation:
+//  - "contract"  (contractId provided): calls to the `contracts/darwin` contract (lot L3), with its documented differences:
+//      * register_agent receives `genome_json` (canonical JSON) + `genome_hash`;
+//      * refund_escrow only accepts `rejected` or `expired`;
+//      * add_reputation requires a released escrow (or refunded, rejected or expired, for a penalty) with an identical proof;
+//      * lock_escrow requires the id to be reserved by the operator (`reserve_task`, chained inside lockEscrow);
+//      * transient statuses `releasing`/`refunding`: we wait for the callback, otherwise they are seen as "locked";
+//      * lock_escrow debits the signing account: we sign with the payer's key.
+//  - "degraded"  (no contract, D-016/D-022): escrow = `escrow.<master>` sub-account driven by the engine
+//    (real testnet transfers), registry and reputation in `LocalLedger`. Never to be presented as "on-chain".
 import {
   ChainError,
   type AgentRecord,
@@ -29,12 +29,12 @@ import type { NearBackend, NearSigner } from "./near-backend.ts";
 import { SpendPolicy } from "./policy.ts";
 
 const NEAR = 10n ** 24n;
-/** Gaz attaché (le gaz non consommé est remboursé ; il est toutefois pré-acheté, donc exigé du solde du signataire). */
-export const GAS_CALL = 30_000_000_000_000n; // 30 Tgas (défaut near-api-js)
+/** Attached gas (unused gas is refunded; it is however pre-purchased, hence required from the signer's balance). */
+export const GAS_CALL = 30_000_000_000_000n; // 30 Tgas (near-api-js default)
 export const GAS_SETTLE = 60_000_000_000_000n; // release/refund : transfert + callback
-/** Réserve conservée si la suppression du compte échoue (balayage « gelé »). */
+/** Reserve kept if account deletion fails ("frozen" sweep). */
 export const GAS_RESERVE = NEAR / 1000n; // 0.001 NEAR
-/** Financement minimal d'un sous-compte d'escrow en mode dégradé. */
+/** Minimum funding of an escrow sub-account in degraded mode. */
 const ESCROW_ACCOUNT_FUNDING = NEAR / 10n; // 0.1 NEAR
 
 export interface NearChainOptions {
@@ -47,13 +47,13 @@ export interface NearChainOptions {
   archive?: AccountArchive;
   policy?: SpendPolicy;
   ledger?: LocalLedger;
-  /** Méthodes autorisées à la clé function call de chaque agent (jamais vide : vide = toutes les méthodes en NEAR). */
+  /** Methods allowed to each agent's function call key (never empty: empty = all methods in NEAR). */
   fcMethods?: string[];
-  /** Allocation de gaz de la clé function call (yocto). Borne la dépense de gaz de cette clé. */
+  /** Gas allowance of the function call key (yocto). Bounds this key's gas spend. */
   fcAllowance?: bigint;
-  /** Notification (journal `chain.tx`). Ne reçoit jamais de clé. */
+  /** Notification (`chain.tx` journal). Never receives a key. */
   onTx?: (r: TxReceipt, d: { from?: string; to?: string; amount?: string }) => void;
-  /** Alerte non fatale (ex. clé function call non ajoutée). Sans secret. */
+  /** Non-fatal alert (e.g. function call key not added). No secret. */
   onWarning?: (code: string, message: string) => void;
   now?: () => Date;
   sleep?: (ms: number) => Promise<void>;
@@ -86,11 +86,11 @@ interface ContractAgent {
 
 const LABEL_RE = /^[a-z0-9]+([_-][a-z0-9]+)*$/;
 
-/** Normalise le motif de remboursement vers l'énumération du contrat. */
+/** Normalises the refund reason to the contract's enumeration. */
 export function refundReasonOf(reason: string): "rejected" | "expired" {
   const r = reason.trim().toLowerCase();
   if (r === "rejected" || r === "expired") return r;
-  throw new ChainError("RPC_ERROR", `refundEscrow : motif « ${reason} » refusé (seuls rejected et expired sont admis)`);
+  throw new ChainError("RPC_ERROR", `refundEscrow: reason "${reason}" refused (only rejected and expired are accepted)`);
 }
 
 export class NearChain implements Chain {
@@ -123,14 +123,14 @@ export class NearChain implements Chain {
     return { kind: "near", network: "testnet", masterId: this.o.masterId, contractId: this.o.contractId, explorerBase: this.explorer };
   }
 
-  /** Vérifie RPC (réseau testnet) et existence du compte maître. À appeler au démarrage. */
+  /** Checks RPC (testnet network) and the master account's existence. To call at startup. */
   async checkReady(): Promise<{ masterBalance: Yocto }> {
     await this.ledger.load();
     await this.recover();
     const st = await this.o.backend.status();
-    if (st.chainId !== "testnet") throw new ChainError("RPC_ERROR", `Réseau inattendu : ${st.chainId} (testnet attendu ; le mainnet est interdit)`);
+    if (st.chainId !== "testnet") throw new ChainError("RPC_ERROR", `Unexpected network: ${st.chainId} (testnet expected; mainnet is forbidden)`);
     const m = await this.o.backend.getState(this.o.masterId);
-    if (!m) throw new ChainError("UNKNOWN_ACCOUNT", `Compte maître introuvable sur testnet : ${this.o.masterId}`);
+    if (!m) throw new ChainError("UNKNOWN_ACCOUNT", `Master account not found on testnet: ${this.o.masterId}`);
     return { masterBalance: m.total.toString() };
   }
 
@@ -150,7 +150,7 @@ export class NearChain implements Chain {
   private async signerFor(accountId: string): Promise<NearSigner> {
     if (accountId === this.master.accountId) return this.master;
     const k = await this.keystore.get(accountId, "full");
-    if (!k) throw new ChainError("UNKNOWN_ACCOUNT", `Aucune clé de signature pour ${accountId} (compte non créé par ce processus ?)`);
+    if (!k) throw new ChainError("UNKNOWN_ACCOUNT", `No signing key for ${accountId} (account not created by this process?)`);
     return { accountId, secretKey: k.secretKey };
   }
 
@@ -167,24 +167,24 @@ export class NearChain implements Chain {
   // ------------------------------------------------------------------ comptes
 
   async createAccount(args: { label: string; initialFunding: Yocto; fundFrom?: string }) {
-    if (!LABEL_RE.test(args.label) || args.label.length > 32) throw new ChainError("RPC_ERROR", `Libellé de compte invalide : ${args.label}`);
+    if (!LABEL_RE.test(args.label) || args.label.length > 32) throw new ChainError("RPC_ERROR", `Invalid account label: ${args.label}`);
     const accountId = `${args.label}.${this.o.masterId}`;
     const fund = BigInt(args.initialFunding);
     const from = args.fundFrom ?? this.o.masterId;
-    if (await this.o.backend.getState(accountId)) throw new ChainError("RPC_ERROR", `Compte déjà existant : ${accountId}`);
+    if (await this.o.backend.getState(accountId)) throw new ChainError("RPC_ERROR", `Account already exists: ${accountId}`);
 
-    // Le parent d'un sous-compte NEAR est toujours le maître : si l'argent vient d'un autre compte
-    // (ex. le parent d'un agent), on le rapatrie d'abord au maître, avec plafond de dépense.
+    // The parent of a NEAR sub-account is always the master: if the money comes from another account
+    // (e.g. an agent's parent), we first bring it back to the master, with a spending cap.
     let reimbursed = false;
     if (from !== this.o.masterId) {
       await this.transfer({ from, to: this.o.masterId, amount: fund.toString(), memo: `fund ${accountId}` });
       reimbursed = true;
     }
-    // La clé est enregistrée AVANT la transaction : un crash ne doit jamais laisser un compte sans clé.
+    // The key is stored BEFORE the transaction: a crash must never leave an account without a key.
     const key = generateKey();
     await this.keystore.put(accountId, "full", key);
-    // Clé function call à droits limités (contrat Darwin seulement, méthodes listées, gaz borné, aucun dépôt possible),
-    // ajoutée dans la même transaction que la création du compte : l'agent naît avec ses deux clés.
+    // Limited-rights function call key (Darwin contract only, listed methods, bounded gas, no deposit possible),
+    // added in the same transaction as the account creation: the agent is born with both keys.
     let fc: ReturnType<typeof generateKey> | undefined;
     if (this.o.contractId) {
       fc = generateKey();
@@ -202,7 +202,7 @@ export class NearChain implements Chain {
               publicKey: fc.publicKey,
               contractId: this.o.contractId,
               methodNames: this.o.fcMethods?.length ? this.o.fcMethods : ["lock_escrow"],
-              allowance: this.o.fcAllowance ?? NEAR / 20n, // 0.05 NEAR de gaz au plus
+              allowance: this.o.fcAllowance ?? NEAR / 20n, // 0.05 NEAR of gas at most
             }
           : undefined,
       );
@@ -221,29 +221,29 @@ export class NearChain implements Chain {
 
   async transfer(args: { from: string; to: string; amount: Yocto; memo?: string }) {
     const amount = BigInt(args.amount);
-    if (amount < 0n) throw new ChainError("RPC_ERROR", "Montant négatif");
+    if (amount < 0n) throw new ChainError("RPC_ERROR", "Negative amount");
     this.policy.check(args.from, amount);
     const st = await this.requireState(args.from);
-    if (st.available < amount) throw new ChainError("INSUFFICIENT_FUNDS", `Solde disponible insuffisant sur ${args.from}`);
+    if (st.available < amount) throw new ChainError("INSUFFICIENT_FUNDS", `Insufficient available balance on ${args.from}`);
     const hash = await this.o.backend.transfer(await this.signerFor(args.from), args.to, amount);
     this.policy.record(args.from, amount);
     return this.receipt("transfer", hash, { from: args.from, to: args.to, amount: amount.toString() });
   }
 
   async closeAccount(args: { accountId: string; beneficiary: string }) {
-    if (args.accountId === this.o.masterId) throw new ChainError("RPC_ERROR", "Le compte maître ne se ferme pas");
-    // Supprimer vers un compte inexistant détruirait les fonds : on vérifie le bénéficiaire d'abord.
+    if (args.accountId === this.o.masterId) throw new ChainError("RPC_ERROR", "The master account cannot be closed");
+    // Deleting toward a non-existent account would destroy the funds: we check the beneficiary first.
     await this.requireState(args.beneficiary);
     const st = await this.requireState(args.accountId);
     const signer = await this.signerFor(args.accountId);
     const pubs = (await this.keystore.list()).filter((k) => k.accountId === args.accountId).map((k) => k.publicKey);
     let hash: string;
-    let swept = st.total; // borne haute : le gaz de la suppression est prélevé sur ce solde
+    let swept = st.total; // upper bound: the deletion gas is taken from this balance
     let disposition: "deleted" | "frozen" = "deleted";
     try {
       hash = await this.o.backend.deleteAccount(signer, args.beneficiary);
     } catch (e) {
-      // Repli : balayer ce qui peut l'être en gardant une réserve de gaz, le compte reste « gelé » (clés retirées).
+      // Fallback: sweep what can be swept while keeping a gas reserve, the account stays "frozen" (keys removed).
       const spendable = st.available - GAS_RESERVE;
       if (spendable <= 0n) throw e;
       hash = await this.o.backend.transfer(signer, args.beneficiary, spendable);
@@ -271,10 +271,10 @@ export class NearChain implements Chain {
   async registerAgent(record: Omit<AgentRecord, "alive" | "deathTick" | "cause">) {
     const genomeJson = canonicalJson(record.genome);
     if (sha256Hex(genomeJson) !== record.genomeHash.toLowerCase()) {
-      throw new ChainError("RPC_ERROR", "genomeHash ne correspond pas au sha256 du JSON canonique du génome");
+      throw new ChainError("RPC_ERROR", "genomeHash does not match the sha256 of the genome's canonical JSON");
     }
     if (this.mode === "degraded") {
-      if (this.ledger.records[record.agentId]) throw new ChainError("ALREADY_REGISTERED", `Déjà enregistré : ${record.agentId}`);
+      if (this.ledger.records[record.agentId]) throw new ChainError("ALREADY_REGISTERED", `Already registered: ${record.agentId}`);
       this.ledger.records[record.agentId] = { ...record, alive: true };
       await this.ledger.save();
       return this.localReceipt("register_agent", record.agentId + record.genomeHash);
@@ -346,21 +346,21 @@ export class NearChain implements Chain {
     }
   }
 
-  // ------------------------------------------------------------------ séquestre
+  // ------------------------------------------------------------------ escrow
 
   async lockEscrow(args: { taskId: string; payer: string; amount: Yocto }) {
     const amount = BigInt(args.amount);
-    if (amount <= 0n) throw new ChainError("RPC_ERROR", "Montant de séquestre nul");
+    if (amount <= 0n) throw new ChainError("RPC_ERROR", "Zero escrow amount");
     this.policy.check(args.payer, amount);
     if (this.mode === "degraded") {
-      if (this.ledger.escrows[args.taskId]) throw new ChainError("ESCROW_EXISTS", `Séquestre déjà créé : ${args.taskId}`);
-      // Même règle que le contrat : réservation opérateur de l'id pour ce payeur, consommée au verrouillage.
+      if (this.ledger.escrows[args.taskId]) throw new ChainError("ESCROW_EXISTS", `Escrow already created: ${args.taskId}`);
+      // Same rule as the contract: operator reservation of the id for this payer, consumed on lock.
       const res = this.ledger.reservations[args.taskId];
       if (res === undefined) this.ledger.reservations[args.taskId] = args.payer;
-      else if (res !== args.payer) throw new ChainError("ESCROW_EXISTS", `Identifiant de tâche déjà réservé pour un autre payeur : ${args.taskId}`);
+      else if (res !== args.payer) throw new ChainError("ESCROW_EXISTS", `Task id already reserved for another payer: ${args.taskId}`);
       await this.ensureEscrowAccount();
       const st = await this.requireState(args.payer);
-      if (st.available < amount) throw new ChainError("INSUFFICIENT_FUNDS", `Solde disponible insuffisant sur ${args.payer}`);
+      if (st.available < amount) throw new ChainError("INSUFFICIENT_FUNDS", `Insufficient available balance on ${args.payer}`);
       const hash = await this.o.backend.transfer(await this.signerFor(args.payer), this.escrowAccount, amount);
       delete this.ledger.reservations[args.taskId];
       this.ledger.escrows[args.taskId] = { taskId: args.taskId, payer: args.payer, amount: amount.toString(), status: "locked" };
@@ -369,16 +369,16 @@ export class NearChain implements Chain {
       return this.receipt("escrow_lock", hash, { from: args.payer, to: this.escrowAccount, amount: amount.toString() });
     }
     const st = await this.requireState(args.payer);
-    if (st.available < amount) throw new ChainError("INSUFFICIENT_FUNDS", `Solde disponible insuffisant sur ${args.payer}`);
-    // Anti-squat (contrat L3) : l'opérateur réserve d'abord l'id pour ce payeur (appel interne, hors interface Chain).
-    // Si une réservation identique existe déjà (échec précédent après réservation), on ne la refait pas.
+    if (st.available < amount) throw new ChainError("INSUFFICIENT_FUNDS", `Insufficient available balance on ${args.payer}`);
+    // Anti-squat (contract L3): the operator first reserves the id for this payer (internal call, outside the Chain interface).
+    // If an identical reservation already exists (previous failure after reserving), we do not redo it.
     const reserved = (await this.o.backend.view(this.o.contractId!, "get_reservation", { task_id: args.taskId })) as string | null;
     if (reserved === null || reserved === undefined) {
       await this.o.backend.call(this.master, this.o.contractId!, "reserve_task", { task_id: args.taskId, payer: args.payer }, { gas: GAS_CALL });
     } else if (reserved !== args.payer) {
-      throw new ChainError("ESCROW_EXISTS", `Identifiant de tâche déjà réservé pour un autre payeur : ${args.taskId}`);
+      throw new ChainError("ESCROW_EXISTS", `Task id already reserved for another payer: ${args.taskId}`);
     }
-    // Le dépôt est prélevé sur le compte qui signe : on signe avec la clé du payeur.
+    // The deposit is taken from the signing account: we sign with the payer's key.
     const hash = await this.o.backend.call(
       await this.signerFor(args.payer),
       this.o.contractId!,
@@ -399,10 +399,10 @@ export class NearChain implements Chain {
     return (await this.o.backend.view(this.o.contractId!, "get_escrow", { task_id: taskId })) as ContractEscrow | null;
   }
 
-  // --- mode dégradé : règlement sûr (statut transitoire écrit avant le transfert, verrou par taskId) ---
+  // --- degraded mode: safe settlement (transient status written before the transfer, lock per taskId) ---
   private locks = new Map<string, Promise<unknown>>();
 
-  /** Sérialise les opérations sur un même taskId (deux appels concurrents ne paient jamais deux fois). */
+  /** Serialises operations on the same taskId (two concurrent calls never pay twice). */
   private withLock<T>(taskId: string, fn: () => Promise<T>): Promise<T> {
     const prev = this.locks.get(taskId) ?? Promise.resolve();
     const run = prev.then(fn, fn);
@@ -414,7 +414,7 @@ export class NearChain implements Chain {
     return run;
   }
 
-  /** Passe en `releasing`/`refunding` et persiste AVANT le transfert ; en cas d'échec, retour à `locked`. */
+  /** Moves to `releasing`/`refunding` and persists BEFORE the transfer; on failure, back to `locked`. */
   private async settleLocal(e: EscrowRow, transient: "releasing" | "refunding", to: string, prepare: () => void): Promise<string> {
     const signer = await this.signerFor(this.escrowAccount);
     const before = (await this.requireState(this.escrowAccount)).total;
@@ -436,9 +436,9 @@ export class NearChain implements Chain {
   }
 
   /**
-   * Reprise après plantage (mode dégradé) : pour chaque séquestre resté `releasing`/`refunding`, compare le solde
-   * du compte escrow à celui noté avant le transfert. Solde baissé d'au moins le montant : le transfert a eu lieu
-   * (état final) ; sinon retour à `locked`. Hypothèse : le compte escrow ne sert qu'à ces règlements. Renvoie les taskId repris.
+    * Recovery after a crash (degraded mode): for each escrow left `releasing`/`refunding`, compares the balance
+    * of the escrow account with the one noted before the transfer. Balance dropped by at least the amount: the transfer happened
+    * (final state); otherwise back to `locked`. Assumption: the escrow account is only used for these settlements. Returns the recovered taskIds.
    */
   async recover(): Promise<string[]> {
     if (this.mode !== "degraded") return [];
@@ -464,29 +464,29 @@ export class NearChain implements Chain {
     return out;
   }
 
-  /** Attend la fin du callback (releasing/refunding -> état final). Rend l'état final observé. */
+  /** Waits for the callback to finish (releasing/refunding -> final state). Returns the observed final state. */
   private async awaitFinal(taskId: string): Promise<ContractEscrow> {
     const polls = this.o.settlePolls ?? 10;
     let e: ContractEscrow | null = null;
     for (let i = 0; i < polls; i++) {
       e = await this.contractEscrow(taskId);
-      if (!e) throw new ChainError("ESCROW_UNKNOWN", `Séquestre inconnu : ${taskId}`);
+      if (!e) throw new ChainError("ESCROW_UNKNOWN", `Unknown escrow: ${taskId}`);
       if (e.status !== "releasing" && e.status !== "refunding") return e;
       await this.sleep(this.o.settlePollMs ?? 1000);
     }
-    throw new ChainError("RPC_ERROR", `Séquestre ${taskId} encore en cours de règlement (${e?.status}) : réessayer plus tard`);
+    throw new ChainError("RPC_ERROR", `Escrow ${taskId} still being settled (${e?.status}): try again later`);
   }
 
   async releaseEscrow(args: { taskId: string; payee: string; proof: ReleaseProof }) {
     const p = args.proof;
     if (!p || p.verdict !== "accepted" || !p.resultHash || !p.validator) {
-      throw new ChainError("PROOF_REQUIRED", "Libération refusée : preuve de validation absente ou non acceptée");
+      throw new ChainError("PROOF_REQUIRED", "Release refused: validation proof missing or not accepted");
     }
     if (this.mode === "degraded") {
       return this.withLock(args.taskId, async () => {
         const e = this.ledger.escrows[args.taskId];
-        if (!e) throw new ChainError("ESCROW_UNKNOWN", `Séquestre inconnu : ${args.taskId}`);
-        if (e.status !== "locked") throw new ChainError("ESCROW_SETTLED", `Séquestre déjà ${e.status} : ${args.taskId}`);
+        if (!e) throw new ChainError("ESCROW_UNKNOWN", `Unknown escrow: ${args.taskId}`);
+        if (e.status !== "locked") throw new ChainError("ESCROW_SETTLED", `Escrow already ${e.status}: ${args.taskId}`);
         const hash = await this.settleLocal(e, "releasing", args.payee, () => {
           e.payee = args.payee;
           e.proofHash = p.resultHash;
@@ -504,7 +504,7 @@ export class NearChain implements Chain {
       { gas: GAS_SETTLE },
     );
     const fin = await this.awaitFinal(args.taskId);
-    if (fin.status !== "released") throw new ChainError("RPC_ERROR", `Libération non confirmée pour ${args.taskId} (état ${fin.status}) : le transfert a échoué`);
+    if (fin.status !== "released") throw new ChainError("RPC_ERROR", `Release not confirmed for ${args.taskId} (state ${fin.status}): the transfer failed`);
     return this.receipt("escrow_release", hash, { from: this.o.contractId, to: args.payee, amount: fin.amount });
   }
 
@@ -513,8 +513,8 @@ export class NearChain implements Chain {
     if (this.mode === "degraded") {
       return this.withLock(args.taskId, async () => {
         const e = this.ledger.escrows[args.taskId];
-        if (!e) throw new ChainError("ESCROW_UNKNOWN", `Séquestre inconnu : ${args.taskId}`);
-        if (e.status !== "locked") throw new ChainError("ESCROW_SETTLED", `Séquestre déjà ${e.status} : ${args.taskId}`);
+        if (!e) throw new ChainError("ESCROW_UNKNOWN", `Unknown escrow: ${args.taskId}`);
+        if (e.status !== "locked") throw new ChainError("ESCROW_SETTLED", `Escrow already ${e.status}: ${args.taskId}`);
         const hash = await this.settleLocal(e, "refunding", e.payer, () => {
           e.reason = reason;
         });
@@ -525,7 +525,7 @@ export class NearChain implements Chain {
     }
     const hash = await this.o.backend.call(this.master, this.o.contractId!, "refund_escrow", { task_id: args.taskId, reason }, { gas: GAS_SETTLE });
     const fin = await this.awaitFinal(args.taskId);
-    if (fin.status !== "refunded") throw new ChainError("RPC_ERROR", `Remboursement non confirmé pour ${args.taskId} (état ${fin.status})`);
+    if (fin.status !== "refunded") throw new ChainError("RPC_ERROR", `Refund not confirmed for ${args.taskId} (state ${fin.status})`);
     return this.receipt("escrow_refund", hash, { from: this.o.contractId, to: fin.payer, amount: fin.amount });
   }
 
@@ -533,44 +533,44 @@ export class NearChain implements Chain {
     if (this.mode === "degraded") {
       const e = this.ledger.escrows[taskId];
       if (!e) return null;
-      const status = e.status === "released" ? "released" : e.status === "refunded" ? "refunded" : "locked"; // en cours = locked
+      const status = e.status === "released" ? "released" : e.status === "refunded" ? "refunded" : "locked"; // in progress = locked
       return { taskId: e.taskId, payer: e.payer, amount: e.amount, status } as const;
     }
     const e = await this.contractEscrow(taskId);
     if (!e) return null;
-    // `releasing`/`refunding` = en cours : vu comme « locked » (l'argent n'a pas encore atteint son destinataire).
+    // `releasing`/`refunding` = in progress: seen as "locked" (the money has not yet reached its recipient).
     const status = e.status === "released" ? "released" : e.status === "refunded" ? "refunded" : "locked";
     return { taskId: e.task_id, payer: e.payer, amount: String(e.amount), status } as const;
   }
 
-  // ------------------------------------------------------------------ réputation
+  // ------------------------------------------------------------------ reputation
 
   async addReputation(args: { agentId: string; taskId: string; delta: number; proofHash: string }) {
-    if (!args.proofHash) throw new ChainError("PROOF_REQUIRED", "Réputation sans preuve refusée");
+    if (!args.proofHash) throw new ChainError("PROOF_REQUIRED", "Reputation without proof refused");
     if (!Number.isInteger(args.delta) || args.delta === 0 || Math.abs(args.delta) > 100) {
-      throw new ChainError("RPC_ERROR", "delta de réputation : entier non nul, |delta| <= 100");
+      throw new ChainError("RPC_ERROR", "reputation delta: non-zero integer, |delta| <= 100");
     }
     if (this.mode === "degraded") {
       const e = this.ledger.escrows[args.taskId];
       const rec = this.ledger.records[args.agentId];
       if (!rec) throw new ChainError("UNKNOWN_AGENT", `Agent inconnu : ${args.agentId}`);
-      if (!e) throw new ChainError("ESCROW_UNKNOWN", `Séquestre inconnu : ${args.taskId}`);
+      if (!e) throw new ChainError("ESCROW_UNKNOWN", `Unknown escrow: ${args.taskId}`);
       if (args.delta > 0) {
         if (e.status !== "released" || e.payee !== rec.accountId || e.proofHash !== args.proofHash) {
-          throw new ChainError("PROOF_REQUIRED", "Crédit refusé : séquestre non libéré vers cet agent avec cette preuve");
+          throw new ChainError("PROOF_REQUIRED", "Credit refused: escrow not released to this agent with this proof");
         }
       } else if (e.status !== "refunded") {
-        throw new ChainError("PROOF_REQUIRED", "Malus refusé : séquestre non remboursé (rejected ou expired)");
+        throw new ChainError("PROOF_REQUIRED", "Penalty refused: escrow not refunded (rejected or expired)");
       }
       const key = `${args.agentId}|${args.taskId}`;
-      if (this.ledger.reputationProofs.includes(key)) throw new ChainError("RPC_ERROR", "Réputation déjà écrite pour cette tâche");
+      if (this.ledger.reputationProofs.includes(key)) throw new ChainError("RPC_ERROR", "Reputation already written for this task");
       this.ledger.reputationProofs.push(key);
       const total = (this.ledger.reputation[args.agentId] ?? 0) + args.delta;
       this.ledger.reputation[args.agentId] = total;
       await this.ledger.save();
       return { total, tx: this.localReceipt("add_reputation", `${key}|${args.delta}`) };
     }
-    // Le contrat exige le séquestre dans son état final : on attend le callback au besoin.
+    // The contract requires the escrow in its final state: we wait for the callback if needed.
     await this.awaitFinal(args.taskId);
     const hash = await this.o.backend.call(this.master, this.o.contractId!, "add_reputation", {
       agent_id: args.agentId,

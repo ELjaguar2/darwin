@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Scan de secrets Darwin (sans dependance). Proprietaire : agent securite.
-// Usage : node scripts/scan-secrets.mjs [--ref <branche>] [--no-history] [--no-files]
-//   (sans --ref : fichiers suivis du dossier de travail + historique de toutes les refs)
-//   --ref X     : fichiers de X (git show) + historique de X seulement
-//   --no-allowlist : ignore scripts/scan-secrets.allowlist.json (revoir les exceptions revues)
-// Sortie 1 si detection. Les valeurs trouvees sont TOUJOURS masquees.
+// Darwin secret scan (no dependency). Owner: security agent.
+// Usage: node scripts/scan-secrets.mjs [--ref <branch>] [--no-history] [--no-files]
+//   (without --ref: tracked files of the working tree + history of all refs)
+//   --ref X     : files of X (git show) + history of X only
+//   --no-allowlist : ignores scripts/scan-secrets.allowlist.json (review the reviewed exceptions)
+// Exit 1 on detection. Values found are ALWAYS masked.
 import { execFileSync, spawn } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -30,7 +30,7 @@ const RULES = [
     group: 1,
   },
   {
-    // affectation non vide d'une variable secrete connue (.env oublie, code)
+    // non-empty assignment of a known secret variable (forgotten .env, code)
     type: "affectation-secret",
     re: new RegExp(String.raw`\b${SECRET_ENV}\b["']?\s*[:=]\s*["'\x60]?([^\s"'\x60#,;)]{16,})`, "g"),
     group: 1,
@@ -38,21 +38,21 @@ const RULES = [
   },
 ];
 
-// Exceptions revues : scripts/scan-secrets.allowlist.json (commit + fichier + type + empreinte de la valeur ; aucune valeur stockee).
-// Elles ne concernent que l'HISTORIQUE (un secret dans l'arbre actuel n'est jamais exempte). --no-allowlist les ignore.
+// Reviewed exceptions: scripts/scan-secrets.allowlist.json (commit + file + type + value fingerprint; no value stored).
+// They only concern HISTORY (a secret in the current tree is never exempt). --no-allowlist ignores them.
 const ALLOW_PATH = new URL("./scan-secrets.allowlist.json", import.meta.url);
 const allowEntries = args.includes("--no-allowlist") || !existsSync(ALLOW_PATH) ? [] : JSON.parse(readFileSync(ALLOW_PATH, "utf8")).entries ?? [];
 const allowed = [];
 function isAllowed(f, fp) {
   if (!f.commit) return false;
-  // identifiant de commit complet (40 hex) compare en entier ; un prefixe ne suffit pas
+  // full commit identifier (40 hex) compared in full; a prefix is not enough
   return allowEntries.some((e) => e.commit === f.commit && e.file === f.file && e.type === f.type && e.fingerprints.includes(fp));
 }
 const mask = (v) => (v.length <= 8 ? "****" : `${v.slice(0, 4)}...[${v.length} car.]`);
 const findings = [];
 const seen = new Set();
 
-// Fenetres de 4000 caracteres avec recouvrement de 600 (plus long qu'un secret connu) : aucune ligne n'est tronquee.
+// 4000-character windows with a 600 overlap (longer than a known secret): no line is truncated.
 const WINDOW = 4000;
 const OVERLAP = 600;
 function scanLine(line, where) {
@@ -94,20 +94,20 @@ function scanText(text, file, extra = {}) {
 
 // 1. Fichiers suivis
 if (doFiles) {
-  const label = ref ? `ref ${ref}` : "dossier de travail";
+  const label = ref ? `ref ${ref}` : "working tree";
   const files = (ref ? git(["ls-tree", "-r", "--name-only", ref]) : git(["ls-files"])).split(/\r?\n/).filter(Boolean);
   for (const f of files) {
-    if (isEnvFile(f)) findings.push({ file: f, line: 0, type: "fichier-.env-suivi-par-git", masked: "(contenu non affiche)" });
+    if (isEnvFile(f)) findings.push({ file: f, line: 0, type: "fichier-.env-suivi-par-git", masked: "(content not displayed)" });
     if (SKIP.test(f)) continue;
     let text;
     try {
       text = ref ? git(["show", `${ref}:${f}`]) : existsSync(f) ? readFileSync(f, "utf8") : "";
     } catch { continue; }
-    // fichier binaire (octet NUL) : on scanne au moins les chaines ASCII imprimables (comme `strings`)
+    // binary file (NUL byte): we scan at least the printable ASCII strings (like `strings`)
     if (text.includes("\u0000")) text = (text.match(/[\x20-\x7e]{16,}/g) ?? []).join("\n");
     scanText(text, f, { source: label });
   }
-  console.log(`[scan-secrets] fichiers scannes (${label}) : ${files.length}`);
+  console.log(`[scan-secrets] files scanned (${label}): ${files.length}`);
 }
 
 // 2. Historique (lignes ajoutees uniquement)
@@ -126,15 +126,15 @@ async function scanHistory() {
       if (!skip) scanLine(l.slice(1), { file, line: ln, source: `historique ${commit.slice(0, 7)}`, commit });
     } else if (!l.startsWith("-")) ln++;
   }
-  console.log(`[scan-secrets] commits scannes (historique ${ref ?? "toutes refs"}) : ${n}`);
+  console.log(`[scan-secrets] commits scanned (history ${ref ?? "all refs"}): ${n}`);
 }
 if (doHistory) await scanHistory();
 
-if (allowed.length) console.log(`[scan-secrets] ${allowed.length} detection(s) de l'historique exemptee(s) par scripts/scan-secrets.allowlist.json (valeurs factices revues, voir docs/SECURITE.md 2.1).`);
+if (allowed.length) console.log(`[scan-secrets] ${allowed.length} history detection(s) exempted by scripts/scan-secrets.allowlist.json (reviewed dummy values, see docs/SECURITE.md 2.1).`);
 if (findings.length === 0) {
-  console.log("[scan-secrets] OK : aucun secret detecte.");
+  console.log("[scan-secrets] OK: no secret detected.");
   process.exit(0);
 }
-console.error(`[scan-secrets] ECHEC : ${findings.length} detection(s) (valeurs masquees).`);
+console.error(`[scan-secrets] FAILURE: ${findings.length} detection(s) (values masked).`);
 for (const f of findings) console.error(` - ${f.type} | ${f.file}:${f.line} | ${f.source ?? ""} | ${f.masked}`);
 process.exit(1);

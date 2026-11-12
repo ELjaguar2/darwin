@@ -1,11 +1,11 @@
-// Faux backend NEAR en mémoire pour les tests : comptes, clés, et une simulation fidèle des règles du contrat
-// `contracts/darwin` (L3) : hash du génome vérifié, refund rejected|expired, réputation sous conditions, callback différé.
+// In-memory fake NEAR backend for tests: accounts, keys, and a faithful simulation of the rules of the
+// `contracts/darwin` contract (L3): genome hash checked, refund rejected|expired, conditional reputation, deferred callback.
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { ChainError } from "../shared/chain.ts";
 import { sha256Hex } from "../shared/hash.ts";
 import { mapChainError, type NearBackend, type NearSigner } from "./near-backend.ts";
 
-const STORAGE = 10n ** 21n; // 0.001 NEAR immobilisé par compte (valeur de test)
+const STORAGE = 10n ** 21n; // 0.001 NEAR locked per account (test value)
 
 export class FakeNearBackend implements NearBackend {
   accounts = new Map<string, { total: bigint; keys: string[] }>();
@@ -16,10 +16,10 @@ export class FakeNearBackend implements NearBackend {
   reputation = new Map<string, number>();
   applied = new Set<string>();
   fcKeys: Array<{ accountId: string; publicKey: string; contractId: string; methodNames: string[]; allowance: bigint }> = [];
-  /** true : release/refund restent `releasing`/`refunding` jusqu'à settle(). */
+  /** true: release/refund stay `releasing`/`refunding` until settle(). */
   deferCallbacks = false;
   failDelete = false;
-  /** Fait échouer les prochains transferts signés par ce compte (nombre de fois). */
+  /** Makes the next transfers signed by this account fail (number of times). */
   failTransfersFrom: { accountId: string; times: number } | null = null;
   onTransfer?: (from: string, to: string, amount: bigint) => void;
   calls: Array<{ method: string; args: Record<string, unknown>; deposit: bigint; signer: string }> = [];
@@ -109,7 +109,7 @@ export class FakeNearBackend implements NearBackend {
         op();
         const r = args.record;
         if (this.agents.has(r.agent_id)) this.panic("ALREADY_REGISTERED");
-        if (sha256Hex(r.genome_json) !== r.genome_hash) this.panic("genome_hash ne correspond pas au genome");
+        if (sha256Hex(r.genome_json) !== r.genome_hash) this.panic("genome_hash does not match the genome");
         this.agents.set(r.agent_id, { ...r, alive: true, death_tick: null, cause: null });
         break;
       }
@@ -129,12 +129,12 @@ export class FakeNearBackend implements NearBackend {
         break;
       }
       case "lock_escrow": {
-        if (!isOp && signer.accountId !== args.payer) this.panic("Reserve a l operateur ou au payeur");
-        if (this.reservations.get(args.task_id) !== args.payer) this.panic("TASK_NOT_RESERVED : id non reserve pour ce payeur");
+        if (!isOp && signer.accountId !== args.payer) this.panic("Reserved for the operator or the payer");
+        if (this.reservations.get(args.task_id) !== args.payer) this.panic("TASK_NOT_RESERVED: id not reserved for this payer");
         this.reservations.delete(args.task_id);
-        if (deposit <= 0n) this.panic("Depot attache requis");
+        if (deposit <= 0n) this.panic("Attached deposit required");
         if (this.escrows.has(args.task_id)) this.panic("ESCROW_EXISTS");
-        this.pay(signer.accountId, deposit); // le signataire paie
+        this.pay(signer.accountId, deposit); // the signer pays
         this.escrows.set(args.task_id, { task_id: args.task_id, payer: args.payer, amount: deposit, status: "locked", payee: null, proof: null, refund_reason: null });
         break;
       }
@@ -167,9 +167,9 @@ export class FakeNearBackend implements NearBackend {
         if (args.delta > 0) {
           if (e.status !== "released") this.panic("PROOF_REQUIRED : sequestre non libere");
           if (e.payee !== a.account_id || e.proof.result_hash !== args.proof_hash) this.panic("PROOF_REQUIRED : proof_hash");
-        } else if (e.status !== "refunded") this.panic("malus seulement apres remboursement rejected ou expired");
+        } else if (e.status !== "refunded") this.panic("penalty only after a rejected or expired refund");
         const k = `${args.task_id}|${args.agent_id}`;
-        if (this.applied.has(k)) this.panic("reputation deja ecrite");
+        if (this.applied.has(k)) this.panic("reputation already written");
         this.applied.add(k);
         this.reputation.set(args.agent_id, (this.reputation.get(args.agent_id) ?? 0) + args.delta);
         break;

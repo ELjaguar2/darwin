@@ -1,6 +1,6 @@
-// Balayage de graines du preset `selection` (parametres testnet, chaine et cerveau MOCK, aucun appel reel).
-// Usage : npx tsx scripts/calibrate-selection.ts [--seeds 10] [--first 1] [--ticks 120] [--env KEY=VAL ...]
-// Critere : generation maximale >= 3 ET au moins 1 mort, dans au moins 80 % des graines (docs/DECISIONS.md D-043).
+// Seed sweep of the `selection` preset (testnet parameters, MOCK chain and brain, no real call).
+// Usage: npx tsx scripts/calibrate-selection.ts [--seeds 10] [--first 1] [--ticks 120] [--env KEY=VAL ...]
+// Criterion: maximum generation >= 3 AND at least 1 death, in at least 80% of the seeds (docs/DECISIONS.md D-043).
 import { createRuntime } from "../backend/runtime.ts";
 import { loadConfig } from "../shared/index.ts";
 
@@ -52,10 +52,10 @@ for (let s = first; s < first + seeds; s++) {
     sumG3 += gen3Tick;
     nG3++;
   }
-  rows.push(`seed ${String(s).padStart(3)} | gen ${st.generations} | nes ${String(st.totals.born).padStart(3)} | morts ${String(st.totals.dead).padStart(3)} | vivants ${String(st.totals.alive).padStart(2)} | gen3@${gen3Tick || "-"} | 1ere mort@${firstDeath || "-"} | ticks ${n} | ${Date.now() - t0} ms | ${ok ? "OK" : "ECHEC"}`);
+  rows.push(`seed ${String(s).padStart(3)} | gen ${st.generations} | born ${String(st.totals.born).padStart(3)} | dead ${String(st.totals.dead).padStart(3)} | alive ${String(st.totals.alive).padStart(2)} | gen3@${gen3Tick || "-"} | 1st death@${firstDeath || "-"} | ticks ${n} | ${Date.now() - t0} ms | ${ok ? "OK" : "FAIL"}`);
   await rt.shutdown();
 }
 console.log(rows.join("\n"));
-console.log(`\n${pass}/${seeds} graines valident le critere (gen >= 3 et >= 1 mort en <= ${maxTicks} ticks) ${pass / seeds >= 0.8 ? "=> OBJECTIF ATTEINT" : "=> insuffisant"}`);
-console.log(`moyennes : naissances ${(sumBorn / seeds).toFixed(1)}, morts ${(sumDead / seeds).toFixed(1)} (ratio ${(sumDead / sumBorn).toFixed(2)}), generation ${(sumGen / seeds).toFixed(1)}, tick moyen de la generation 3 : ${nG3 ? (sumG3 / nG3).toFixed(0) : "-"} (${nG3}/${seeds} graines)`);
+console.log(`\n${pass}/${seeds} seeds meet the criterion (gen >= 3 and >= 1 death within <= ${maxTicks} ticks) ${pass / seeds >= 0.8 ? "=> TARGET MET" : "=> insufficient"}`);
+console.log(`averages: births ${(sumBorn / seeds).toFixed(1)}, deaths ${(sumDead / seeds).toFixed(1)} (ratio ${(sumDead / sumBorn).toFixed(2)}), generation ${(sumGen / seeds).toFixed(1)}, mean tick of generation 3: ${nG3 ? (sumG3 / nG3).toFixed(0) : "-"} (${nG3}/${seeds} seeds)`);
 process.exit(0);

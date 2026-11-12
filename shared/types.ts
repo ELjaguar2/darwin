@@ -1,35 +1,35 @@
-// Schémas de données partagés. Source de vérité : docs/ARCHITECTURE.md §6.
-// Règle : tout ce qui traverse un module, l'API ou le journal est sérialisable en JSON (montants = Yocto en chaîne).
+// Shared data schemas. Source of truth: docs/ARCHITECTURE.md §6.
+// Rule: everything crossing a module, the API or the journal is JSON-serialisable (amounts = Yocto as strings).
 import { z } from "zod";
 import type { Yocto } from "./money.ts";
 
 /**
- * Catalogue « Freelance réel » (lot L16) : 6 métiers dont les livrables sont réellement produits.
- * logo = 3 propositions SVG originales ; finance = analyse à partir de chiffres fournis ; architecture = document + schéma Mermaid ;
- * marketing = texte de rédaction ; translation = traduction ; legal = checklist juridique simple (avec avertissement « pas un avis juridique »).
- * Détail (prix de référence, grilles, juges) : shared/catalogue.ts et docs/CATALOGUE_FREELANCE.md.
+  * "Real freelance" catalogue (lot L16): 6 professions whose deliverables are actually produced.
+  * logo = 3 original SVG proposals; finance = analysis from supplied figures; architecture = document + Mermaid diagram;
+  * marketing = copywriting text; translation = translation; legal = simple legal checklist (with a "not legal advice" disclaimer).
+  * Details (reference prices, grids, judges): shared/catalogue.ts and docs/CATALOGUE_FREELANCE.md.
  */
 export const PROFESSIONS = ["logo", "finance", "architecture", "marketing", "translation", "legal"] as const;
 export type Profession = (typeof PROFESSIONS)[number];
 
-/** Bornes de chaque gène (utilisées par la mutation et la validation). */
+/** Bounds of each gene (used by mutation and validation). */
 export const GENOME_BOUNDS = {
-  askRatio: { min: 0.3, max: 1.0 }, // part du budget demandée dans l'enchère (gène « prix »)
+  askRatio: { min: 0.3, max: 1.0 }, // share of the budget requested in the bid ("price" gene)
   risk: { min: 0, max: 1 },
-  reproThreshold: { min: 1.2, max: 4 }, // multiple du capital de naissance exigé pour se reproduire
-  generosity: { min: 0, max: 0.6 }, // part supplémentaire du capital du parent donnée à l'enfant
-  cooperation: { min: 0, max: 1 }, // propension à sous-traiter / accepter la sous-traitance
+  reproThreshold: { min: 1.2, max: 4 }, // multiple of the birth capital required to reproduce
+  generosity: { min: 0, max: 0.6 }, // extra share of the parent's capital given to the child
+  cooperation: { min: 0, max: 1 }, // propensity to subcontract / accept subcontracting
 } as const;
 
 export const GenomeSchema = z.object({
   profession: z.enum(PROFESSIONS),
-  model: z.string().min(1), // id de modèle NEAR AI Cloud (ou mock), vérifié via GET /v1/models
+  model: z.string().min(1), // NEAR AI Cloud (or mock) model id, checked via GET /v1/models
   askRatio: z.number().min(GENOME_BOUNDS.askRatio.min).max(GENOME_BOUNDS.askRatio.max),
   risk: z.number().min(0).max(1),
   reproThreshold: z.number().min(GENOME_BOUNDS.reproThreshold.min).max(GENOME_BOUNDS.reproThreshold.max),
   generosity: z.number().min(0).max(GENOME_BOUNDS.generosity.max),
   cooperation: z.number().min(0).max(1),
-  personality: z.string().min(1).max(2000), // prompt système
+  personality: z.string().min(1).max(2000), // system prompt
 });
 export type Genome = z.infer<typeof GenomeSchema>;
 
@@ -39,7 +39,7 @@ export type CauseOfDeath = "starvation" | "manual" | "reset";
 export interface Agent {
   id: string; // ex. "a-0007"
   name: string;
-  accountId: string; // sous-compte NEAR (réel ou mock)
+  accountId: string; // NEAR sub-account (real or mock)
   generation: number; // 1 = fondateurs
   parentId: string | null;
   childrenIds: string[];
@@ -51,26 +51,26 @@ export interface Agent {
   diedAt?: string;
   causeOfDeath?: CauseOfDeath;
   birthCapital: Yocto;
-  balance: Yocto; // cache du solde on-chain, rafraîchi à chaque changement
-  earned: Yocto; // total gagné (tâches)
-  spentBrain: Yocto; // total payé à l'IA
+  balance: Yocto; // on-chain balance cache, refreshed on each change
+  earned: Yocto; // total earned (tasks)
+  spentBrain: Yocto; // total paid to the AI
   reputation: number;
   tasksDone: number;
-  letterId?: string; // lettre reçue du parent
+  letterId?: string; // letter received from the parent
   birthTx?: string;
 }
 
 export type TaskStatus =
-  | "posted" // publiée, enchères ouvertes
-  | "awarded" // gagnant choisi, séquestre verrouillé
-  | "submitted" // résultat remis, en attente de validation
-  | "settled" // validée, paiement libéré
-  | "rejected" // validation refusée, séquestre remboursé
-  | "expired"; // aucune offre ou délai dépassé, séquestre remboursé
+  | "posted" // published, bidding open
+  | "awarded" // winner chosen, escrow locked
+  | "submitted" // result handed in, awaiting validation
+  | "settled" // validated, payment released
+  | "rejected" // validation refused, escrow refunded
+  | "expired"; // no bid or deadline exceeded, escrow refunded
 
 export type Requester =
   | { kind: "visitor"; label: string; accountId?: string }
-  | { kind: "simulated"; label: string } // client simulé : TOUJOURS étiqueté dans l'UI
+  | { kind: "simulated"; label: string } // simulated client: ALWAYS labelled in the UI
   | { kind: "agent"; agentId: string }; // sous-traitance
 
 export interface Task {
@@ -116,7 +116,7 @@ export interface Validation {
 export type EscrowStatus = "locked" | "released" | "refunded";
 
 export interface Escrow {
-  id: string; // = taskId (un séquestre par tâche)
+  id: string; // = taskId (one escrow per task)
   taskId: string;
   payer: string; // accountId
   payee?: string;
@@ -124,7 +124,7 @@ export interface Escrow {
   status: EscrowStatus;
   lockTx?: string;
   settleTx?: string;
-  /** Preuve exigée pour libérer : jamais de crédit sans preuve vérifiée. */
+  /** Proof required to release: never a credit without a verified proof. */
   proof?: { resultHash: string; verdict: "accepted"; validator: string };
 }
 
@@ -132,7 +132,7 @@ export interface Letter {
   id: string; // "l-0003"
   fromAgentId: string;
   toAgentId: string;
-  generation: number; // génération de l'enfant
+  generation: number; // child's generation
   text: string;
   model: string;
   mock: boolean;
@@ -144,7 +144,7 @@ export const TaskInputSchema = z.object({
   title: z.string().min(3).max(120),
   prompt: z.string().min(10).max(4000),
   profession: z.enum(PROFESSIONS).default("logo"),
-  budgetNear: z.string().regex(/^\d+(\.\d{1,6})?$/), // en NEAR ; bornes vérifiées avec la config
+  budgetNear: z.string().regex(/^\d+(\.\d{1,6})?$/), // in NEAR; bounds checked against the config
   requesterLabel: z.string().min(1).max(60).default("visiteur"),
 });
 export type TaskInput = z.infer<typeof TaskInputSchema>;
