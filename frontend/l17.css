@@ -333,3 +333,8 @@ body[data-mode="replay"] .toasts { top: 170px; } /* fallback; exact value set by
 .sub-table .ko { color: var(--down); } .sub-table .ok { color: var(--up); }
 .fin li.sub-row { grid-template-columns: 52px 1fr auto; } .fin .sub-row .f-r small { display: block; color: var(--muted); font-size: 13px; }
 @media (max-width: 760px) { .thread.sub { margin-left: 8px; } }
+.cd-sub { margin: 12px 0; padding: 10px 14px; border-radius: 14px; border: 2px solid var(--p-architecture); background: color-mix(in srgb, var(--p-architecture) 12%, var(--surface)); }
+.cd-sub.inhouse { border-color: var(--down); background: color-mix(in srgb, var(--down) 10%, var(--surface)); }
+.cd-sub-head { font-weight: 800; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 4px; }
+.cd-sub-prof { font-size: 13px; padding: 1px 10px; border-radius: 99px; background: var(--surface); border: 1px solid var(--line); font-weight: 600; }
+.pill-sys.deleg { overflow-wrap: anywhere; }

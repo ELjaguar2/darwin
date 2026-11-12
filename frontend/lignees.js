@@ -4,7 +4,7 @@ import { store, core, ledger, api, on, aliveAgents, labelOfJob } from "./core.js
 import { h, formatNear, formatNearSmall, signedNear, nearNumber, big } from "./format.js";
 import { jobOf, icon, avatar, firstName } from "./jobs.js";
 import { TEE_MODELS } from "./preuves.js";
-import { subs } from "./subcontract.js";
+import { subs, FALLBACK_REASON } from "./subcontract.js";
 
 const NS = "http://www.w3.org/2000/svg";
 const svgEl = (tag, attrs = {}, text) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (text != null) e.textContent = text; return e; };
@@ -218,12 +218,18 @@ export function subRowsOf(a, near = (v) => formatNear(v, 3)) {
   for (const r of subs.records()) {
     const prof = r.profession ? labelOf(r.profession) : "";
     if (r.byAgentId === a.id) {
-      const st = r.status === "paid" ? "paid" : r.status === "expired" ? "expired, no bidder" : r.status === "refunded" ? "refunded" : r.status === "awarded" ? "awarded" : "open";
+      const st = r.status === "integrated" ? "integrated" : r.status === "fallback" ? "fell back in-house" : r.status === "paid" ? "paid" : r.status === "expired" ? "expired, no bidder" : r.status === "refunded" ? "refunded" : r.status === "awarded" ? "awarded" : "open";
       const amt = r.price ?? (r.commissionKind === "none" ? null : r.budget);
       const com = r.commissionKind === "none" ? " · no money moved, delegator keeps the whole price" : r.commission != null ? ` · ${r.commissionKind === "max" ? "up to " : ""}${near(r.commission)} commission` : "";
-      out.push({ tick: r.tick, delta: r.price != null ? -r.price : 0n, text: `delegated ${prof ? prof + " " : ""}sub-task${amt != null ? ` · ${near(amt)}` : ""}${com}`, sub: st, amount: r.price != null ? `-${near(r.price)}` : "–" });
+      out.push({ tick: r.tick, delta: r.price != null && r.status !== "integrated" ? -r.price : 0n, text: `delegated ${prof ? prof + " " : ""}sub-task${amt != null ? ` · ${near(amt)}` : ""}${com}`, sub: st, amount: r.price != null && r.status !== "integrated" ? `-${near(r.price)}` : "–" });
     }
-    if (r.status === "paid" && r.payee && r.payee === a.accountId) {
+    if (r.byAgentId === a.id && r.status === "integrated") {
+      const ch = store.agents.get(r.winnerId);
+      out.push({ tick: r.tick, delta: -(r.price ?? 0n), text: `paid child${ch ? ` ${firstName(ch)}` : ""}`, sub: prof ? `${prof} sub-task` : "sub-task", amount: `-${near(r.price ?? 0n)}` });
+      out.push({ tick: r.tick, delta: r.commission ?? 0n, text: "subcontract commission", sub: "parent price - child price", amount: `+${near(r.commission ?? 0n)}` });
+    }
+    if (r.byAgentId === a.id && r.status === "fallback") out.push({ tick: r.tick, delta: 0n, text: "fallback: done in-house", sub: FALLBACK_REASON[r.fallbackReason] ?? r.fallbackReason ?? "failed", amount: "–" });
+    if ((r.status === "paid" || r.status === "integrated") && r.payee && r.payee === a.accountId) {
       const by = store.agents.get(r.byAgentId);
       out.push({ tick: r.tick, delta: r.paidAmount ?? 0n, text: `subcontract earned${by ? ` from ${firstName(by)}` : ""}`, sub: prof ? `${prof} sub-task` : "sub-task", amount: `+${near(r.paidAmount ?? 0n)}` });
     }

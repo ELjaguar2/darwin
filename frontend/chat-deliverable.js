@@ -3,7 +3,22 @@
 // (names, types, sizes: only what remains in a replayed log). Same security rules as deliverable.js:
 // SVG only via <img src="data:image/svg+xml">, text and Markdown as DOM nodes, never innerHTML.
 import { h, shortHash } from "./format.js";
+import { splitSubcontract } from "./subcontract.js";
 import { renderMarkdown, svgDataUri, fileUrl, isSvg, isMermaid, isMarkdown, SAFE_NAME, MAX_INLINE_CHARS } from "./deliverable.js";
+
+/** Markdown with the subcontracted part made visible: boxed section "Subcontracted to <name> (<profession>)" (nodes only, text rendered by the sanitized Markdown renderer). */
+function subcontractAware(content, fileName) {
+  if (fileName === "subcontracted.md") return h("aside", { class: "cd-sub" }, h("div", { class: "cd-sub-head" }, "⇄ Subcontracted part"), renderMarkdown(content));
+  const parts = splitSubcontract(content);
+  if (!parts.some((p) => p.kind !== "md")) return renderMarkdown(content);
+  const root = h("div", { class: "md-split" });
+  for (const p of parts) {
+    if (p.kind === "md") root.append(renderMarkdown(p.text));
+    else if (p.kind === "sub") root.append(h("aside", { class: "cd-sub" }, h("div", { class: "cd-sub-head" }, "⇄ Subcontracted to ", h("b", null, String(p.name).slice(0, 40)), h("span", { class: "cd-sub-prof" }, String(p.profession).slice(0, 40))), renderMarkdown(p.text)));
+    else root.append(h("aside", { class: "cd-sub inhouse" }, h("div", { class: "cd-sub-head" }, "Done in-house", h("span", { class: "cd-sub-prof" }, `subcontract failed: ${String(p.reason).slice(0, 60)}`)), renderMarkdown(p.text)));
+  }
+  return root;
+}
 
 export function buildChatDeliverable(d, meta) {
   const root = h("div", { class: "chat-deliv", role: "group", "aria-label": "Deliverable submitted by the agent" });
@@ -35,7 +50,7 @@ export function buildChatDeliverable(d, meta) {
     const content = String(f.content ?? "");
     const body = isMermaid(f)
       ? h("pre", { class: "md-code" }, h("code", null, content.slice(0, MAX_INLINE_CHARS)))
-      : isMarkdown(f) ? renderMarkdown(content) : h("div", { class: "md" }, h("pre", { class: "plain" }, content.slice(0, MAX_INLINE_CHARS)));
+      : isMarkdown(f) ? subcontractAware(content, name) : h("div", { class: "md" }, h("pre", { class: "plain" }, content.slice(0, MAX_INLINE_CHARS)));
     const box = h("div", { class: "cd-text clamp" }, body, f.truncated ? h("p", { class: "muted small" }, `… content truncated in the log (${f.bytes ?? "?"} B in total).`) : null);
     const more = h("button", { type: "button", class: "cd-more", onclick: () => { const clamped = box.classList.toggle("clamp"); more.textContent = clamped ? "Read all" : "Collapse"; } }, "Read all");
     root.append(h("div", { class: "cd-file" },

@@ -3,7 +3,7 @@
 import { store, core, ledger, on, aliveAgents, labelOfJob, txUrl } from "./core.js";
 import { h, formatNear, formatNearSmall, shortHash, big, nearNumber } from "./format.js";
 import { jobOf, icon, firstName } from "./jobs.js";
-import { subs } from "./subcontract.js";
+import { subs, FALLBACK_REASON } from "./subcontract.js";
 
 /** Models marked attestable (TEE) in docs/ATTESTATION_TEE.md section 1 (brain allowlist). The others are external: nothing is proven for them. */
 export const TEE_MODELS = new Set(["Qwen/Qwen3.8-27B", "z-ai/glm-5.3-flash", "Qwen/Qwen3.6-35B-A3B-FP8", "deepseek-ai/DeepSeek-V4.1-Flash-1017"]);
@@ -81,18 +81,18 @@ function renderSubcontracting() {
   const near = (v) => `${formatNear(v, 3)} NEAR`;
   const name = (id) => { const a = store.agents.get(id); return a ? firstName(a) : String(id ?? "?"); };
   const link = (hash, label) => { if (!hash) return h("span", { class: "muted" }, "–"); const u = txUrl(hash); return u ? h("a", { class: "hash", href: u, target: "_blank", rel: "noopener noreferrer", "aria-label": `${label}, transaction ${hash} on nearblocks (new tab)` }, shortHash(hash), " ↗") : h("span", { class: "hash", title: hash }, shortHash(hash)); };
-  const STATE = { paid: ["paid ✓", "ok"], expired: ["expired", "ko"], refunded: ["refunded", "ko"], awarded: ["awarded", ""], open: ["open", ""] };
+  const STATE = { integrated: ["integrated ✓", "ok"], fallback: ["fallback in-house", "ko"], paid: ["paid ✓", "ok"], expired: ["expired", "ko"], refunded: ["refunded", "ko"], awarded: ["awarded", ""], open: ["open", ""] };
   const rows = [...sm.records].sort((x, y) => (y.status === "paid") - (x.status === "paid") || x.tick - y.tick).slice(0, 40);
   box.replaceChildren(
     h("h3", { id: "hSub" }, "Agent-to-agent subcontracting"),
     h("ul", { class: "sub-kpis" },
-      [[sm.count, "subcontracts"], [sm.awarded, "awarded"], [sm.paid, "paid"], [sm.expired, "expired (no bidder)"], [near(sm.delegated), "delegated (escrowed)"], [near(sm.paidTotal), "paid to agents"], [near(sm.commission), "commission kept (real)"]]
+      [[sm.count, "created"], [sm.integrated, "integrated"], [sm.fallback, `fallback${sm.fallback ? ` (${Object.entries(sm.fallbackByReason).map(([k, n]) => `${k} ${n}`).join(", ")})` : ""}`], [sm.expired, "sub-tasks expired (no bidder)"], [near(sm.delegated), "delegated (escrowed)"], [near(sm.paidTotal), "paid to child agents"], [near(sm.commission), "real commission kept"]]
         .map(([v, l]) => h("li", null, h("b", null, String(v)), h("span", null, l)))),
     h("div", { class: "sub-wrap" }, h("table", { class: "sub-table" },
-      h("thead", null, h("tr", null, ["Delegating agent → paid agent", "Trade", "Amount", "Commission", "Status", "Escrow", "Release"].map((x) => h("th", { scope: "col" }, x)))),
+      h("thead", null, h("tr", null, ["Delegating agent → paid agent", "Trade", "Child price", "Commission", "Status", "Child escrow", "Child release", "Parent release"].map((x) => h("th", { scope: "col" }, x)))),
       h("tbody", null, rows.map((r) => { const st = STATE[r.status] ?? [r.status, ""]; const payee = r.payee ? (store.agentByAccount(r.payee) ? firstName(store.agentByAccount(r.payee)) : String(r.payee).split(".")[0]) : r.winnerId ? name(r.winnerId) : "no bidder";
-        return h("tr", null, h("td", null, `${name(r.byAgentId)} → ${payee}`), h("td", null, r.profession ? labelOf(r.profession) : "–"), h("td", null, r.price != null ? near(r.price) : r.budget != null ? `${near(r.budget)} (offered)` : "–"), h("td", null, r.commissionKind === "none" ? "none, no money moved" : r.commission != null ? `${r.commissionKind === "max" ? "up to " : ""}${near(r.commission)}` : "–"), h("td", { class: st[1] }, st[0]), h("td", null, link(r.lockTx, "Sub-task escrow")), h("td", null, link(r.releaseTx, "Sub-task payment"))); })))),
-    h("p", { class: "note" }, "A delegating agent hires another agent through the market, escrows the sub-task budget itself, and keeps the difference with the price its own client pays (the commission). Commission = the price its own client pays minus the amount actually escrowed for the sub-task (before the award: an upper bound; expired sub-tasks move no money). Totals come from the received log."));
+        return h("tr", null, h("td", null, `${name(r.byAgentId)} → ${payee}`), h("td", null, r.profession ? labelOf(r.profession) : "–"), h("td", null, r.price != null ? near(r.price) : r.budget != null ? `${near(r.budget)} (offered)` : "–"), h("td", null, r.commissionKind === "none" ? (r.status === "fallback" ? `none, done in-house (${FALLBACK_REASON[r.fallbackReason] ?? r.fallbackReason ?? "failed"})` : "none, no money moved") : r.commission != null ? `${r.commissionKind === "max" ? "up to " : r.commissionKind === "expected" ? "expected " : ""}${near(r.commission)}` : "–"), h("td", { class: st[1] }, st[0]), h("td", null, link(r.lockTx, "Sub-task escrow")), h("td", null, link(r.releaseTx, "Sub-task payment")), h("td", null, link(r.parentReleaseTx, "Parent payment"))); })))),
+    h("p", { class: "note" }, "A delegating agent hires another agent through the market, escrows the sub-task budget itself, and keeps the difference with the price its own client pays (the commission). Real commission = the price its own client pays minus what the delegating agent paid the child agent (at integration). Expired or failed sub-tasks move no money; the parent then does the work itself. Totals come from the received log."));
 }
 
 function renderTxs() {

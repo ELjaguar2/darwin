@@ -5,7 +5,7 @@ import { store, core, api, on, txUrl, aliveAgents, labelOfJob } from "./core.js"
 import { h, formatNear, formatNearSmall, nearNumber, big, nearInput, parseNearToYocto, shortHash, errorMessages, requesterBadge, badgeText } from "./format.js";
 import { jobOf, icon, avatar, firstName } from "./jobs.js";
 import { buildChatDeliverable } from "./chat-deliverable.js";
-import { subs } from "./subcontract.js";
+import { subs, FALLBACK_REASON } from "./subcontract.js";
 
 const JOB_IDS = ["logo", "finance", "architecture", "marketing", "translation", "legal"];
 const RULES = [
@@ -192,6 +192,8 @@ function msgNode(th, m) {
     case "refund": return h("div", { class: "msg sys bad" }, h("span", { class: "pill-sys bad" }, `refunded · ${money(m.amount, 3)} returned to the client`), txChip(m.tx, "Refund"));
     case "expired": return h("div", { class: "msg sys bad" }, h("span", { class: "pill-sys bad" }, subs.isChild(th.id) && m.reason === "no_bids" ? "sub-task expired, no bidder" : `${subs.isChild(th.id) ? "sub-task " : ""}expired · ${{ no_bids: "no bids", deadline: "deadline passed", unfunded: "client without funds", winner_dead: "the winner died" }[m.reason] ?? m.reason ?? ""}`));
     case "sub": return subNode(m);
+    case "integrated": return h("div", { class: "msg sys sub-int" }, h("span", { class: "pill-sys paid" }, h("b", null, "integrated: "), `${m.name}${m.prof ? ` (${m.prof})` : ""} paid ${money(m.price, 3)}, commission ${money(m.commission, 3)}`), txChip(m.tx, "Sub-task payment"));
+    case "fallback": return h("div", { class: "msg sys bad sub-fb" }, h("span", { class: "pill-sys bad" }, `fallback: done in-house (${FALLBACK_REASON[m.reason] ?? m.reason ?? "failed"}), no commission`));
     default: return h("div");
   }
 }
@@ -202,15 +204,15 @@ export function delegationText(name, profLabel, rec) {
   const amount = rec?.price ?? rec?.budget ?? null; // escrowed amount once awarded, otherwise the budget offered
   const k = rec?.commissionKind;
   if (k === "none") return `${head}${amount != null ? ` for ${money(amount, 3)}` : ""}: no money moved, delegator keeps the whole price`;
-  return `${head}${amount != null ? ` for ${money(amount, 3)}` : ""}${rec?.commission != null ? ` and keeps ${k === "max" ? "up to " : ""}${money(rec.commission, 3)} commission` : ""}`;
+  return `${head}${amount != null ? ` for ${money(amount, 3)}` : ""}${rec?.commission != null ? ` and ${k === "expected" ? "expects" : "keeps"} ${k === "max" ? "up to " : ""}${money(rec.commission, 3)} commission` : ""}`;
 }
-const SUB_STATE = { open: ["sub-task open for bids", ""], awarded: ["sub-task awarded", ""], paid: ["sub-task paid ✓", "ok"], expired: ["sub-task expired, no bidder", "ko"], refunded: ["sub-task refunded", "ko"] };
+const SUB_STATE = { integrated: ["sub-task integrated ✓", "ok"], fallback: ["fallback: done in-house", "ko"], open: ["sub-task open for bids", ""], awarded: ["sub-task awarded", ""], paid: ["sub-task paid ✓", "ok"], expired: ["sub-task expired, no bidder", "ko"], refunded: ["sub-task refunded", "ko"] };
 function subNode(m) {
   const rec = subs.record(m.childId);
   const a = store.agents.get(m.byAgentId);
   const prof = rec?.profession ? labelOf(rec.profession) : null;
   const st = SUB_STATE[rec?.status ?? "open"];
-  const why = rec?.status === "expired" && rec.expiredReason && rec.expiredReason !== "no_bids" ? `sub-task expired · ${rec.expiredReason.replace(/_/g, " ")}` : st[0];
+  const why = rec?.status === "fallback" ? `fallback: done in-house (${FALLBACK_REASON[rec.fallbackReason] ?? rec.fallbackReason ?? "failed"}), no commission` : rec?.status === "expired" && rec.expiredReason && rec.expiredReason !== "no_bids" ? `sub-task expired · ${rec.expiredReason.replace(/_/g, " ")}` : st[0];
   return h("div", { class: "msg sys sub-deleg" }, h("span", { class: "pill-sys deleg" }, "⇄ ", delegationText(firstName(a) || String(m.byAgentId), prof, rec)),
     h("span", { class: `sub-state ${st[1]}` }, why), rec?.releaseTx ? txChip(rec.releaseTx, "Sub-task payment") : rec?.lockTx ? txChip(rec.lockTx, "Sub-task escrow") : null);
 }
@@ -218,7 +220,7 @@ function delegatedBy(childId) {
   const rec = subs.record(childId);
   const a = rec ? store.agents.get(rec.byAgentId) : null;
   const par = rec ? threads.get(rec.parentTaskId)?.task ?? store.tasks.get(rec.parentTaskId) : null;
-  return h("div", { class: "sub-from" }, `↳ sub-task delegated by ${a ? firstName(a) : "an agent"}${par?.title ? ` from “${String(par.title).slice(0, 70)}”` : ""}`);
+  return h("div", { class: "sub-from" }, `↳ sub-task delegated by ${a ? firstName(a) : "an agent"}${par?.title ? ` from “${String(par.title).slice(0, 70)}”` : ""}${rec?.lockTx ? ` · escrow signed by ${a ? firstName(a) : "the delegating agent"}` : ""}`);
 }
 
 function summaryLine(th) {
@@ -353,11 +355,24 @@ export function ingest(ev, { silent = false } = {}) {
       }, silent);
       break;
     }
+    case "subcontract.integrated": {
+      enqueue((s) => {
+        const th = threads.get(d.parentTaskId);
+        const rec = subs.record(d.childTaskId);
+        if (th) push(th, { kind: "integrated", name: firstName(store.agents.get(d.childAgentId)), prof: d.childProfession ? labelOf(d.childProfession) : "", price: d.childPrice, commission: d.commission, tx: rec?.releaseTx ?? null }, s);
+        if (!s) delegating(store.agents.get(d.childAgentId) ? d.childAgentId : rec?.byAgentId);
+      }, silent);
+      break;
+    }
+    case "subcontract.fallback": {
+      enqueue((s) => { const th = threads.get(d.parentTaskId); if (th) push(th, { kind: "fallback", reason: d.reason }, s); }, silent);
+      break;
+    }
     default: break;
   }
   // a sub-task thread changed: the delegation line of the parent thread (status, tx) is refreshed in order
   const tid = d.taskId ?? d.task?.id ?? d.bid?.taskId;
-  if (tid && ev.type !== "subcontract.created" && subs.isChild(tid)) enqueue(() => { const p = threads.get(subs.parentOf(tid)); if (p) renderThread(p); }, silent);
+  if (tid && ev.type !== "subcontract.created" && ev.type !== "subcontract.integrated" && ev.type !== "subcontract.fallback" && subs.isChild(tid)) enqueue(() => { const p = threads.get(subs.parentOf(tid)); if (p) renderThread(p); }, silent);
 }
 
 export function resetMission() {
