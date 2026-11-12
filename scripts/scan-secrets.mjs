@@ -45,14 +45,26 @@ const allowEntries = args.includes("--no-allowlist") || !existsSync(ALLOW_PATH) 
 const allowed = [];
 function isAllowed(f, fp) {
   if (!f.commit) return false;
-  return allowEntries.some((e) => f.commit.startsWith(e.commit) && e.file === f.file && e.type === f.type && e.fingerprints.includes(fp));
+  // identifiant de commit complet (40 hex) compare en entier ; un prefixe ne suffit pas
+  return allowEntries.some((e) => e.commit === f.commit && e.file === f.file && e.type === f.type && e.fingerprints.includes(fp));
 }
 const mask = (v) => (v.length <= 8 ? "****" : `${v.slice(0, 4)}...[${v.length} car.]`);
 const findings = [];
 const seen = new Set();
 
+// Fenetres de 4000 caracteres avec recouvrement de 600 (plus long qu'un secret connu) : aucune ligne n'est tronquee.
+const WINDOW = 4000;
+const OVERLAP = 600;
 function scanLine(line, where) {
-  if (!line || line.length > 4000) line = (line || "").slice(0, 4000);
+  if (!line) return;
+  if (line.length <= WINDOW) return scanWindow(line, where);
+  for (let i = 0; ; i += WINDOW - OVERLAP) {
+    scanWindow(line.slice(i, i + WINDOW), where);
+    if (i + WINDOW >= line.length) break;
+  }
+}
+
+function scanWindow(line, where) {
   for (const rule of RULES) {
     rule.re.lastIndex = 0;
     let m;
@@ -91,7 +103,8 @@ if (doFiles) {
     try {
       text = ref ? git(["show", `${ref}:${f}`]) : existsSync(f) ? readFileSync(f, "utf8") : "";
     } catch { continue; }
-    if (text.includes("\u0000")) continue;
+    // fichier binaire (octet NUL) : on scanne au moins les chaines ASCII imprimables (comme `strings`)
+    if (text.includes("\u0000")) text = (text.match(/[\x20-\x7e]{16,}/g) ?? []).join("\n");
     scanText(text, f, { source: label });
   }
   console.log(`[scan-secrets] fichiers scannes (${label}) : ${files.length}`);
@@ -104,13 +117,13 @@ async function scanHistory() {
   const rl = createInterface({ input: child.stdout, crlfDelay: Infinity });
   let commit = "?", file = "?", n = 0, ln = 0, skip = false;
   for await (const l of rl) {
-    if (l.startsWith("commit ") && /^commit [0-9a-f]{40}/.test(l)) { commit = l.slice(7, 14); n++; continue; }
+    if (l.startsWith("commit ") && /^commit [0-9a-f]{40}/.test(l)) { commit = l.slice(7, 47); n++; continue; }
     if (l.startsWith("diff --git ")) { file = l.split(" b/").pop(); skip = SKIP.test(file); continue; }
     if (l.startsWith("@@")) { const m = /\+(\d+)/.exec(l); ln = m ? +m[1] - 1 : 0; continue; }
     if (l.startsWith("+++") || l.startsWith("---")) continue;
     if (l.startsWith("+")) {
       ln++;
-      if (!skip) scanLine(l.slice(1), { file, line: ln, source: `historique ${commit}`, commit });
+      if (!skip) scanLine(l.slice(1), { file, line: ln, source: `historique ${commit.slice(0, 7)}`, commit });
     } else if (!l.startsWith("-")) ln++;
   }
   console.log(`[scan-secrets] commits scannes (historique ${ref ?? "toutes refs"}) : ${n}`);

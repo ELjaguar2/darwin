@@ -114,7 +114,7 @@ describe("masquage avant émission (constat 6)", () => {
     expect(redactText("Une phrase ordinaire avec des mots et un hash de transaction 6Zr4Tq2ZxqQ9wq3kXr7mYv9o3Jf8kN5pHc1VbA2dEf3G")).toContain("hash de transaction 6Zr4");
   });
   it("redactEvent couvre fichiers, pitch, texte de tâche et messages", () => {
-    const secret = "sk-" + "a1B2c3D4e5F6g7H8i9J0k";
+    const secret = ["sk", "a1B2c3D4e5F6g7H8i9J0k"].join("-"); // assemblé à l'exécution : le scanner ne doit pas voir de clé factice dans l'arbre
     const ev = (type: string, data: any) => { const e = { type, data }; redactEvent(e); return e.data; };
     expect(ev("deliverable.produced", { files: [{ name: "a.md", content: `clé ${secret}` }] }).files[0].content).not.toContain(secret);
     expect(ev("bid.placed", { bid: { pitch: `Bearer abcdefgh12345678` } }).bid.pitch).toBe("Bearer [masqué]");

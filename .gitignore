@@ -12,3 +12,8 @@ data/
 *.log
 # worktrees des agents
 .claude/worktrees/
+
+# Rotation de cle (scripts/rotate-master-key.mjs) : sauvegardes de cle en clair, jamais dans le depot
+new-master-key-*.json
+env-backup-*
+.darwin-secure/
