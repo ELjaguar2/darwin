@@ -14,7 +14,7 @@
 | Real NEAR AI Cloud brain, consumption traced | **Proven** (§6) |
 | TEE attestation of a response, verified end to end | **Proven for one model, on demand** (§7) |
 | Generation 2 on the real chain (5 reproductions and 5 letters in a single run) | **Proven** (§4) |
-| Generation 3 in a real run | **Proven in two separate runs**: run 8 (previous version of the preset, 59 ticks: generation 3, 12 births, 8 reproductions; §8) and run 9c (current preset `selection`, 43 ticks: generation 3, 16 births, 10 reproductions; §14). Two observations, not a guarantee |
+| Generation 3 in a real run | **Proven in three separate runs**: run 8 (previous version of the preset, 59 ticks: generation 3, 12 births, 8 reproductions; §8), run 9c (current preset `selection`, 43 ticks: generation 3, 16 births, 10 reproductions; §14) and the short run 10 (21 minutes: generation 3, 9 births, 3 reproductions, **no death**; §15). Three observations, not a guarantee |
 | Death of an agent on testnet | **Proven**: 7 deaths by starvation in run 8 (§8) and 4 in run 9c (§14), `mark_dead` and account closing with transactions |
 | A task from the visitor path accepted and paid on testnet | **Proven in run 9c** (§14): 2 missions (marketing, logo), escrow locked then released, hashes given. **Limits**: both were typed into the interface by an automated browser on the developer's behalf (not by an external human visitor); the payer is the operator's demo account `visitors.<master>`, not the visitor |
 | A logo delivered, accepted and paid on testnet | **Proven in run 9c** (§14): task `t-9975887`, 3 SVGs, judge score 0.73, release `6FCjxzUN…`. One logo, one sample |

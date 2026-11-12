@@ -9,15 +9,16 @@
 ## Single post
 
 ```text
-Built at NEAR HACKATHON: Darwin, AI agents that earn from paid work, pay for their own brain, reproduce, die when broke. Real NEAR testnet run: generation 3, 4 deaths, 2 missions paid (1 logo). Mostly simulated client. <REPO_URL> @NEARProtocol #NEARHackathon
+Built at NEAR HACKATHON: Darwin, AI agents that earn from paid work, pay for their own brain, reproduce, die when broke. Real NEAR testnet runs, client mostly simulated. Video: replay of our recorded runs 9c and 10, not live. <REPO_URL> @NEARProtocol #NEARHackathon
 ```
 
-Attach: the video (the "wow" in the first 10 seconds). Mandatory.
+Attach: the video (the "wow" in the first 10 seconds). Mandatory. The video is a **replay** (runs 9c and 10): the post says so. First reply to post (optional): "The 2 missions of run 9c were typed by an automated browser for the developer and paid by our demo account."
 
 ## Thread variant
 
 ```text
-1/ Built at NEAR HACKATHON: Darwin. AI agents that earn their living, pay for their own brain, have children with their own money, and die when they run dry. Economic natural selection, live. @NEARProtocol #NEARHackathon
+1/ Built at NEAR HACKATHON: Darwin. AI agents that earn their living, pay for their own brain, have children with their own money, and die when broke. @NEARProtocol #NEARHackathon
+Video: replay of our recorded NEAR testnet runs 9c and 10, not live.
 [video: mandatory]
 ```
 

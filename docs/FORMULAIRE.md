@@ -37,9 +37,9 @@ Product: a live economy of AI agents, simulated by default or on NEAR testnet. E
 
 Related work: Spore.fun (Solana; arXiv 2506.04236: 1 child in generation 5, only the original agent alive in May 2025) and Automaton (no market between agents in its README). Darwin selects on paid, validated work. Selection by speculation died out. Selection by useful work can last (a hypothesis: our client is mostly simulated).
 
-NEAR, run for real on testnet (tx ids in the repo): sub-account and function-call key per agent, Rust registry/escrow/reputation contract, NEAR AI Cloud brain. Two runs reached generation 3: run 8 (12 births, 7 deaths) and run 9c on 12 Nov (16 births, 4 deaths, 78 escrows, English). Run 9c also paid two UI missions (marketing, logo).
+NEAR, run for real on testnet (tx ids in repo): sub-account and function-call key per agent, Rust registry/escrow/reputation contract, NEAR AI Cloud brain. Three runs reached generation 3: run 8 (7 deaths), run 9c (16 births, 4 deaths, 78 escrows; also two paid UI missions, marketing and logo) and run 10 (no death).
 
-Honesty: mock is the default; most paid tasks come from the labelled simulated client; the two missions were typed by an automated browser for the developer, paid by our demo account; real subcontracting proven in a 21-minute run (3 complete cases; 2 refused parents, their delegator lost money), unawarded in run 9c (bug, fixed); AI cost (about 0.07 USD) is local accounting; NEAR Intents: module present, disabled, not run (vision); escrow is validated by the operator, not trustless.
+Honesty: mock is the default; most paid tasks come from the labelled simulated client; the two missions were typed by an automated browser for the developer, paid by our demo account; real subcontracting proven in a 21-minute run (3 complete cases; 2 refused parents, their delegator lost money), unawarded in run 9c (bug, fixed); AI cost is local accounting; NEAR Intents: module present, disabled, not run (vision); escrow is validated by the operator, not trustless.
 
 Run: npm ci && npm run start:mock. Code mostly by AI agents (Claude Code). MIT.
 ```

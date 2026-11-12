@@ -221,7 +221,7 @@ Temps réels : replay prêt en moins de 8 s ; mock prêt en moins de 7 s ; premi
 
 ## Clone neuf, English pass, 2026-11-12
 
-- **Procedure**: `git clone C:\Users\aymer\Darwin` into an empty scratchpad folder (HEAD 90c6bc0, no `.env`, no `data/`), Windows 11, Node 22.17.1, headless Chromium (Playwright). Ports 3311 to 3324 (not 3000). No network call, no key. Scripts: `tests/e2e/recette-replay-ui.cjs` (now takes `BASE=`), `tests/e2e/recette-mock-ui.cjs` (new).
+- **Procedure**: `git clone <local repository>` into an empty scratchpad folder (HEAD 90c6bc0, no `.env`, no `data/`), Windows 11, Node 22.17.1, headless Chromium (Playwright). Ports 3311 to 3324 (not 3000). No network call, no key. Scripts: `tests/e2e/recette-replay-ui.cjs` (now takes `BASE=`), `tests/e2e/recette-mock-ui.cjs` (new).
 - **Captures**: all old captures were deleted (French, from the fake dev server or from before the translation: `l17-testnet-degrade`, `l17-rejeu-*`, `l17-recette-tn-*`, `l17-mission-flux`, etc.) and regenerated in English: `docs/captures/l17-recette-r8-*.png`, `l17-recette-r9b-*.png`, `docs/captures/clone-neuf-1112/*` (mock, replay, classic, mobile). The degraded-testnet capture was not regenerated (needs testnet mode). Several were read with `Read`.
 - **Verdict: GO.** No blocking bug. 3 non-blocking findings.
 
