@@ -1,4 +1,4 @@
-// Erreurs typées du marché. `httpStatus` est une suggestion pour le backend (ex. 429 pour le plafond visiteurs).
+// Typed market errors. `httpStatus` is a suggestion for the backend (e.g. 429 for the visitor cap). Codes are stable; messages are English.
 export type MarketErrorCode =
   | "INVALID_INPUT" | "BUDGET_OUT_OF_RANGE" | "VISITOR_CAP_EXCEEDED" | "UNKNOWN_TASK" | "UNKNOWN_AGENT"
   | "NOT_OPEN" | "NOT_WINNER" | "NOT_AWARDED" | "DEADLINE_PASSED" | "DUPLICATE_BID" | "SELF_DEALING"

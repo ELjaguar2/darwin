@@ -1,11 +1,12 @@
-// Contrôles DÉTERMINISTES par métier (L16), appliqués avant tout juge IA : un échec ici = rejet, sans appel de modèle.
+// DETERMINISTIC checks per profession (L16), applied before any AI judge: a failure here = rejection, with no model call.
+// L19: failure reasons and notes are readable English text (free text; stable codes live elsewhere, e.g. `rule:<profession>`).
 import { BRANDS_TO_AVOID, LEGAL_DISCLAIMER, type Deliverable, type Task } from "../shared/index.ts";
 
 export interface CheckResult {
   ok: boolean;
-  /** Raisons d'échec (vide si ok). */
+  /** Failure reasons (empty if ok). */
   failures: string[];
-  /** Constats informatifs (ex. nombre de chiffres retrouvés). */
+  /** Informational findings (e.g. number of figures found again). */
   notes: string[];
 }
 
@@ -21,60 +22,60 @@ export function findBrand(text: string): string | undefined {
 
 function checkLogo(d: Deliverable, f: string[], n: string[]): void {
   const svgs = d.files.filter((x) => x.name.startsWith("logo-"));
-  if (svgs.length !== 3) f.push(`3 logos attendus, ${svgs.length} fournis`);
+  if (svgs.length !== 3) f.push(`3 logos expected, ${svgs.length} provided`);
   for (const s of svgs) {
-    if (!/viewBox\s*=\s*["']\s*0\s+0\s+256\s+256\s*["']/i.test(s.content)) f.push(`${s.name} : viewBox 0 0 256 256 absent`);
-    if (s.content.length > 20_000) f.push(`${s.name} : trop gros`);
-    if (!/<(rect|circle|ellipse|path|polygon|polyline|line|text|g)\b/i.test(s.content)) f.push(`${s.name} : aucune forme dessinée`);
+    if (!/viewBox\s*=\s*["']\s*0\s+0\s+256\s+256\s*["']/i.test(s.content)) f.push(`${s.name}: viewBox 0 0 256 256 missing`);
+    if (s.content.length > 20_000) f.push(`${s.name}: too large`);
+    if (!/<(rect|circle|ellipse|path|polygon|polyline|line|text|g)\b/i.test(s.content)) f.push(`${s.name}: no shape drawn`);
     const brand = findBrand(s.content);
-    if (brand) f.push(`${s.name} : contient le nom d'une marque connue (« ${brand} »), le logo doit être original`);
+    if (brand) f.push(`${s.name}: contains the name of a known brand ("${brand}"), the logo must be original`);
   }
-  if (new Set(svgs.map((s) => s.content.replace(/\s+/g, ""))).size < svgs.length) f.push("deux logos (ou plus) sont identiques");
-  n.push(`${svgs.length} SVG, ${svgs.reduce((a, s) => a + s.content.length, 0)} caractères`);
+  if (new Set(svgs.map((s) => s.content.replace(/\s+/g, ""))).size < svgs.length) f.push("two (or more) logos are identical");
+  n.push(`${svgs.length} SVG, ${svgs.reduce((a, s) => a + s.content.length, 0)} characters`);
 }
 
 // ---------- architecture ----------
 export function mermaidSyntaxProblem(src: string): string | undefined {
   const lines = src.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith("%%"));
-  if (lines.length < 3) return "schéma Mermaid trop court (3 lignes minimum)";
-  if (!MERMAID_START.test(lines[0]!)) return `schéma Mermaid : première ligne invalide (« ${lines[0]!.slice(0, 30)} »)`;
+  if (lines.length < 3) return "Mermaid diagram too short (3 lines minimum)";
+  if (!MERMAID_START.test(lines[0]!)) return `Mermaid diagram: invalid first line ("${lines[0]!.slice(0, 30)}")`;
   for (const [open, close] of [["[", "]"], ["(", ")"], ["{", "}"]] as const) {
     const o = src.split(open).length - 1;
     const c = src.split(close).length - 1;
-    if (o !== c) return `schéma Mermaid : ${open}${close} non appariés`;
+    if (o !== c) return `Mermaid diagram: unbalanced ${open}${close}`;
   }
-  if (/^(flowchart|graph)/i.test(lines[0]!) && !lines.slice(1).some((l) => /-->|---|==>|-\.->|-\.-/.test(l))) return "flowchart sans aucune liaison";
+  if (/^(flowchart|graph)/i.test(lines[0]!) && !lines.slice(1).some((l) => /-->|---|==>|-\.->|-\.-/.test(l))) return "flowchart without any link";
   return undefined;
 }
 
 function checkArchitecture(d: Deliverable, f: string[], n: string[]): void {
   const md = d.files.find((x) => x.name === "architecture.md");
   const mmd = d.files.find((x) => x.name === "schema.mmd");
-  if (!md || !mmd) return void f.push("architecture.md et schema.mmd requis");
+  if (!md || !mmd) return void f.push("architecture.md and schema.mmd required");
   const problem = mermaidSyntaxProblem(mmd.content);
   if (problem) f.push(problem);
   const prose = md.content.replace(/```[\s\S]*?```/g, "").trim();
-  if (prose.length < 200) f.push(`document trop court (${prose.length} caractères hors schéma, 200 minimum)`);
-  n.push(`schéma de ${mmd.content.split("\n").length} lignes, ${prose.length} caractères de texte`);
+  if (prose.length < 200) f.push(`document too short (${prose.length} characters outside the diagram, 200 minimum)`);
+  n.push(`${mmd.content.split("\n").length}-line diagram, ${prose.length} characters of text`);
 }
 
 // ---------- legal ----------
 function checkLegal(d: Deliverable, f: string[], n: string[]): void {
   const t = norm(d.rawText.replace(/[*_>#`]/g, ""));
   const disc = norm(LEGAL_DISCLAIMER);
-  if (!t.startsWith(disc)) f.push(`l'avertissement « ${LEGAL_DISCLAIMER} » doit ouvrir le document`);
-  if (!t.endsWith(disc)) f.push(`l'avertissement « ${LEGAL_DISCLAIMER} » doit clore le document`);
+  if (!t.startsWith(disc)) f.push(`the disclaimer "${LEGAL_DISCLAIMER}" must open the document`);
+  if (!t.endsWith(disc)) f.push(`the disclaimer "${LEGAL_DISCLAIMER}" must close the document`);
   const items = (d.rawText.match(/^\s*[-*]\s*\[[ xX]?\]/gm) ?? []).length;
-  if (items < 3) f.push(`checklist : au moins 3 cases à cocher (- [ ]) attendues, ${items} trouvée(s)`);
-  n.push(`${items} cases à cocher`);
+  if (items < 3) f.push(`checklist: at least 3 checkboxes (- [ ]) expected, ${items} found`);
+  n.push(`${items} checkboxes`);
 }
 
 // ---------- marketing ----------
 export const MARKETING_MIN_CHARS = 150;
 function checkMarketing(d: Deliverable, f: string[], n: string[]): void {
   const len = d.rawText.trim().length;
-  if (len < MARKETING_MIN_CHARS) f.push(`texte trop court (${len} < ${MARKETING_MIN_CHARS} caractères)`);
-  n.push(`${len} caractères`);
+  if (len < MARKETING_MIN_CHARS) f.push(`text too short (${len} < ${MARKETING_MIN_CHARS} characters)`);
+  n.push(`${len} characters`);
 }
 
 // ---------- translation ----------
@@ -85,7 +86,7 @@ function sourceSegments(prompt: string): string[] {
   const afterColon = /:\s*([\s\S]{20,})$/.exec(prompt.trim());
   return afterColon ? [afterColon[1]!] : [];
 }
-/** Partie « traduction » d'un résultat : avant la ligne `---` ou `Note :`. */
+/** "Translation" part of a result: before the `---` or `Note:` line. */
 export function translationBody(text: string): string {
   const m = /\r?\n\s*(?:---+|\*\*?note\s*:?\*?\*?|note\s*:)/i.exec(text);
   return (m ? text.slice(0, m.index) : text).trim();
@@ -94,12 +95,19 @@ const STOP: Record<"en" | "fr", string[]> = {
   en: ["the", "and", "of", "to", "is", "in", "your", "you", "for", "will", "with", "that", "be", "are", "our", "this", "it", "on"],
   fr: ["le", "la", "les", "de", "des", "du", "et", "est", "un", "une", "votre", "vous", "pour", "que", "dans", "sur", "en", "nos", "ce"],
 };
-/** Langue cible si c'est l'anglais ou le français (autres langues : pas de contrôle). */
+/** Languages other than English/French that a task may name explicitly: no stop-word check is possible for them. */
+const OTHER_LANGUAGES = /\b(?:spanish|german|italian|portuguese|dutch|arabic|chinese|japanese|russian|korean|turkish|polish|espagnol|allemand|italien|portugais|n[ée]erlandais|arabe|chinois|japonais|russe)\b/i;
+/**
+ * Target language of a translation. The default target is ALWAYS English (L19), including for a task written in French
+ * ("Traduis ce texte" without a language gives English). French is the target only when the order says so explicitly
+ * ("into French", "en français"). Any other explicitly named language: no check (`undefined`).
+ */
 export function targetLanguage(prompt: string): "en" | "fr" | undefined {
   const head = prompt.split(/«/)[0] ?? prompt;
   if (/\b(en|into|to)\s+(anglais|english)\b/i.test(head)) return "en";
   if (/\b(en|into|to)\s+(fran[cç]ais|french)\b/i.test(head)) return "fr";
-  return undefined;
+  if (OTHER_LANGUAGES.test(head)) return undefined;
+  return "en";
 }
 function stopwordShare(text: string, lang: "en" | "fr"): number {
   const words = text.toLowerCase().match(/[a-zà-ÿ']+/g) ?? [];
@@ -109,19 +117,19 @@ function stopwordShare(text: string, lang: "en" | "fr"): number {
 }
 function checkTranslation(d: Deliverable, task: Pick<Task, "prompt">, f: string[], n: string[]): void {
   const body = translationBody(d.rawText);
-  if (body.length < 5) return void f.push("traduction vide");
+  if (body.length < 5) return void f.push("empty translation");
   const segs = sourceSegments(task.prompt);
   const src = segs.join(" ");
-  if (!src) return void n.push("texte source non identifiable, contrôle de longueur ignoré");
+  if (!src) return void n.push("source text not identifiable, length check skipped");
   const ratio = body.length / src.length;
-  if (ratio < 0.4 || ratio > 2.5) f.push(`rapport de longueur implausible (${ratio.toFixed(2)}, attendu entre 0,4 et 2,5)`);
+  if (ratio < 0.4 || ratio > 2.5) f.push(`implausible length ratio (${ratio.toFixed(2)}, expected between 0.4 and 2.5)`);
   const nb = lower(body);
-  for (const s of segs) if (nb.includes(lower(s))) f.push("le texte source est recopié tel quel au lieu d'être traduit");
-  n.push(`rapport de longueur ${ratio.toFixed(2)}`);
+  for (const s of segs) if (nb.includes(lower(s))) f.push("the source text is copied as is instead of being translated");
+  n.push(`length ratio ${ratio.toFixed(2)}`);
   const lang = targetLanguage(task.prompt);
   if (lang) {
     const other = lang === "en" ? "fr" : "en";
-    if (stopwordShare(body, lang) < 0.1 || stopwordShare(body, other) > stopwordShare(body, lang)) f.push(`le texte ne semble pas être en ${lang === "en" ? "anglais" : "français"}`);
+    if (stopwordShare(body, lang) < 0.1 || stopwordShare(body, other) > stopwordShare(body, lang)) f.push(`the text does not seem to be in ${lang === "en" ? "English" : "French"}`);
   }
 }
 
@@ -141,21 +149,21 @@ export function numbersIn(text: string): number[] {
   return (text.match(NUM) ?? []).map(parseNumber).filter(Number.isFinite);
 }
 
-/** Colonnes numériques d'un tableau Markdown de la commande (une liste de séries par colonne). */
+/** Numeric columns of a Markdown table in the order (one list of series per column). */
 export function tableColumns(prompt: string): number[][] {
   const rows = prompt.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.startsWith("|") && !/^\|[\s:|-]+\|?$/.test(l))
     .map((l) => l.replace(/^\||\|$/g, "").split("|").map((c) => c.trim()));
-  const body = rows.slice(1); // 1re ligne = en-têtes
+  const body = rows.slice(1); // 1st row = headers
   const width = Math.max(0, ...body.map((r) => r.length));
   const cols: number[][] = [];
   for (let c = 0; c < width; c++) {
     const vals = body.map((r) => r[c] ?? "");
-    if (vals.every((v) => /^-?[\d\s .,]+\s*\S{0,4}$/.test(v) && /\d/.test(v))) cols.push(vals.map((v) => numbersIn(v)[0]!));
+    if (vals.every((v) => /^-?[\d\s .,]+\s*\S{0,4}$/.test(v) && /\d/.test(v))) cols.push(vals.map((v) => numbersIn(v)[0]!));
   }
   return cols;
 }
 
-/** Totaux que l'on peut recalculer à partir des données : sommes de plages contiguës de chaque colonne et de leurs différences, ligne à ligne. */
+/** Totals that can be recomputed from the data: sums of contiguous ranges of each column and of their differences, row by row. */
 export function computableTotals(prompt: string): number[] {
   const cols = tableColumns(prompt);
   const series: number[][] = [...cols];
@@ -177,22 +185,22 @@ function checkFinance(d: Deliverable, task: Pick<Task, "prompt">, f: string[], n
   if (provided.length) {
     const found = provided.filter((v) => have.has(Math.round(v * 100) / 100)).length;
     const share = found / provided.length;
-    n.push(`${found}/${provided.length} chiffres fournis retrouvés`);
-    if (share < 0.6) f.push(`les chiffres fournis ne sont pas repris (${found}/${provided.length} retrouvés, 60 % minimum)`);
-  } else n.push("aucun chiffre dans la commande : contrôle de reprise ignoré");
+    n.push(`${found}/${provided.length} provided figures found again`);
+    if (share < 0.6) f.push(`the provided figures are not restated (${found}/${provided.length} found, 60% minimum)`);
+  } else n.push("no figure in the order: restatement check skipped");
   const totals = computableTotals(task.prompt);
   if (totals.length) {
     for (const line of d.rawText.split(/\r?\n/)) {
-      const m = /\btotal\b[^\n=:]*?[=:]\s*\**\s*(-?[\d\s .,]*\d)/i.exec(line);
+      const m = /\btotal\b[^\n=:]*?[=:]\s*\**\s*(-?[\d\s .,]*\d)/i.exec(line);
       if (!m) continue;
       const v = parseNumber(m[1]!);
-      if (Number.isFinite(v) && !totals.some((t) => close(t, v))) f.push(`total annoncé non recalculable à partir des données : « ${line.trim().slice(0, 80)} »`);
+      if (Number.isFinite(v) && !totals.some((t) => close(t, v))) f.push(`announced total cannot be recomputed from the data: "${line.trim().slice(0, 80)}"`);
     }
   }
-  if (d.rawText.trim().length < 200) f.push("analyse trop courte (200 caractères minimum)");
+  if (d.rawText.trim().length < 200) f.push("analysis too short (200 characters minimum)");
 }
 
-/** Exécute les contrôles déterministes du métier de la tâche sur un livrable déjà extrait. */
+/** Runs the deterministic checks of the task's profession on an already extracted deliverable. */
 export function runChecks(task: Pick<Task, "profession" | "prompt">, d: Deliverable): CheckResult {
   const failures: string[] = [];
   const notes: string[] = [];

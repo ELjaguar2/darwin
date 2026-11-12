@@ -1,171 +1,175 @@
-# Catalogue freelance : prix de référence réels et mise à l'échelle testnet
+# Freelance catalogue: real reference prices and testnet scaling
 
-Propriétaire : architecte. Lot L16 (6 métiers freelance). Recherches effectuées le **2026-11-11**.
+Owner: architect. Lot L16 (6 freelance professions). Research carried out on **2026-11-11**. Translated to English in lot L19 (the whole project is English).
 
-Ce document sert de base aux budgets des tâches de Darwin pour les 6 métiers de `shared/types.ts` (`PROFESSIONS`) :
+This document is the basis for Darwin's task budgets for the 6 professions of `shared/types.ts` (`PROFESSIONS`):
 `logo`, `finance`, `architecture`, `marketing`, `translation`, `legal`.
 
-## Réserve générale (valable pour toute la page)
+The catalogue in code (`shared/catalogue.ts`) is the single source for titles, deliverable descriptions, scoring rubrics and production instructions; since L19 all of them are in English and every production and judge prompt contains "Always answer in English.". Protocol identifiers (profession ids, deliverable file names such as `analyse.md`, `texte.md`, `traduction.md`, `checklist.md`) are deliberately not translated.
 
-Les tarifs freelance varient très fortement selon le pays, l'expérience, la plateforme, la langue, l'urgence et le périmètre exact.
-Les chiffres ci-dessous sont des **ordres de grandeur** relevés dans des sources publiques, et non des prix garantis.
-Aucun chiffre n'a été inventé : quand une source ne donne pas de chiffre exact, c'est indiqué.
+## General caveat (applies to the whole page)
 
-### Comment lire les sources
+Freelance rates vary enormously with country, experience, platform, language, urgency and exact scope.
+The figures below are **orders of magnitude** collected from public sources, not guaranteed prices.
+No figure was invented: when a source gives no exact figure, it is stated.
 
-- **[lu]** : page ouverte et lue directement le 2026-11-11.
-- **[extrait]** : chiffre lu dans l'extrait de résultat de recherche, parce que la page renvoie HTTP 403 aux outils automatiques (Upwork, Fiverr, Malt, Clio). Les chiffres sont à revérifier dans un navigateur.
-- **[tiers]** : site tiers ou concurrent qui cite une autre source. Fiabilité plus faible.
-- Conversion EUR -> USD : taux de référence BCE de **1,1214 USD pour 1 EUR** (10 novembre 2026) [lu], https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/eurofxref-graph-usd.en.html
-- Les médianes BLS (salariés américains, mai 2025) sont données comme **plancher de comparaison**. Ce ne sont pas des tarifs freelance, qui sont en général plus élevés à l'heure.
+### How to read the sources
 
----
-
-## 1. Logo (3 propositions SVG) — `logo`
-
-| Source | Chiffre | Unité | Type |
-|---|---|---|---|
-| Upwork, coût d'un designer de logo : https://www.upwork.com/hire/logo-designers/cost/ | médiane 15 à 30 USD ; les meilleurs designers de 25 à 75 USD, la plupart de 35 à 50 USD | heure | [extrait] |
-| Guide Fiverr (coût d'un brand designer) : https://www.fiverr.com/resources/guides/costs/brand-designer | 63 à 180 USD pour un logo principal avec 2 à 3 concepts et une palette de couleurs de base | projet | [extrait] |
-| Codeur.com, « Combien coûte la création d'un logo » : https://www.codeur.com/pages/combien-coute-creation-dun-logo | freelance : 100 à 400 EUR (112 à 449 USD) ; logo de qualité pour une petite entreprise : 150 à 300 EUR (168 à 336 USD) ; graphiste logo : 35 EUR/h | projet / heure | [lu], page titrée « tarifs 2025 », sans date précise |
-| Codeur.com, tarif des graphistes logo : https://www.codeur.com/graphiste/logo/tarif | TJM moyen 125 EUR (140 USD) ; budget moyen des projets 311 EUR (349 USD), relevé de novembre 2026 | jour / projet | [lu] |
-| 99designs, concours de logo : https://99designs.fr/pricing | Bronze 289 EUR (324 USD), Silver 479 EUR, Gold 859 EUR, Platinum 1 299 EUR, hors taxe | projet (concours, dizaines de propositions) | [lu], pas de date sur la page |
-| BLS, graphic designers : https://www.bls.gov/ooh/arts-and-design/graphic-designers.htm | médiane de 30,27 USD/h (salariés, mai 2025) | heure | [lu], plancher |
-
-**Fourchette retenue (projet « 3 propositions de logo »)** : basse **63 USD**, typique **150 USD**, haute **450 USD**.
-Les bornes viennent de Fiverr (63 USD) et du haut de la fourchette freelance Codeur (400 EUR, soit 449 USD). Le chiffre typique est un choix d'architecte situé dans le recouvrement Fiverr (jusqu'à 180 USD) et Codeur (dès 112 USD).
-
-Réserve : un logo coûte de quelques dollars sur les plateformes d'entrée de gamme à plusieurs milliers en agence. Ce sont des ordres de grandeur.
-
-## 2. Analyse financière (à partir de chiffres fournis) — `finance`
-
-| Source | Chiffre | Unité | Type |
-|---|---|---|---|
-| Upwork, coût d'un modélisateur financier : https://www.upwork.com/hire/financial-modelers/cost/ | médiane de 25 à 65 USD | heure | [extrait] |
-| Upwork, page analystes financiers : https://www.upwork.com/hire/financial-analysts/ | pas de fourchette officielle ; mentionne 95 USD/h pour des missions courtes ou exploratoires | heure | [extrait] |
-| Fiverr, catégorie analyse financière (block.fiverr.com/hire/financial-analysis, qui redirige aujourd'hui vers l'accueil de Fiverr) | moyenne d'environ 90 USD pour « analysis and valuation » et 73 USD pour « financial forecasting and modeling » | projet | [extrait], page plus consultable |
-| goLance, guide des tarifs des analystes financiers : https://golance.com/hiring/best-freelance-financial-analysts-hourly-rate | 35 à 300 USD/h, environ 90 USD/h en milieu de gamme | heure | [tiers], plateforme concurrente |
-| BLS, financial analysts : https://www.bls.gov/ooh/business-and-financial/financial-analysts.htm | médiane de 49,79 USD/h (salariés, mai 2025) | heure | [lu], plancher |
-
-Aucune source ne donne de prix forfaitaire officiel pour « une analyse à partir de chiffres fournis ».
-**Fourchette retenue (projet court)** : basse **73 USD**, typique **120 USD**, haute **300 USD**.
-Les bornes viennent de Fiverr (73 USD) et d'environ 3 h au tarif haut d'Upwork (65 USD/h). Le chiffre typique est un choix d'architecte : un peu plus de 2 h à la médiane BLS ou au milieu de la fourchette Upwork.
-
-Réserve : les tarifs dépendent du niveau (de simples ratios jusqu'à la modélisation complète). Ce sont des ordres de grandeur.
-
-## 3. Architecture logicielle (document + schéma) — `architecture`
-
-| Source | Chiffre | Unité | Type |
-|---|---|---|---|
-| Upwork, architectes cloud AWS certifiés : https://www.upwork.com/hire/certified-aws-cloud-architects/cost/ | médiane de 60 à 200 USD | heure | [extrait] |
-| Upwork, développeurs logiciels : https://www.upwork.com/en-gb/hire/software-developers/cost/ | 10 à 100 USD | heure | [extrait] |
-| Codeur.com, architectes logiciels : https://www.codeur.com/architecte/logiciel/tarif | TJM moyen 195 EUR (219 USD), soit 28 EUR/h ; débutant 105 EUR, junior 175 EUR, confirmé 231 EUR, senior 315 EUR ; budget moyen des projets 1 242 EUR (1 393 USD) ; relevé de novembre 2026 | jour / projet | [lu] |
-| Grille TJM de régie-portage : https://www.regie-portage.fr/freelance/freelance-grille-tjm/ | architecte logiciel : 550 à 650 EUR (junior), 650 à 800 EUR (intermédiaire), 800 à 1 000 EUR (senior) | jour | [extrait] [tiers] |
-| BLS, software developers : https://www.bls.gov/ooh/computer-and-information-technology/software-developers.htm | médiane de 135 980 USD/an ; 64,44 USD/h pour le groupe développeurs, QA et testeurs (mai 2025) | heure | [lu], plancher |
-
-Aucune source ne donne de prix forfaitaire pour « un document d'architecture avec schéma ».
-**Fourchette retenue (document court + 1 schéma, environ une demi-journée)** : basse **110 USD**, typique **200 USD**, haute **500 USD**.
-La borne basse correspond à une demi-journée au TJM moyen Codeur (219 USD / 2), la borne haute à une demi-journée au haut de la grille régie-portage (1 000 EUR / 2, soit 561 USD, arrondi à 500). Le chiffre typique est un choix d'architecte : environ 3 h à la médiane BLS (64 USD/h).
-
-Réserve : écart énorme entre les plateformes à bas coût et les architectes seniors en mission. Ce sont des ordres de grandeur.
-
-## 4. Rédaction marketing — `marketing`
-
-| Source | Chiffre | Unité | Type |
-|---|---|---|---|
-| Editorial Freelancers Association, grille des tarifs : https://www.the-efa.org/rates/ | Business/marketing, travail de commande : 0,32 à 0,875 USD/mot, 65 à 75 USD/h ; ghostwriting : 0,50 à 1,00 USD/mot, 87,50 à 125 USD/h ; enquête menée de nov. 2025 à mi-janv. 2026 sur les tarifs de 2025 | mot / heure | [lu] |
-| Upwork, coût d'un rédacteur publicitaire : https://www.upwork.com/hiring/marketing/cost-to-hire-copywriter/ | débutant 20 à 30 USD/h, intermédiaire 30 à 50 USD/h, expert 50 à 150 USD/h | heure | [extrait] |
-| Codeur.com, rédacteurs web : https://www.codeur.com/redacteur-web/tarif | TJM moyen 90 EUR (101 USD) ; senior 119 EUR ; budget moyen des projets 382 EUR (428 USD), relevé de novembre 2026 ; pas de tarif au mot | jour / projet | [lu] |
-
-**Fourchette retenue (texte marketing d'environ 300 mots)** : basse **40 USD**, typique **80 USD**, haute **260 USD**.
-La borne basse correspond à environ 2 h au bas de la fourchette Upwork (20 USD/h), la borne haute à 300 mots au haut de la fourchette EFA (0,875 USD/mot). Le chiffre typique est un choix d'architecte : 2 h au haut du palier intermédiaire Upwork (40 USD/h), un peu sous 300 mots au bas de l'EFA (0,32 USD/mot = 96 USD).
-
-Réserve : les tarifs varient selon le format, la notoriété du rédacteur et le mode de facturation (mot, heure ou forfait). Ce sont des ordres de grandeur.
-
-## 5. Traduction — `translation`
-
-| Source | Chiffre | Unité | Type |
-|---|---|---|---|
-| Editorial Freelancers Association : https://www.the-efa.org/rates/ | depuis l'anglais : 0,12 à 0,19 USD/mot, 60 à 75 USD/h ; vers l'anglais : 0,06 à 0,18 USD/mot, 47,50 à 62,50 USD/h (tarifs de 2025) | mot / heure | [lu] |
-| Upwork, coût d'un traducteur : https://www.upwork.com/hire/translators/cost/ et https://www.upwork.com/en-gb/hire/translators/cost/ | médiane de 15 à 25 USD/h ; 0,08 à 0,50 USD/mot selon la complexité | heure / mot | [extrait] |
-| ATA, résumé de l'enquête sur les services : https://www.atanet.org/resources/summary-ata-translation-interpreting-services-survey/ | **aucun chiffre public** : les tarifs sont dans le rapport payant (95 USD pour les non-membres). Un site tiers (ThePricer) cite des médianes ATA de 2019 de 0,13 USD (ES>EN) et 0,14 USD (EN>ES) par mot source, non vérifiées | mot | [lu] pour l'absence de chiffre, [tiers] pour 0,13 et 0,14 |
-| ProZ, forums sur les tarifs de la communauté (EN>FR) : https://www.proz.com/forum/money_matters/40261-rates_for_english_to_french.html et fils associés | environ 0,08 à 0,11 EUR par mot source (0,09 à 0,12 USD), selon des messages de forum ; outil officiel non consulté | mot | [extrait] |
-| Codeur.com, traducteurs anglais : https://www.codeur.com/traducteur/anglais/tarif | TJM moyen 85 EUR (95 USD), senior 112 EUR ; budget moyen des projets 859 EUR ; relevé de novembre 2026 ; pas de tarif au mot | jour / projet | [lu] |
-| BLS, interpreters and translators : https://www.bls.gov/ooh/media-and-communication/interpreters-and-translators.htm | médiane de 28,93 USD/h (salariés, mai 2025) | heure | [lu], plancher |
-
-**Fourchette retenue (traduction d'environ 300 mots)** : basse **24 USD**, typique **40 USD**, haute **150 USD**.
-La borne basse correspond à 300 mots à 0,08 USD (bas Upwork), la borne haute à 300 mots à 0,50 USD (haut Upwork, textes spécialisés). Le chiffre typique est un choix d'architecte : 300 mots à environ 0,13 USD, au milieu de la fourchette EFA depuis l'anglais.
-
-Réserve : le tarif au mot dépend de la paire de langues, du domaine et de la spécialisation. Beaucoup de traducteurs appliquent aussi un minimum de facturation. Ce sont des ordres de grandeur.
-
-## 6. Checklist juridique simple — `legal`
-
-Rappel concept : le livrable Darwin porte l'avertissement « pas un avis juridique ». Les références ci-dessous sont celles d'un professionnel, ce qui donne une borne haute de valeur.
-
-| Source | Chiffre | Unité | Type |
-|---|---|---|---|
-| Upwork, professionnels du droit des contrats : https://www.upwork.com/hire/contract-law-professionals/cost/ | 30 à 200 USD | heure | [extrait] |
-| Clio, tarifs par État : https://www.clio.com/state-rates-pages/ | tarif horaire moyen d'un avocat américain de 362 USD (2026) | heure | [extrait] |
-| LegalZoom, relecture de documents : https://www.legalzoom.com/attorneys/legal-documents-review.html | page lue : forfait annoncé mais **aucun montant affiché**. L'extrait de recherche mentionnait « à partir de 39 USD » (documents jusqu'à 25 pages), que la page lue ne confirme pas | projet | [lu] sans chiffre, [extrait] pour 39 USD |
-| BLS, lawyers : https://www.bls.gov/ooh/legal/lawyers.htm | médiane de 76,76 USD/h (salariés, mai 2025) | heure | [lu], plancher |
-
-**Fourchette retenue (checklist courte, environ 1 h de travail)** : basse **39 USD**, typique **150 USD**, haute **362 USD**.
-La borne basse vient de l'extrait LegalZoom, à confirmer. La borne haute correspond à 1 h au tarif moyen Clio. Le chiffre typique est un choix d'architecte : environ 2 h à la médiane BLS, ou 1 h dans le milieu de la fourchette Upwork.
-
-Réserve : les honoraires juridiques varient fortement selon la juridiction, la spécialité et le fait qu'on paie ou non un avocat inscrit. Ce sont des ordres de grandeur.
+- **[read]**: page opened and read directly on 2026-11-11.
+- **[snippet]**: figure read in a search-result snippet, because the page returns HTTP 403 to automated tools (Upwork, Fiverr, Malt, Clio). Figures to be re-checked in a browser.
+- **[third party]**: third-party or competitor site quoting another source. Lower reliability.
+- EUR -> USD conversion: ECB reference rate of **1.1214 USD for 1 EUR** (10 November 2026) [read], https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/eurofxref-graph-usd.en.html
+- BLS medians (US employees, May 2025) are given as a **comparison floor**. They are not freelance rates, which are usually higher per hour.
 
 ---
 
-## Prix de référence retenu par livrable Darwin
+## 1. Logo (3 SVG proposals) — `logo`
 
-Il y a un seul chiffre USD typique par métier, pour **un** livrable standard de la taille d'une tâche de démo. Ces chiffres sont des choix d'architecte appuyés sur les fourchettes ci-dessus.
-
-| Métier (`profession`) | Livrable standard | refUsd typique | Fourchette observée (basse à haute) |
+| Source | Figure | Unit | Type |
 |---|---|---|---|
-| `logo` | 3 propositions de logo SVG | 150 | 63 à 450 |
-| `finance` | analyse courte à partir de chiffres fournis | 120 | 73 à 300 |
-| `architecture` | document court + 1 schéma Mermaid | 200 | 110 à 500 |
-| `marketing` | texte marketing d'environ 300 mots | 80 | 40 à 260 |
-| `translation` | traduction d'environ 300 mots | 40 | 24 à 150 |
-| `legal` | checklist juridique simple (pas un avis juridique) | 150 | 39 à 362 |
+| Upwork, cost of a logo designer: https://www.upwork.com/hire/logo-designers/cost/ | median 15 to 30 USD; best designers 25 to 75 USD, most 35 to 50 USD | hour | [snippet] |
+| Fiverr guide (cost of a brand designer): https://www.fiverr.com/resources/guides/costs/brand-designer | 63 to 180 USD for a main logo with 2 to 3 concepts and a basic colour palette | project | [snippet] |
+| Codeur.com, "How much does a logo cost": https://www.codeur.com/pages/combien-coute-creation-dun-logo | freelance: 100 to 400 EUR (112 to 449 USD); quality logo for a small business: 150 to 300 EUR (168 to 336 USD); logo designer: 35 EUR/h | project / hour | [read], page titled "2025 rates", no precise date |
+| Codeur.com, logo designer rates: https://www.codeur.com/graphiste/logo/tarif | average daily rate 125 EUR (140 USD); average project budget 311 EUR (349 USD), recorded November 2026 | day / project | [read] |
+| 99designs, logo contest: https://99designs.fr/pricing | Bronze 289 EUR (324 USD), Silver 479 EUR, Gold 859 EUR, Platinum 1,299 EUR, excluding tax | project (contest, dozens of proposals) | [read], no date on the page |
+| BLS, graphic designers: https://www.bls.gov/ooh/arts-and-design/graphic-designers.htm | median 30.27 USD/h (employees, May 2025) | hour | [read], floor |
 
-Ordre des prix : architecture > logo = legal > finance > marketing > translation. Le rapport entre le plus cher et le moins cher est de 5.
+**Range retained ("3 logo proposals" project)**: low **63 USD**, typical **150 USD**, high **450 USD**.
+The bounds come from Fiverr (63 USD) and the top of the Codeur freelance range (400 EUR, i.e. 449 USD). The typical figure is an architect's choice within the Fiverr (up to 180 USD) and Codeur (from 112 USD) overlap.
 
-## Mise à l'échelle testnet
+Caveat: a logo costs from a few dollars on entry-level platforms to several thousand in an agency. These are orders of magnitude.
 
-Les budgets de tâches testnet vont de 0,02 à 0,06 NEAR. On applique un **facteur unique** pour conserver les rapports de prix entre métiers :
+## 2. Financial analysis (from provided figures) — `finance`
+
+| Source | Figure | Unit | Type |
+|---|---|---|---|
+| Upwork, cost of a financial modeler: https://www.upwork.com/hire/financial-modelers/cost/ | median 25 to 65 USD | hour | [snippet] |
+| Upwork, financial analysts page: https://www.upwork.com/hire/financial-analysts/ | no official range; mentions 95 USD/h for short or exploratory assignments | hour | [snippet] |
+| Fiverr, financial analysis category (block.fiverr.com/hire/financial-analysis, which now redirects to the Fiverr home page) | average of about 90 USD for "analysis and valuation" and 73 USD for "financial forecasting and modeling" | project | [snippet], page no longer viewable |
+| goLance, financial analyst rates guide: https://golance.com/hiring/best-freelance-financial-analysts-hourly-rate | 35 to 300 USD/h, about 90 USD/h mid-range | hour | [third party], competing platform |
+| BLS, financial analysts: https://www.bls.gov/ooh/business-and-financial/financial-analysts.htm | median 49.79 USD/h (employees, May 2025) | hour | [read], floor |
+
+No source gives an official flat price for "an analysis from provided figures".
+**Range retained (short project)**: low **73 USD**, typical **120 USD**, high **300 USD**.
+The bounds come from Fiverr (73 USD) and about 3 h at the high Upwork rate (65 USD/h). The typical figure is an architect's choice: a little over 2 h at the BLS median or in the middle of the Upwork range.
+
+Caveat: rates depend on the level (from simple ratios to full modelling). These are orders of magnitude.
+
+## 3. Software architecture (document + diagram) — `architecture`
+
+| Source | Figure | Unit | Type |
+|---|---|---|---|
+| Upwork, certified AWS cloud architects: https://www.upwork.com/hire/certified-aws-cloud-architects/cost/ | median 60 to 200 USD | hour | [snippet] |
+| Upwork, software developers: https://www.upwork.com/en-gb/hire/software-developers/cost/ | 10 to 100 USD | hour | [snippet] |
+| Codeur.com, software architects: https://www.codeur.com/architecte/logiciel/tarif | average daily rate 195 EUR (219 USD), i.e. 28 EUR/h; beginner 105 EUR, junior 175 EUR, experienced 231 EUR, senior 315 EUR; average project budget 1,242 EUR (1,393 USD); recorded November 2026 | day / project | [read] |
+| Contractor-portage daily-rate grid: https://www.regie-portage.fr/freelance/freelance-grille-tjm/ | software architect: 550 to 650 EUR (junior), 650 to 800 EUR (intermediate), 800 to 1,000 EUR (senior) | day | [snippet] [third party] |
+| BLS, software developers: https://www.bls.gov/ooh/computer-and-information-technology/software-developers.htm | median 135,980 USD/year; 64.44 USD/h for the developers, QA and testers group (May 2025) | hour | [read], floor |
+
+No source gives a flat price for "an architecture document with a diagram".
+**Range retained (short document + 1 diagram, about half a day)**: low **110 USD**, typical **200 USD**, high **500 USD**.
+The low bound is half a day at the average Codeur daily rate (219 USD / 2), the high bound is half a day at the top of the portage grid (1,000 EUR / 2, i.e. 561 USD, rounded to 500). The typical figure is an architect's choice: about 3 h at the BLS median (64 USD/h).
+
+Caveat: huge gap between low-cost platforms and senior architects on assignment. These are orders of magnitude.
+
+## 4. Marketing copywriting — `marketing`
+
+| Source | Figure | Unit | Type |
+|---|---|---|---|
+| Editorial Freelancers Association, rate chart: https://www.the-efa.org/rates/ | Business/marketing, commissioned work: 0.32 to 0.875 USD/word, 65 to 75 USD/h; ghostwriting: 0.50 to 1.00 USD/word, 87.50 to 125 USD/h; survey run from Nov. 2025 to mid-Jan. 2026 on 2025 rates | word / hour | [read] |
+| Upwork, cost of a copywriter: https://www.upwork.com/hiring/marketing/cost-to-hire-copywriter/ | beginner 20 to 30 USD/h, intermediate 30 to 50 USD/h, expert 50 to 150 USD/h | hour | [snippet] |
+| Codeur.com, web writers: https://www.codeur.com/redacteur-web/tarif | average daily rate 90 EUR (101 USD); senior 119 EUR; average project budget 382 EUR (428 USD), recorded November 2026; no per-word rate | day / project | [read] |
+
+**Range retained (marketing text of about 300 words)**: low **40 USD**, typical **80 USD**, high **260 USD**.
+The low bound is about 2 h at the bottom of the Upwork range (20 USD/h), the high bound is 300 words at the top of the EFA range (0.875 USD/word). The typical figure is an architect's choice: 2 h at the top of the Upwork intermediate tier (40 USD/h), a little under 300 words at the bottom of the EFA range (0.32 USD/word = 96 USD).
+
+Caveat: rates vary with the format, the writer's reputation and the billing mode (word, hour or flat fee). These are orders of magnitude.
+
+## 5. Translation — `translation`
+
+| Source | Figure | Unit | Type |
+|---|---|---|---|
+| Editorial Freelancers Association: https://www.the-efa.org/rates/ | from English: 0.12 to 0.19 USD/word, 60 to 75 USD/h; into English: 0.06 to 0.18 USD/word, 47.50 to 62.50 USD/h (2025 rates) | word / hour | [read] |
+| Upwork, cost of a translator: https://www.upwork.com/hire/translators/cost/ and https://www.upwork.com/en-gb/hire/translators/cost/ | median 15 to 25 USD/h; 0.08 to 0.50 USD/word depending on complexity | hour / word | [snippet] |
+| ATA, services survey summary: https://www.atanet.org/resources/summary-ata-translation-interpreting-services-survey/ | **no public figure**: rates are in the paid report (95 USD for non-members). A third-party site (ThePricer) quotes 2019 ATA medians of 0.13 USD (ES>EN) and 0.14 USD (EN>ES) per source word, not verified | word | [read] for the absence of figure, [third party] for 0.13 and 0.14 |
+| ProZ, community rate forums (EN>FR): https://www.proz.com/forum/money_matters/40261-rates_for_english_to_french.html and related threads | about 0.08 to 0.11 EUR per source word (0.09 to 0.12 USD), according to forum posts; official tool not consulted | word | [snippet] |
+| Codeur.com, English translators: https://www.codeur.com/traducteur/anglais/tarif | average daily rate 85 EUR (95 USD), senior 112 EUR; average project budget 859 EUR; recorded November 2026; no per-word rate | day / project | [read] |
+| BLS, interpreters and translators: https://www.bls.gov/ooh/media-and-communication/interpreters-and-translators.htm | median 28.93 USD/h (employees, May 2025) | hour | [read], floor |
+
+**Range retained (translation of about 300 words)**: low **24 USD**, typical **40 USD**, high **150 USD**.
+The low bound is 300 words at 0.08 USD (low Upwork), the high bound is 300 words at 0.50 USD (high Upwork, specialised texts). The typical figure is an architect's choice: 300 words at about 0.13 USD, in the middle of the EFA range from English.
+
+Since L19 the simulated client always orders translations INTO English (French source texts); an order without an explicit target language is checked against English.
+
+Caveat: the per-word rate depends on the language pair, the domain and the specialisation. Many translators also apply a minimum charge. These are orders of magnitude.
+
+## 6. Simple legal checklist — `legal`
+
+Concept reminder: the Darwin deliverable carries the disclaimer "This is not legal advice." (`LEGAL_DISCLAIMER`, first and last line, checked deterministically). The references below are those of a professional, which gives an upper bound of value.
+
+| Source | Figure | Unit | Type |
+|---|---|---|---|
+| Upwork, contract law professionals: https://www.upwork.com/hire/contract-law-professionals/cost/ | 30 to 200 USD | hour | [snippet] |
+| Clio, rates by State: https://www.clio.com/state-rates-pages/ | average US lawyer hourly rate of 362 USD (2026) | hour | [snippet] |
+| LegalZoom, document review: https://www.legalzoom.com/attorneys/legal-documents-review.html | page read: flat fee advertised but **no amount displayed**. The search snippet mentioned "from 39 USD" (documents up to 25 pages), which the page read does not confirm | project | [read] without figure, [snippet] for 39 USD |
+| BLS, lawyers: https://www.bls.gov/ooh/legal/lawyers.htm | median 76.76 USD/h (employees, May 2025) | hour | [read], floor |
+
+**Range retained (short checklist, about 1 h of work)**: low **39 USD**, typical **150 USD**, high **362 USD**.
+The low bound comes from the LegalZoom snippet, to be confirmed. The high bound is 1 h at the average Clio rate. The typical figure is an architect's choice: about 2 h at the BLS median, or 1 h in the middle of the Upwork range.
+
+Caveat: legal fees vary strongly with jurisdiction, specialty and whether a registered lawyer is paid. These are orders of magnitude.
+
+---
+
+## Reference price retained per Darwin deliverable
+
+There is a single typical USD figure per profession, for **one** standard deliverable of the size of a demo task. These figures are architect's choices backed by the ranges above.
+
+| Profession (`profession`) | Standard deliverable | typical refUsd | Observed range (low to high) |
+|---|---|---|---|
+| `logo` | 3 SVG logo proposals | 150 | 63 to 450 |
+| `finance` | short analysis from provided figures | 120 | 73 to 300 |
+| `architecture` | short document + 1 Mermaid diagram | 200 | 110 to 500 |
+| `marketing` | marketing text of about 300 words | 80 | 40 to 260 |
+| `translation` | translation of about 300 words | 40 | 24 to 150 |
+| `legal` | simple legal checklist (not legal advice) | 150 | 39 to 362 |
+
+Price order: architecture > logo = legal > finance > marketing > translation. The ratio between the most and the least expensive is 5.
+
+## Testnet scaling
+
+Testnet task budgets range from 0.02 to 0.06 NEAR. A **single factor** is applied to keep the price ratios between professions:
 
 ```
-NEAR = refUsd x facteur
+NEAR = refUsd x factor
 ```
 
-Contraintes : le plus cher ne dépasse pas 0,09 NEAR (200 x f <= 0,09, donc f <= 0,00045) et le moins cher atteint au moins 0,01 NEAR (40 x f >= 0,01, donc f >= 0,00025).
+Constraints: the most expensive does not exceed 0.09 NEAR (200 x f <= 0.09, so f <= 0.00045) and the least expensive reaches at least 0.01 NEAR (40 x f >= 0.01, so f >= 0.00025).
 
-**Facteur retenu : `f = 0,0003` NEAR par USD de référence.** Il est purement symbolique : ce n'est pas un taux de change NEAR/USD.
-C'est la valeur ronde du bas de l'intervalle autorisé qui place 5 métiers sur 6 dans la plage 0,02 à 0,06 NEAR des budgets existants.
+**Factor retained: `f = 0.0003` NEAR per reference USD.** It is purely symbolic: it is not a NEAR/USD exchange rate.
+It is the round value at the low end of the allowed interval that puts 5 professions out of 6 in the 0.02 to 0.06 NEAR range of the existing budgets.
 
-| Métier | refUsd | Prix testnet (NEAR) |
+| Profession | refUsd | Testnet price (NEAR) |
 |---|---|---|
-| `logo` | 150 | 0,045 |
-| `finance` | 120 | 0,036 |
-| `architecture` | 200 | 0,060 |
-| `marketing` | 80 | 0,024 |
-| `translation` | 40 | 0,012 |
-| `legal` | 150 | 0,045 |
+| `logo` | 150 | 0.045 |
+| `finance` | 120 | 0.036 |
+| `architecture` | 200 | 0.060 |
+| `marketing` | 80 | 0.024 |
+| `translation` | 40 | 0.012 |
+| `legal` | 150 | 0.045 |
 
-Vérifications : maximum 0,060 <= 0,09 ; minimum 0,012 >= 0,01. Seule `translation` (0,012) passe sous 0,02 NEAR, ce qui reste conforme à la contrainte de plancher de 0,01.
-Si l'on veut plus de marge vers le haut (enchères au-dessus du prix de référence), on peut monter jusqu'à `f = 0,00045` (architecture à 0,09 NEAR, traduction à 0,018 NEAR) sans changer les rapports.
+Checks: maximum 0.060 <= 0.09; minimum 0.012 >= 0.01. Only `translation` (0.012) falls below 0.02 NEAR, which still meets the 0.01 floor constraint.
+For more headroom upwards (bids above the reference price), one can go up to `f = 0.00045` (architecture at 0.09 NEAR, translation at 0.018 NEAR) without changing the ratios.
 
-Réserve finale : ces prix NEAR servent uniquement à conserver des proportions réalistes entre métiers sur testnet. Ils ne représentent aucune valeur monétaire réelle.
+Final caveat: these NEAR prices only serve to keep realistic proportions between professions on testnet. They represent no real monetary value.
 
-## Calibrage du preset `selection` (L17, D-043)
+## `selection` preset calibration (L17, D-043)
 
-| Paramètre (testnet, `selection`) | Avant | Après |
+| Parameter (testnet, `selection`) | Before | After |
 |---|---|---|
-| Capital de naissance | 0,10 NEAR | 0,12 NEAR |
-| Métabolisme | 0,005 NEAR/tick | 0,0035 NEAR/tick |
-| Client simulé | 1,5 tâche/tick | 2 tâches/tick |
-| Graines validant « génération >= 3 et >= 1 mort » (100 graines, mock) | 62 | 92 |
-| Morts par naissance (mock) | 0,84 | 0,66 (run 8 réel : 0,58) |
+| Birth capital | 0.10 NEAR | 0.12 NEAR |
+| Metabolism | 0.005 NEAR/tick | 0.0035 NEAR/tick |
+| Simulated client | 1.5 tasks/tick | 2 tasks/tick |
+| Seeds validating "generation >= 3 and >= 1 death" (100 seeds, mock) | 62 | 92 |
+| Deaths per birth (mock) | 0.84 | 0.66 (real run 8: 0.58) |
 
-Prix du catalogue inchangés. Reproduire : `npx tsx scripts/calibrate-selection.ts --seeds 100 --first 31`.
+Catalogue prices unchanged. To reproduce: `npx tsx scripts/calibrate-selection.ts --seeds 100 --first 31`.

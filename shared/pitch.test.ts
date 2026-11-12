@@ -36,10 +36,13 @@ describe("langue", () => {
     expect(detectLanguage("I can do this for you and deliver it in the time that you need.")).toBe("en");
     expect(detectLanguage("Logo")).toBeUndefined();
   });
-  it("un pitch dans la mauvaise langue est refusé, vide aussi", () => {
+  it("the target language is ALWAYS English: a French pitch is refused, even for a French task; empty too", () => {
     const fr = "Rédige une accroche pour le lancement de notre café et de la boutique dans le quartier.";
-    expect(pitchLanguageOk("I will write a warm hook for your café and deliver it to you.", fr)).toBe(false);
-    expect(pitchLanguageOk("Une accroche chaleureuse pour votre café, livrée dans les temps.", fr)).toBe(true);
+    const en = "Write a hook for the launch of our cafe and of the shop in the neighbourhood.";
+    expect(pitchLanguageOk("I will write a warm hook for your café and deliver it to you.", fr)).toBe(true);
+    expect(pitchLanguageOk("I will write a warm hook for your café and deliver it to you.", en)).toBe(true);
+    expect(pitchLanguageOk("Une accroche chaleureuse pour votre café, livrée dans les temps.", fr)).toBe(false);
+    expect(pitchLanguageOk("Une accroche chaleureuse pour votre café, livrée dans les temps.", en)).toBe(false);
     expect(pitchLanguageOk("", fr)).toBe(false);
   });
 });
@@ -60,11 +63,17 @@ describe("mockPitch", () => {
     for (let i = 0; i < 24; i++) set.add(mockPitch(g("logo", `Perso ${i}`, (i % 10) / 10, (i % 7) / 7, 0.5 + i / 100), { ...task, id: `t-${i}` }));
     expect(set.size).toBeGreaterThanOrEqual(8);
   });
-  it("suit la langue de la tâche (anglais si la tâche est en anglais)", () => {
-    const en = mockPitch(g("translation", "Fidèle."), { id: "t-9", title: "Translation", prompt: "Please translate this sentence into French and keep the tone of the original for our team." });
-    expect(detectLanguage(en)).toBe("en");
-    const fr = mockPitch(g("translation", "Fidèle."), { id: "t-9", title: "Traduction", prompt: "Traduis cette phrase en anglais et garde le ton de l'original pour notre équipe." });
-    expect(detectLanguage(fr)).toBe("fr");
+  it("always English, whatever the language of the task (L19)", () => {
+    const en = mockPitch(g("translation", "Faithful."), { id: "t-9", title: "Translation", prompt: "Please translate this sentence into French and keep the tone of the original for our team." });
+    expect(detectLanguage(en)).not.toBe("fr");
+    const fr = mockPitch(g("translation", "Faithful."), { id: "t-9", title: "Traduction", prompt: "Traduis cette phrase en anglais et garde le ton de l'original pour notre équipe." });
+    expect(detectLanguage(fr)).not.toBe("fr");
+    expect(fr).toBe(en); // the task language no longer matters
+    for (const prof of PROFESSIONS) for (let i = 0; i < 6; i++) {
+      const p = mockPitch(g(prof, `P${i}`, i / 6, i / 6), { id: `t-${i}`, title: "Logo pour Atelier", prompt: "Crée trois logos pour cette boutique." });
+      expect(pitchLanguageOk(p, "Crée trois logos pour cette boutique dans le quartier.")).toBe(true);
+      expect(p).not.toMatch(/\b(je|votre|vous|pour)\b/i);
+    }
   });
 });
 
