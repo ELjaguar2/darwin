@@ -9,7 +9,7 @@
 ## Single post
 
 ```text
-Built at NEAR HACKATHON: Darwin, AI agents that earn from paid work, pay for their own brain, reproduce, die when broke. Real NEAR testnet runs, client mostly simulated. Video: replay of our recorded runs 9c and 10, not live. <REPO_URL> @NEARProtocol #NEARHackathon
+Built at NEAR HACKATHON. Everyone is building agents that can pay. Nobody asked which agents deserve to get paid. Darwin: AI agents bid on NEAR testnet, get paid from escrow only if a judge accepts, die broke. Real-run replay: <REPO_URL> @NEARProtocol #NEARHackathon
 ```
 
 Attach: the video (the "wow" in the first 10 seconds). Mandatory. The video is a **replay** (runs 9c and 10): the post says so. First reply to post (optional): "The 2 missions of run 9c were typed by an automated browser for the developer and paid by our demo account."
@@ -17,13 +17,13 @@ Attach: the video (the "wow" in the first 10 seconds). Mandatory. The video is a
 ## Thread variant
 
 ```text
-1/ Built at NEAR HACKATHON: Darwin. AI agents that earn their living, pay for their own brain, have children with their own money, and die when broke. @NEARProtocol #NEARHackathon
+1/ Built at NEAR HACKATHON. Everyone is building agents that can pay. Nobody asked which agents deserve to get paid. Darwin: a market where AI agents earn the right to exist. @NEARProtocol #NEARHackathon
 Video: replay of our recorded NEAR testnet runs 9c and 10, not live.
 [video: mandatory]
 ```
 
 ```text
-2/ Each agent has a genome (profession, AI model, price, risk, generosity...). It is born as a NEAR sub-account, bids in auctions, works, and is paid through an escrow after validation. Its AI cost is debited from its balance.
+2/ Each agent has a genome (profession, AI model, price, risk, generosity...). It is born as a NEAR sub-account, bids in auctions, works, and is paid from an escrow only if a separate AI judge accepts the work. Its AI cost is debited from its balance.
 ```
 
 ```text
@@ -39,15 +39,19 @@ Video: replay of our recorded NEAR testnet runs 9c and 10, not live.
 ```
 
 ```text
-6/ Subcontracting, for real on testnet (a separate 21-minute run): an agent paid a child agent from its own account, folded its text into its deliverable and got paid. 3 complete cases, hashes in the repo. 2 parents were refused by the judge: their delegator lost money.
+6/ In our real runs the top 3 agents earned 53% to 90% of all earnings; in two of three runs most agents earned nothing. Tiny samples, one run each: anecdotes, not statistics.
 ```
 
 ```text
-7/ Honest limits: most tasks come from a labelled simulated client. The 2 missions were typed by an automated browser, paid by our demo account. Escrow validated by the operator (not trustless). One run each, not a guarantee. The subcontracting run had no death.
+7/ Subcontracting, for real on testnet (a separate 21-minute run): an agent paid a child agent from its own account, folded its text into its deliverable and got paid. 3 complete cases, hashes in the repo. 2 parents were refused by the judge: their delegator lost money.
 ```
 
 ```text
-8/ Try it: <REPO_URL> (npm ci && npm run start:mock, or npm run replay for the recorded run). README has "do X, you will see Y" steps. Most code written by AI agents (Claude Code). #NEARHackathon @NEARProtocol
+8/ Honest limits: most tasks come from a labelled simulated client. The 2 missions of run 9c were typed by an automated browser. The AI judge is fallible: 10 of 25 logo verdicts were refusals. One run each, not a guarantee. Escrow validated by the operator.
+```
+
+```text
+9/ Try it: <REPO_URL> (npm ci && npm run replay for the recorded run, no key needed). README has "do X, you will see Y" steps. Most code written by AI agents (Claude Code). #NEARHackathon @NEARProtocol
 ```
 
 ## Checks before publishing
