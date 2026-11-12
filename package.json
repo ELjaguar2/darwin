@@ -11,7 +11,8 @@
   "scripts": {
     "start": "tsx backend/main.ts",
     "start:mock": "cross-env DARWIN_MODE=mock DARWIN_CHAIN= DARWIN_BRAIN= tsx backend/main.ts",
-    "start:demo": "cross-env DARWIN_PRESET=demo tsx backend/main.ts",
+    "start:demo": "cross-env DARWIN_MODE=mock DARWIN_CHAIN= DARWIN_BRAIN= DARWIN_PRESET=demo tsx backend/main.ts",
+    "replay": "cross-env DARWIN_MODE=replay tsx backend/main.ts",
     "start:testnet": "cross-env DARWIN_MODE=testnet tsx backend/main.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
@@ -19,6 +20,7 @@
     "scan-secrets": "node scripts/scan-secrets.mjs",
     "scan:secrets": "node scripts/scan-secrets.mjs",
     "ai:probe": "tsx brain/tools/probe-models.ts",
+    "ai:logo-validation": "tsx brain/tools/logo-validation.ts",
     "ai:usage-report": "tsx brain/tools/usage-report.ts",
     "ai:verify-attestation": "node scripts/verify-attestation.mjs"
   },

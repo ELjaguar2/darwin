@@ -8,6 +8,7 @@ import { bal, type Ctx, type EngineOptions } from "./context.ts";
 import { chargeBrain, debit, flushAll, resolveModel, syncBalances, warnOnce } from "./economy.ts";
 import { canReproduce, createFounders, die, reproduce } from "./lifecycle.ts";
 import { decideBid, decideSubcontract } from "./policy.ts";
+import { makePitch } from "./pitch.ts";
 
 export type { EngineOptions } from "./context.ts";
 export { createFounderGenome, mutateGenome } from "./genome.ts";
@@ -126,7 +127,8 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
       if (!best) continue;
       bidsPlaced.add(`${a.id}|${best.task.id}`);
       try {
-        await market.placeBid({ taskId: best.task.id, agentId: a.id, price: best.price.toString(), etaTicks: best.etaTicks });
+        const pitch = await makePitch(ctx, a, best.task, best.price);
+        await market.placeBid({ taskId: best.task.id, agentId: a.id, price: best.price.toString(), etaTicks: best.etaTicks, ...(pitch ? { pitch } : {}) });
       } catch (e) {
         warnOnce(ctx, "BID_FAILED", (e as Error).message);
       }

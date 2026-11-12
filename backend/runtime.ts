@@ -11,6 +11,7 @@ import {
   type Bid, type Brain, type Chain, type Config, type DarwinEvent, type Deps, type Engine, type EventCatalog, type Journal, type MarketEvent,
 } from "../shared/index.ts";
 import { redactText, safeErrorMessage } from "./redact.ts";
+import type { Replay } from "./replay.ts";
 import type { Store } from "./store.ts";
 
 export interface RuntimeOptions {
@@ -44,6 +45,8 @@ export interface Runtime {
   lastPopulation(): EventCatalog["population.snapshot"] | undefined;
   /** `chain.mode` de NearChain, sinon `mock`. */
   escrowMode(): "contract" | "operator-account";
+  /** Présent uniquement en mode replay (L17) : lecteur de journal ; le marché, le moteur et la chaîne sont alors des façades en lecture seule. */
+  replay?: Replay;
   /** Vérifications de démarrage (testnet : RPC et compte maître). Lève une erreur claire sinon. */
   checkReady(): Promise<void>;
   /** Lance la simulation (fondateurs puis boucle). */

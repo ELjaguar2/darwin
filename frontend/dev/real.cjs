@@ -11,7 +11,7 @@ const out = process.argv[2] || ".";
     const p = await ctx.newPage();
     p.on("console", (m) => { if (["error", "warning"].includes(m.type())) errs.push(name + " " + m.text()); });
     p.on("pageerror", (e) => errs.push(name + " PAGEERROR " + e.message));
-    await p.goto(URL_);
+    await p.goto(String(URL_).replace(/[/]+$/, "") + "/?classique");
     await p.waitForFunction(() => document.querySelectorAll(".node").length >= 4, null, { timeout: 20000 });
     console.log(name, "conn:", await p.textContent("#connText"));
     await p.fill("#fTitle", "Résumer un article sur NEAR");

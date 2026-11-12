@@ -3,6 +3,7 @@
 // Usage : node scripts/scan-secrets.mjs [--ref <branche>] [--no-history] [--no-files]
 //   (sans --ref : fichiers suivis du dossier de travail + historique de toutes les refs)
 //   --ref X     : fichiers de X (git show) + historique de X seulement
+//   --no-allowlist : ignore scripts/scan-secrets.allowlist.json (revoir les exceptions revues)
 // Sortie 1 si detection. Les valeurs trouvees sont TOUJOURS masquees.
 import { execFileSync, spawn } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
@@ -37,6 +38,15 @@ const RULES = [
   },
 ];
 
+// Exceptions revues : scripts/scan-secrets.allowlist.json (commit + fichier + type + empreinte de la valeur ; aucune valeur stockee).
+// Elles ne concernent que l'HISTORIQUE (un secret dans l'arbre actuel n'est jamais exempte). --no-allowlist les ignore.
+const ALLOW_PATH = new URL("./scan-secrets.allowlist.json", import.meta.url);
+const allowEntries = args.includes("--no-allowlist") || !existsSync(ALLOW_PATH) ? [] : JSON.parse(readFileSync(ALLOW_PATH, "utf8")).entries ?? [];
+const allowed = [];
+function isAllowed(f, fp) {
+  if (!f.commit) return false;
+  return allowEntries.some((e) => f.commit.startsWith(e.commit) && e.file === f.file && e.type === f.type && e.fingerprints.includes(fp));
+}
 const mask = (v) => (v.length <= 8 ? "****" : `${v.slice(0, 4)}...[${v.length} car.]`);
 const findings = [];
 const seen = new Set();
@@ -50,10 +60,13 @@ function scanLine(line, where) {
       const v = rule.group ? m[rule.group] : m[0];
       if (!v || v.trim() === "") continue;
       if (rule.reject && rule.reject(v)) continue;
-      const key = rule.type + "|" + where.file + "|" + createHash("sha256").update(v).digest("hex").slice(0, 16);
+      const fp = createHash("sha256").update(v).digest("hex").slice(0, 16);
+      const key = rule.type + "|" + where.file + "|" + fp;
       if (seen.has(key)) continue;
       seen.add(key);
-      findings.push({ ...where, type: rule.type, masked: mask(v) });
+      const f = { ...where, type: rule.type, masked: mask(v) };
+      if (isAllowed(f, fp)) { allowed.push(f); continue; }
+      findings.push(f);
     }
   }
 }
@@ -97,13 +110,14 @@ async function scanHistory() {
     if (l.startsWith("+++") || l.startsWith("---")) continue;
     if (l.startsWith("+")) {
       ln++;
-      if (!skip) scanLine(l.slice(1), { file, line: ln, source: `historique ${commit}` });
+      if (!skip) scanLine(l.slice(1), { file, line: ln, source: `historique ${commit}`, commit });
     } else if (!l.startsWith("-")) ln++;
   }
   console.log(`[scan-secrets] commits scannes (historique ${ref ?? "toutes refs"}) : ${n}`);
 }
 if (doHistory) await scanHistory();
 
+if (allowed.length) console.log(`[scan-secrets] ${allowed.length} detection(s) de l'historique exemptee(s) par scripts/scan-secrets.allowlist.json (valeurs factices revues, voir docs/SECURITE.md 2.1).`);
 if (findings.length === 0) {
   console.log("[scan-secrets] OK : aucun secret detecte.");
   process.exit(0);

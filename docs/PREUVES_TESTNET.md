@@ -1,6 +1,6 @@
 # PREUVES TESTNET — ce qui a réellement tourné
 
-> Mis à jour le 2026-11-10 (run 8 : génération 3 et morts). Règle : seul ce qui figure ici avec un identifiant de transaction, un journal ou une commande reproductible est **prouvé**. Le reste est dit non prouvé. Explorateur : `https://testnet.nearblocks.io/txns/<hash>` (nearblocks, testnet). Aucune dépense mainnet, rien n'est publié. Ce fichier est généré à partir de `docs/preuves/PREUVES_TEMPLATE.md` et des journaux par `node scripts/assemble-preuves.mjs`.
+> Mis à jour le 2026-11-12 : §8 = run 8 du 2026-11-10 (génération 3 et morts), §10 = validation du logo du 2026-11-11, §11 = résumé des runs 9a et 9b du 2026-11-11. Règle : seul ce qui figure ici avec un identifiant de transaction, un journal ou une commande reproductible est **prouvé**. Le reste est dit non prouvé. Explorateur : `https://testnet.nearblocks.io/txns/<hash>` (nearblocks, testnet). Aucune dépense mainnet, rien n'est publié. Ce fichier est généré à partir de `docs/preuves/PREUVES_TEMPLATE.md` et des journaux par `node scripts/assemble-preuves.mjs`.
 
 ## 1. Résumé honnête
 
@@ -315,3 +315,44 @@ Transactions par type : create_account 8, register_agent 8, transfer 61, escrow_
 | 5 à 7 | `JUDGE_COST_UNKNOWN` | préfixe du modèle servi différent de l'identifiant du catalogue | prix cherché sur l'identifiant demandé (run 8 : 0) |
 
 Réglages du run 8 : `DARWIN_PRESET=selection` seul. Réglages des runs 6 et 7 : `DARWIN_PRESET=demo`, `DARWIN_TICK_MS=10000`, `DARWIN_BIRTH_CAPITAL=0.1`, `DARWIN_METABOLISM=0.002`, `DARWIN_MIN_VITAL=0.02`, `DARWIN_REPRO_COOLDOWN_TICKS=5`, `DARWIN_SIM_CLIENT_RATE=1.5`, `DARWIN_MAX_POPULATION=14` (run 7 seulement), Node 22.23.4, RPC `https://test.rpc.fastnear.com`.
+
+## 10. Validation du logo par un appel NEAR AI réel (L17, piste C)
+
+Date : 2026-11-11 (22:32 UTC). **Un seul appel réel** (aucun second), `npm run ai:logo-validation` (`brain/tools/logo-validation.ts`). Chemin de code réel : `executeMessages` (consignes du catalogue `logo`), `max_tokens` = `max(sim.maxTokensPerCall, CATALOGUE.logo.maxOutputTokens)` = 3000 comme `engine/index.ts`, garde-fous et budget du `NearAiBrain`, puis `extractDeliverable` et `runChecks` du marché. Brief : « Logo pour Atelier Lumio » (entreprise fictive, secteur luminaires, style chaleureux et minimal). Modèle : `Qwen/Qwen3.6-35B-A3B-FP8` (liste blanche, prix du catalogue en direct, `verified=true` : 0,17 USD/M en entrée, 1,10 USD/M en sortie). Pire cas calculé avant l'appel : 0,00339 USD pour un plafond par appel de 0,05 USD.
+
+| Contrôle | Résultat |
+|---|---|
+| `finish_reason` | `stop` (pas `length`) ; `max_tokens` envoyé : 3000 |
+| Tokens (`usage`) | prompt 424, completion 788 (dont raisonnement 0), total 1212 |
+| Coût | 0,000939 USD (environ 0,00085 EUR à 1,10), soit 0,3 % du plafond par appel ; cumul du budget IA après l'appel : 0,0412 USD |
+| Blocs ```svg | 3 exactement (408, 416 et 491 caractères) |
+| Parseur XML (Python `xml.etree`, indépendant du code du dépôt) | 3 documents bien formés, racine `svg` avec xmlns, `viewBox="0 0 256 256"`, 5 éléments chacun |
+| Contenu actif | aucun script, foreignObject, image, `on*=`, href ou `url()` externe (contrôle par regex indépendant et par `sanitizeSvg`) |
+| `extractDeliverable` et `runChecks` (règle `rule:logo`) | acceptés : 3 SVG distincts, aucune marque de `BRANDS_TO_AVOID` |
+| Troncature due au plafond de coût | non : 788 tokens produits pour 3000 autorisés, plafond de coût jamais atteint |
+
+**Verdict : VALIDÉ** pour le chemin production + extraction + contrôles déterministes. Cause de la troncature du run 9b : `max_tokens` plafonné à 300 dans le preset `selection` des journaux 9a/9b (400 dans le preset normal ; `maxTokensPerCall`) pour un livrable de 3 SVG ; corrigée par le plafond dur `maxTokensHardCap` (commit 7cb869d), confirmée ici (788 tokens suffisent, marge de 3,8 fois). Aucune correction supplémentaire n'a été nécessaire.
+
+Réserves : (1) un seul échantillon, un seul modèle ; un modèle plus bavard ou à raisonnement peut consommer davantage (les modèles à raisonnement de la liste blanche sont bridés par `extraBody`). (2) Qualité modeste : le texte entre blocs reprend le gabarit littéral « Idee du logo » au lieu d'une phrase d'idée, sans effet sur l'extraction. (3) Le juge IA (grille d'originalité, pertinence) n'a pas été appelé ici : seuls les contrôles déterministes sont validés. (4) Les prix de ce modèle sont ceux du catalogue du jour, pas une valeur figée.
+
+Fichiers : `docs/preuves/logo-validation/` (`reponse-brute.txt` réponse brute du modèle, `logo-1.svg` à `logo-3.svg` extraits, `meta.json` usage/coût/`finish_reason`/identifiant de réponse). Ni clé ni en-tête d'autorisation ne sont écrits. Test sans réseau : `brain/l17-logo.test.ts` rejoue cette réponse réelle dans l'extraction et les contrôles.
+
+## 11. Runs 9a et 9b : commandes de logo, tous rejetés par le contrôle de format (résumé factuel des journaux)
+
+Date : 2026-11-11 (UTC), testnet NEAR, `mode=testnet`, `preset=selection` (version de l'époque), `chain=near`, `brain=nearai`, graine 42. Sources : `docs/preuves/run9a-journal.jsonl` (270 événements, 00:49:30 à 00:54:39 UTC, 14 ticks) et `docs/preuves/run9b-journal.jsonl` (377 événements, 00:56:41 à 01:03:51 UTC, 19 ticks). Ce résumé ne reprend que ce qui est lisible dans ces deux journaux. Les deux runs se sont arrêtés par **extinction** (`sim.stopped`, `reason: extinction`, `generations: 1`) : aucune naissance au-delà des fondateurs (4 en 9a, 6 en 9b), aucune génération 2. Ils ne contredisent ni n'améliorent le run 8 (§8).
+
+| | Run 9a | Run 9b |
+|---|---|---|
+| Fondateurs, morts | 4, 4 morts (tick 14) | 6, 6 morts (ticks 14, 14, 14, 14, 17, 19) |
+| Verdicts de validation | **7 rejetés** (`rule:logo`), 0 accepté | **2 acceptés** (`brain:gemini-2.5-flash-lite`, textes marketing et traduction, payeur : client simulé), **7 rejetés** (6 `rule:logo`, 1 `rule:architecture`) |
+| Séquestres | 7 verrouillés, **7 remboursés**, 0 libéré | 9 verrouillés, 2 libérés, 7 remboursés |
+| Commandes de logo « visiteur » (`visitors.darwin-master-7k2.testnet`) | 3 publiées : 1 rejetée puis remboursée (`t-8669702`, verrouillage `9SGVgFKxwV4bsRE82oRToib4j7eFZKMtWh1pyR4EKFYR`, remboursement `A8jjAF4B9zp9ogPtPmbeNQcxgNAFYGgU2B12q2ngUEzX`), **2 expirées sans offre** (`t-8669704`, `t-8669719`) | 1 publiée, rejetée puis remboursée (`t-8674013`, verrouillage `AMQEHEDN96FtFpupFJKrcYvMZckdGiq99UDHhkDUQVBP`, remboursement `BkQM1xYYcxzbP5KaEEivwDN1ea2XsoeZmVTEPBLTFj9f`) ; une commande de rédaction d'un post LinkedIn par un visiteur (`t-8674030`) a expiré sans offre |
+| Motif du rejet des logos | « exactement 3 blocs ```svg attendus, 0 trouvé(s) » (parfois 1) | idem |
+| Appels IA débités (`brain.charged`) | 7, tous de production, 300 tokens de sortie chacun, total 0,00285 USD (comptabilité locale) | 11 (9 de production, 2 de validation), total 0,00333 USD (comptabilité locale) |
+
+À retenir :
+- **Aucun logo n'a été livré, accepté ni payé sur testnet** dans ces deux runs. Les seuls paiements du run 9b (2 séquestres libérés, `t-8674011` et `t-8674012`) concernent des livrables texte commandés par le **client simulé**, pas par un visiteur.
+- La commande de logo d'un visiteur du run 9b (`t-8674013`) a bien suivi le chemin : verrouillage depuis `visitors.<maître>`, rejet par la règle de format, remboursement par le contrat. C'est la preuve d'un cas refusé réel, pas d'un cas réussi.
+- Cause du rejet : la sortie du modèle était tronquée et ne contenait pas les 3 blocs SVG attendus. Le §10 l'attribue à un plafond de tokens de sortie trop bas, corrigé ensuite (commit `7cb869d`) puis validé par un appel réel isolé (§10). **Nuance** : le §10 cite un plafond de 400 ; dans ces journaux chaque appel de production s'arrête à exactement 300 tokens de sortie (valeur du preset `selection` de l'époque). Le plafond a été relevé depuis ; il n'a pas été rejoué dans un run complet.
+- Enchères : 7 (`bid.placed`) en 9a et 9 en 9b, très peu face aux 92 du run 8 ; les deux runs se sont éteints en génération 1 (extinction), schéma que `docs/RUN_9C.md` §0 et §4 demande de surveiller. Écart de comptage avec `docs/RUN_9C.md` §0 : ce tableau indique 6 fondateurs pour 9a, alors que `run9a-journal.jsonl` n'en contient que 4 (`agent.born` : 4, `agent.died` : 4) ; les journaux font foi.
+- Vérifiable : `https://testnet.nearblocks.io/txns/<hash>` avec les hashes ci-dessus ; les hashes complets des autres événements sont dans les journaux.

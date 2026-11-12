@@ -181,7 +181,7 @@ function postTask(requester, budget, profession, title, prompt) {
   pipeline.push({ id, stage: "bidding", at: tick + 1 });
   // enchères immédiates des agents vivants de la profession
   for (const a of alive().filter((x) => x.genome.profession === profession)) {
-    if (rnd() < 0.5 + a.genome.risk * 0.4) {
+    if (requester.kind === "visitor" || rnd() < 0.5 + a.genome.risk * 0.4) { // les missions de visiteurs reçoivent toujours une offre (test déterministe)
       const bid = { id: "b-" + String(++counters.b).padStart(4, "0"), taskId: id, agentId: a.id, price: near(nearNum(budget) * a.genome.askRatio).toString(), etaTicks: 1 + Math.floor(rnd() * 3), pitch: pick(["Livraison soignée.", "Prix serré, résultat net.", "Je connais ce type de mission."]), tick };
       t.bidIds.push(bid.id);
       (bidsByTask.get(id) ?? bidsByTask.set(id, []).get(id)).push(bid);
@@ -395,6 +395,7 @@ const server = http.createServer(async (req, res) => {
     if ((m = p.match(/^\/api\/tasks\/([\w-]+)$/))) { const t = tasks.get(m[1]); return t ? send(res, 200, { task: withBadge(t), bids: bidsByTask.get(t.id) ?? [], escrow: escrows.get(t.id) }) : send(res, 404, { error: "not_found" }); }
     if (p === "/api/events") { const since = Number(url.searchParams.get("since") ?? 0), limit = Math.min(1000, Number(url.searchParams.get("limit") ?? 200)); return send(res, 200, { events: journal.filter((e) => e.seq > since).slice(0, limit), lastSeq: journal.length }); }
     if (p.startsWith("/api/")) return send(res, 404, { error: "not_found" });
+    if (p === "/classique") { res.writeHead(302, { Location: "/?classique" }); return res.end(); } // le vrai backend doit faire de même
     // statique
     let f = path.join(ROOT, p === "/" ? "index.html" : p);
     if (!f.startsWith(ROOT) || f.includes(path.sep + "dev" + path.sep)) { res.writeHead(403); return res.end(); }

@@ -19,7 +19,7 @@ const port = 3201;
     const p = await ctx.newPage();
     p.on("console", (m) => { if (m.type() === "error" || m.type() === "warning") errs.push(name + " " + m.type() + ": " + m.text()); });
     p.on("pageerror", (e) => errs.push(name + " PAGEERROR " + e.message));
-    await p.goto(REAL ?? `http://127.0.0.1:${port}/`);
+    await p.goto((REAL ?? `http://127.0.0.1:${port}`) + "/?classique");
     await p.waitForTimeout(wait);
     await p.screenshot({ path: path.join(out, `${name}-top.png`) });
     await p.screenshot({ path: path.join(out, `${name}-full.png`), fullPage: true });

@@ -13,14 +13,14 @@ export function parseSince(v: string | undefined): number {
   return Number(v.trim());
 }
 
-export function sseHandler(journal: Journal, opts: { pingMs?: number; onOpen?: () => () => void } = {}) {
+export function sseHandler(journal: Journal & { subscribeReset?: (fn: () => void) => () => void }, opts: { pingMs?: number; onOpen?: () => () => void } = {}) {
   const pingMs = opts.pingMs ?? PING_MS;
   return (c: Context) => {
     const close = opts.onOpen?.();
     let since = parseSince(c.req.header("last-event-id") ?? c.req.query("since"));
     c.header("X-Accel-Buffering", "no");
     return streamSSE(c, async (stream) => {
-      const queue: DarwinEvent[] = [];
+      const queue: (DarwinEvent | "reset")[] = [];
       let closed = false;
       let wake: (() => void) | undefined;
       const stop = () => {
@@ -34,6 +34,12 @@ export function sseHandler(journal: Journal, opts: { pingMs?: number; onOpen?: (
         queue.push(ev);
         wake?.();
       });
+      // Replay (L17) : le rejeu repart de zéro ; le client vide son affichage puis reçoit les événements depuis seq 1.
+      const unsubReset = journal.subscribeReset?.(() => {
+        queue.length = 0;
+        queue.push("reset");
+        wake?.();
+      });
       try {
         await stream.write("retry: 3000\n\n");
         if (since > journal.lastSeq) {
@@ -42,6 +48,10 @@ export function sseHandler(journal: Journal, opts: { pingMs?: number; onOpen?: (
           since = 0;
         }
         let lastSent = since;
+        const resetNow = async () => {
+          lastSent = 0;
+          await stream.writeSSE({ event: "reset", data: JSON.stringify({ lastSeq: 0 }) });
+        };
         const send = async (ev: DarwinEvent) => {
           if (ev.seq <= lastSent) return;
           lastSent = ev.seq;
@@ -49,7 +59,11 @@ export function sseHandler(journal: Journal, opts: { pingMs?: number; onOpen?: (
         };
         for (const ev of journal.since(since, 1_000_000)) await send(ev);
         while (!closed) {
-          while (queue.length && !closed) await send(queue.shift()!);
+          while (queue.length && !closed) {
+            const item = queue.shift()!;
+            if (item === "reset") await resetNow();
+            else await send(item);
+          }
           if (closed) break;
           const woke = await new Promise<boolean>((resolve) => {
             const t = setTimeout(() => resolve(false), pingMs);
@@ -65,6 +79,7 @@ export function sseHandler(journal: Journal, opts: { pingMs?: number; onOpen?: (
         /* client parti : on nettoie simplement */
       } finally {
         unsubscribe();
+        unsubReset?.();
         close?.();
       }
     });

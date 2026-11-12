@@ -11,6 +11,8 @@ import { getConnInfo } from "@hono/node-server/conninfo";
 import { CATALOGUE, PROFESSIONS, formatNear, redactConfig, scaledPrice, type Task } from "../shared/index.ts";
 import { MarketError, SIMULATED_BADGE, VISITOR_FUNDING_LABEL } from "../market/index.ts";
 import { RateLimiter } from "./rate-limit.ts";
+import { ReplayError } from "./replay.ts";
+import { REPLAY_READ_ONLY_MESSAGE } from "./replay-runtime.ts";
 import { safeErrorMessage } from "./redact.ts";
 import type { Runtime } from "./runtime.ts";
 import { sseHandler, parseSince } from "./sse.ts";
@@ -61,6 +63,8 @@ export interface AppOptions {
   limits?: { api?: number; postTask?: number; adminFailures?: number; streamsPerIp?: number; streamsTotal?: number };
   pingMs?: number;
   now?: () => number;
+  /** Mode replay uniquement (D-044) : "open" (défaut) = contrôle de la lecture sans jeton ; "locked" = jeton d'administration exigé. */
+  replayControl?: "open" | "locked";
 }
 
 const defaultIp = (c: Context): string => {
@@ -142,6 +146,16 @@ export function createApp(rt: Runtime, opts: AppOptions = {}): Hono {
   };
   app.use("/api/*", sameOrigin);
 
+  // ---- replay (L17) : toute écriture est refusée proprement, avant validation, limitation de débit ou marché ----
+  if (rt.replay) {
+    app.use("/api/*", async (c, next) => {
+      const p = c.req.path;
+      if (c.req.method !== "GET" && c.req.method !== "HEAD" && (p === "/api/tasks" || p.startsWith("/api/sim/")))
+        return c.json(errBody("REPLAY_READ_ONLY", REPLAY_READ_ONLY_MESSAGE, { mode: "replay" }), 403);
+      await next();
+    });
+  }
+
   // ---- limitation de débit générale (le flux SSE a son propre plafond de connexions) ----
   app.use("/api/*", async (c, next) => {
     if (c.req.path === "/api/stream") return next();
@@ -175,11 +189,12 @@ export function createApp(rt: Runtime, opts: AppOptions = {}): Hono {
       running: s.running,
       paused: s.paused,
       startedAt: rt.startedAt,
+      replay: rt.replay?.status(), // L17 : présent seulement en mode replay (bandeau permanent du frontend)
       visitors: { spentLastHour: market.visitorSpentLastHour().toString(), hourlyCap: market.visitorHourlyCap().toString() },
     });
   });
   app.get("/api/config", (c) => c.json(publicConfig(rt)));
-  app.get("/api/state", (c) => c.json({ ...state(), population: rt.lastPopulation() }));
+  app.get("/api/state", (c) => c.json({ ...state(), population: rt.lastPopulation(), replay: rt.replay?.status() }));
   app.get("/api/population", (c) => c.json({ population: rt.lastPopulation() ?? null }));
 
   // ---- catalogue des métiers (formulaire visiteur) + événements de marché actifs ----
@@ -264,7 +279,7 @@ export function createApp(rt: Runtime, opts: AppOptions = {}): Hono {
     const d = deliverableOf(c);
     if (!d) return c.json(errBody("UNKNOWN_DELIVERABLE", "pas de livrable pour cette tâche"), 404);
     const { rawText: _raw, ...pub } = d;
-    return c.json({ ...pub, files: d.files.map((f) => ({ name: f.name, mime: f.mime, content: f.content })) });
+    return c.json({ ...pub, files: d.files.map((f) => ({ name: f.name, mime: f.mime, content: f.content, ...(f.truncated ? { truncated: true } : {}) })) });
   });
   app.get("/api/tasks/:id/deliverable/:file", (c) => {
     const file = c.req.param("file") ?? "";
@@ -425,7 +440,46 @@ export function createApp(rt: Runtime, opts: AppOptions = {}): Hono {
     return c.json({ ok: true, ...simInfo() });
   });
 
+  // ---- mode replay (L17) : lecture seule, contrôle de la lecture par /api/replay/* ----
+  if (rt.replay) {
+    const replay = rt.replay;
+    app.get("/api/replay", (c) => c.json(replay.status()));
+    // Fils de discussion des missions de visiteurs : pour chaque mission, ses événements dans l'ordre (voir backend/README, « Catalogue d'événements »).
+    app.get("/api/replay/missions", (c) => {
+      const all = new Map(journal.since(0, 1_000_000).map((e) => [e.seq, e]));
+      return c.json({
+        missions: [...replay.state.missions.values()].map((m) => ({ ...m, events: m.events.map((e) => all.get(e.seq) ?? e) })),
+      });
+    });
+    // D-044 : le rejeu n'a aucun pouvoir d'écriture ; contrôle ouvert par défaut, jeton exigé si DARWIN_REPLAY_CONTROL=locked.
+    const replayGuard: MiddlewareHandler = opts.replayControl === "locked" ? admin : async (_c, next) => { await next(); };
+    const ctl = (name: string, run: (body: Record<string, unknown>) => void) =>
+      app.post(`/api/replay/${name}`, replayGuard, async (c) => {
+        let body: Record<string, unknown> = {};
+        try {
+          const j = await c.req.json();
+          if (typeof j === "object" && j !== null && !Array.isArray(j)) body = j;
+        } catch {
+          /* corps facultatif */
+        }
+        try {
+          run(body);
+        } catch (e) {
+          if (e instanceof ReplayError) return c.json(errBody(e.code, e.message), 400);
+          throw e;
+        }
+        return c.json(replay.status());
+      });
+    ctl("speed", (b) => replay.setSpeed(b.speed));
+    ctl("pause", () => replay.pause());
+    ctl("resume", () => replay.resume());
+    ctl("restart", () => replay.restart());
+  }
+
   app.all("/api/*", (c) => c.json(errBody("NOT_FOUND", "route inconnue"), 404));
+
+  // Ancienne interface : /classique -> /?classique (même comportement que le faux serveur de frontend/dev)
+  app.get("/classique", (c) => c.redirect("/?classique", 302));
 
   // ---- statique frontend/ (un autre agent y travaille) ----
   const frontendDir = opts.frontendDir ?? fileURLToPath(new URL("../frontend", import.meta.url));

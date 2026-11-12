@@ -9,7 +9,7 @@ const URL_ = process.env.REAL_URL || "http://127.0.0.1:3000";
   const errs = [];
   p.on("console", (m) => { if (["error", "warning"].includes(m.type())) errs.push(m.text()); });
   p.on("pageerror", (e) => errs.push("PAGEERROR " + e.message));
-  await p.goto(URL_);
+  await p.goto(String(URL_).replace(/[/]+$/, "") + "/?classique");
   await p.waitForSelector(".node.dead", { timeout: 300000 });
   await p.waitForTimeout(2500);
   const info = await p.evaluate(() => ({

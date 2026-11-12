@@ -1,4 +1,26 @@
-# Frontend Darwin (lot L8)
+# Frontend Darwin (lots L8 à L17)
+
+## Interface L17 (par défaut) : trois onglets
+
+Épurée, sombre par défaut (bascule clair/sombre), grandes polices, une action principale par page. **Le mode est toujours affiché** dans l'en-tête (MODE MOCK, TESTNET NEAR ou REJEU) ; en rejeu, un bandeau « Rejeu d'un run réel testnet du <date> » porte la progression et les boutons x1/x5/x20 (POST `/api/replay/speed`, sans effet si le jeton admin est exigé).
+
+| Onglet | Contenu |
+|---|---|
+| **Mission** | agents vivants en cartes (avatar coloré par le génome, prénom, icône du métier, jauge de solde = solde / seuil de reproduction) ; barre « Décrivez votre mission… » (métier deviné d'après le texte et budget minimum du catalogue, modifiables d'un clic, Entrée envoie) ; fil en direct : mission, enchères (prix + pitch), attribution, travail, livrable (SVG en `<img data:>`, Markdown en nœuds DOM), verdict du juge, « payé ✓ » + lien « preuve ↗ » nearblocks. La carte de l'agent qui s'exprime s'illumine ; naissances et morts en notifications qui s'effacent. Les missions terminées se replient. En rejeu : barre désactivée (« Missions désactivées pendant le rejeu »), le fil rejoue les missions du journal. |
+| **Lignées** | arbre plein écran (zoom molette/pincement/boutons, déplacement, recentrage), nœuds colorés par métier, morts grisés ; clic = panneau latéral (génome, personnalité, lettres parent-enfant, historique financier avec courbe de solde) ; Échap ferme. |
+| **Preuves** | indicateurs, population par génération (vivants/morts par métier), flux d'argent (gagné, cerveau, transmis, par génération), transactions avec liens nearblocks, badge TEE (honnête : contrôle à la demande, appels sur modèles attestables comptés), briques NEAR utilisées. |
+
+Ancienne interface (L16) : **`/?classique`** (le backend doit rediriger `/classique` vers `/?classique` : une ligne côté `backend/`, voir rapport L17 ; le faux serveur le fait déjà). Le bandeau de rejeu y est conservé.
+
+Fichiers L17 : `index.html` + `l17.css` (coquille), `boot.js` (choisit L17 ou classique), `core.js` (état, historique complet paginé, SSE avec reprise, mode, registre financier), `darwin.js` (routage, mode, notifications), `mission.js`, `lignees.js`, `preuves.js`, `jobs.js` (métiers, icônes, avatars ; les métiers historiques writer/analyst/coder/summarizer/translator des runs 5 à 8 sont lisibles), `chat-deliverable.js`, `classique-markup.js` (balisage statique de l'ancienne page, importé par DOMParser, jamais d'innerHTML). Compatible avec la CSP du backend (pas de script ni de `style=` inline).
+
+Dégradations assumées : le journal réel ne contient pas toujours le pitch d'une enchère (résumé neutre : délai et métier, rien d'inventé) ni le contenu des livrables (liste des fichiers + « Livrable non enregistré ») ; sans `population.snapshot`, la population est calculée depuis la liste des agents.
+
+Vérification : `NODE_PATH=<node_modules avec playwright> node frontend/dev/l17.cjs docs/captures` (41 contrôles contre le faux serveur : onglets, mode, cartes, barre, fil complet jusqu'à « payé ✓ », livrable SVG inerte, arbre, zoom, panneau, preuves, classique, mobile 375, aucune erreur console/CSP). Contre un backend de rejeu : `REAL_URL=http://127.0.0.1:3000 node frontend/dev/l17.cjs <dossier> --replay`. `l16.cjs` et `e2e.cjs` testent l'ancienne interface via `/?classique`.
+
+---
+
+# Interface classique (lot L8, L16)
 
 Page unique, HTML + CSS + modules ES, **sans build, sans dépendance, hors ligne** (aucune ressource externe ; compatible avec la CSP du backend : pas de script ni de `style=` inline). Le backend (`backend/`) la sert en statique.
 

@@ -157,3 +157,15 @@ Vérifications : maximum 0,060 <= 0,09 ; minimum 0,012 >= 0,01. Seule `translati
 Si l'on veut plus de marge vers le haut (enchères au-dessus du prix de référence), on peut monter jusqu'à `f = 0,00045` (architecture à 0,09 NEAR, traduction à 0,018 NEAR) sans changer les rapports.
 
 Réserve finale : ces prix NEAR servent uniquement à conserver des proportions réalistes entre métiers sur testnet. Ils ne représentent aucune valeur monétaire réelle.
+
+## Calibrage du preset `selection` (L17, D-043)
+
+| Paramètre (testnet, `selection`) | Avant | Après |
+|---|---|---|
+| Capital de naissance | 0,10 NEAR | 0,12 NEAR |
+| Métabolisme | 0,005 NEAR/tick | 0,0035 NEAR/tick |
+| Client simulé | 1,5 tâche/tick | 2 tâches/tick |
+| Graines validant « génération >= 3 et >= 1 mort » (100 graines, mock) | 62 | 92 |
+| Morts par naissance (mock) | 0,84 | 0,66 (run 8 réel : 0,58) |
+
+Prix du catalogue inchangés. Reproduire : `npx tsx scripts/calibrate-selection.ts --seeds 100 --first 31`.

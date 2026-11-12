@@ -19,7 +19,7 @@ Deuxième passe : `accounts/` (L2), `intents/` (L9) et `backend/` (L7) sont revu
 
 ## 2. État du scan de secrets
 
-Script : `scripts/scan-secrets.mjs` (`npm run scan:secrets`, alias `npm run scan-secrets`). Sans dépendance. Il scanne les fichiers suivis par git et les lignes ajoutées de l'historique (`git log -p`) : clés NEAR `ed25519:`/`secp256k1:`, clés PEM, phrases de récupération de 12 à 24 mots précédées d'un mot-clé, clés `sk-`, `Bearer` long, JWT, affectation non vide (16 caractères ou plus) de `NEAR_MASTER_PRIVATE_KEY`, `NEARAI_API_KEY`, `INTENTS_JWT`, `DARWIN_ADMIN_TOKEN` ; fichier `.env*` suivi (hors `.env.example`). Valeurs toujours masquées (4 premiers caractères + longueur). Code de sortie 1 si détection. Options : `--ref <branche>` (arbre et historique de cette branche), `--no-history`, `--no-files`.
+Script : `scripts/scan-secrets.mjs` (`npm run scan:secrets`, alias `npm run scan-secrets`). Sans dépendance. Il scanne les fichiers suivis par git et les lignes ajoutées de l'historique (`git log -p`) : clés NEAR `ed25519:`/`secp256k1:`, clés PEM, phrases de récupération de 12 à 24 mots précédées d'un mot-clé, clés `sk-`, `Bearer` long, JWT, affectation non vide (16 caractères ou plus) de `NEAR_MASTER_PRIVATE_KEY`, `NEARAI_API_KEY`, `INTENTS_JWT`, `DARWIN_ADMIN_TOKEN` ; fichier `.env*` suivi (hors `.env.example`). Valeurs toujours masquées (4 premiers caractères + longueur). Code de sortie 1 si détection. Options : `--ref <branche>` (arbre et historique de cette branche), `--no-history`, `--no-files`, `--no-allowlist`. Depuis L17 (voir §2.1) les 7 valeurs factices de l'historique sont exemptées par `scripts/scan-secrets.allowlist.json` : le scan complet sort 0, et `--no-allowlist` les fait réapparaître.
 
 Le script a été vérifié sur un dépôt jetable contenant des valeurs factices de chaque type (détection de chacun, rien d'affiché en clair). Limites connues : une phrase de récupération sans mot-clé voisin n'est pas détectée ; un secret de moins de 16 caractères non préfixé non plus.
 
@@ -39,7 +39,21 @@ Le scan signale 7 valeurs (la consigne en annonçait 6 ; la 7e est `cle-api-sk` 
 - la « clé NEAR » fait 30 caractères au total ; une vraie clé ed25519 NEAR en fait environ 96 (`ed25519:` + base58 de 64 octets) ;
 - la valeur « jwt » fait 21 caractères et n'a pas les trois segments d'un JWT ; aucune clé réelle n'a jamais été saisie dans le dépôt (le scan est propre sur les 41 autres commits, et `.env` n'a jamais été suivi : `git ls-files` ne contient que `.env.example`).
 
-Options :
+**Verdict L17 (2026-11-11) : format NON réel, option C appliquée (exception ciblée), pas de réécriture.** Vérification sans afficher les valeurs (script de mesure local, longueur, entropie, test de motifs) sur les 9 chaînes des lignes 42, 53, 229, 376, 403 du commit `4eb92ea` :
+
+| Valeur (fragment) | Longueur | Motif de secret réel correspondant ? |
+|---|---|---|
+| `sk-s...` (lignes 42, 53) | 29 | non : ni OpenAI (`sk-...T3BlbkFJ...` ou `sk-proj-` + 40 car. ou plus), ni Anthropic (`sk-ant-api03-` + 80 car. ou plus) |
+| `sk-t...` (376), `sk-a...` (403) | 28, 25 | non (mêmes motifs) |
+| `tok-...` (42, 53), `le-b...` (229) | 17, 16 | non : jetons inventés, aucun format de fournisseur |
+| `ed25...` (53) | 30 | non : une clé NEAR réelle fait 96 caractères (`ed25519:` + base58 de 64 octets) ; le corps contient des caractères hors base58 |
+| `jwt-...` (53) | 21 | non : pas de trois segments `eyJ...eyJ...` |
+
+Le push protection de GitHub (secret scanning) repose sur des motifs de fournisseurs à préfixe et longueur fixes ; aucune de ces valeurs n'en satisfait un. Il n'existe pas, à ma connaissance, de motif NEAR dans cette liste (non vérifié en ligne : la liste publique de GitHub n'a pas été consultée depuis ce poste), et la valeur « ed25519 » est de toute façon trop courte pour être décodable en clé. `gitleaks` et `trufflehog` ne sont pas installés sur ce poste : non testés. Réserve : la règle générique `generic-api-key` de gitleaks (mot-clé `api_key` + chaîne d'entropie élevée) pourrait signaler la ligne 42 (`NEARAI_API_KEY: "sk-s..."`, entropie 4,1) ; c'est un faux positif de scanner tiers, pas un secret. Exception appliquée : `scripts/scan-secrets.allowlist.json`, une entrée par (commit, fichier, type de règle) avec l'empreinte sha256 (16 premiers hex) de chaque valeur, aucune valeur stockée, justification écrite dans le fichier ; une autre valeur, un autre fichier, un autre commit ou un secret de l'arbre actuel reste détecté. Les exceptions ne s'appliquent qu'à l'historique. Scan complet après exception : 176 fichiers, 75 commits, sortie 0 ; `--no-allowlist` retrouve les 7 détections.
+
+Si l'humain préfère malgré tout un historique sans aucune de ces valeurs (jury avec gitleaks), l'option B ci-dessous reste valable (procédure : sauvegarde `git clone --mirror`, retrait des worktrees, `git filter-repo --replace-text <fichier>` ou `git filter-branch --tree-filter` limité au commit `4eb92ea`, `git reflog expire --expire=now --all && git gc --prune=now`, scan sans allowlist, `npm test`). `git filter-repo` n'est pas installé ici : la procédure n'a pas été répétée, rien n'a été réécrit.
+
+Options (analyse initiale, avant L17) :
 
 | Option | Avantages | Inconvénients |
 |---|---|---|
@@ -209,7 +223,7 @@ BLOQUANT = interdit la fusion ; À CORRIGER = avant l'étape indiquée ; FUSIONN
 | L7-backend | fusionné | FUSIONNABLE | aucun | testnet public : liste blanche `Host`, jeton fort, IP derrière proxy |
 | L8-frontend | fusionné | FUSIONNABLE | aucun | déploiement public : ne pas servir `frontend/dev` ni `screens`, retirer `style-src 'unsafe-inline'`, avertissement « données publiques » dans le formulaire |
 
-**Historique git : 7 valeurs factices détectées par le scan (§2.1).** Ce n'est pas un secret, mais le scan de publication reste en échec tant que l'option B (réécriture) n'est pas faite ou que l'option A n'est pas actée par l'humain. À traiter AVANT la publication du dépôt.
+**Historique git : 7 valeurs factices (§2.1).** Verdict L17 : format non réel, exemptées dans `scripts/scan-secrets.allowlist.json` ; le scan complet sort 0. La réécriture (option B) reste facultative, au choix de l'humain.
 
 Aucun secret réel détecté, aucun crédit sans preuve constaté (le module Intents n'est branché à aucun solde), aucune libération sans verdict `accepted` constatée, `NearChain` refuse tout réseau autre que testnet. Les trois points « À corriger » qui touchent à l'argent (séquestre dégradé, recontrôle du devis Intents, preuve persistée) sont à faire avant la mise en service de l'étape correspondante ci-dessous.
 
@@ -231,12 +245,12 @@ Aucun secret réel détecté, aucun crédit sans preuve constaté (le module Int
 
 ### 5.2 Avant la publication du dépôt (par l'humain, règle 5)
 
-- [ ] Décision sur l'historique (§2.1) : option B recommandée (réécrire `4eb92ea` sur une copie de sauvegarde, après la dernière fusion, branches `lot/*` et `.claude/worktrees/` traités), sinon option A actée dans `docs/DECISIONS.md`.
+- [x] Historique (§2.1) : valeurs factices de format non réel, exception ciblée appliquée (L17), scan complet à 0. Facultatif pour l'humain : option B (réécriture) si le jury utilise gitleaks.
 - [ ] `node scripts/scan-secrets.mjs` (toutes branches, fichiers et historique) sort 0 ; plus d'ancienne ref (`git reflog expire --expire=now --all && git gc --prune=now`).
 - [ ] `git ls-files` : aucun `.env`, `data/`, `*.key`, `*.pem`, `.near-credentials/`.
 - [ ] `.env.example` : secrets vides, `INTENTS_ENABLED=false`, `INTENTS_DRY_ONLY=true`, `HOST=127.0.0.1`.
 - [ ] README : modèle de confiance (l'opérateur est oracle, D-024), mode `mock` / `dégradé` signalé, limites connues, aucune promesse « trustless ».
-- [ ] Clés et jetons utilisés pendant le développement (clé NEAR AI, clé du compte maître testnet, jeton admin) : régénérés ou révoqués s'ils ont servi hors de ce poste.
+- [ ] Clés et jetons utilisés pendant le développement : clé du compte maître testnet FAITE (§6) ; clé NEAR AI et jeton admin : régénérés ou révoqués s'ils ont servi hors de ce poste (HUMAIN, §6.3).
 - [ ] Aucune donnée personnelle dans `docs/` ni dans les journaux versionnés.
 
 ### 5.3 Avant le déploiement testnet
@@ -260,3 +274,103 @@ Aucun secret réel détecté, aucun crédit sans preuve constaté (le module Int
 - [ ] Preuve de dépôt recoupée à la main (explorateur de la chaîne de destination) avant d'annoncer quoi que ce soit ; une preuve `mock:true` n'est jamais présentée comme réelle.
 - [ ] Clé partenaire `INTENTS_JWT` : jamais dans un fichier suivi, jamais collée dans un chat ou un post ; révoquée après la démo si elle a été exposée.
 - [ ] Aucun lien entre le module Intents et les soldes des agents (le crédit mainnet n'est pas branché) : le dire dans le README.
+
+## 6. Rotation de la clé du compte maître testnet (L17, 2026-11-11)
+
+Compte `darwin-master-7k2.testnet`, testnet seulement. Script réutilisable : `scripts/rotate-master-key.mjs` (dry-run par défaut ; `--apply` exécute ; `--keep-old` garde l'ancienne clé ; `--resume <fichier>` reprend après un arrêt ; `--backup-dir` ; `--rpc url1,url2` ou `NEAR_RPC_URL`). Refuse tout réseau autre que testnet, n'affiche que des fragments de clés publiques, sauvegarde le `.env` et la nouvelle clé hors dépôt avant toute transaction, réessaie avec délai croissant sur 429. Lancer depuis un dossier où `near-api-js` est installé (`node scripts/rotate-master-key.mjs`).
+
+### 6.1 Déroulé et preuves
+
+| Étape | Résultat | Preuve (testnet, publique) |
+|---|---|---|
+| Dry-run | une seule clé full access (`ed25519:Hag7...17o8`) | aucune écriture |
+| a) sauvegarde `.env` | faite, hors dépôt (dossier temporaire de la session) | : |
+| b) nouvelle paire ed25519 | générée, sauvegardée hors dépôt AVANT toute transaction (`ed25519:4dXQ...nReh`) | : |
+| c) AddKey full access, signée par l'ancienne clé | OK. Le 1er passage a arrêté à l'étape d) : la finalité du RPC avait quelques secondes de retard, la clé figurait bien on-chain au contrôle suivant. Le script interroge maintenant jusqu'à 60 s, et `--resume` a permis de reprendre sans régénérer. Le hash de cette transaction n'a pas été relevé (arrêt avant l'affichage) ; la clé est visible dans la liste des clés d'accès du compte | liste des clés (RPC `view_access_key_list`) |
+| d) vérification RPC | nouvelle clé présente en FullAccess (2 clés à cet instant) | idem |
+| e) `.env` mis à jour (ligne `NEAR_MASTER_PRIVATE_KEY`, valeur non affichée) | relecture du fichier cohérente, clé publique dérivée = nouvelle clé | : |
+| f) contrôle avec la NOUVELLE clé seule | OK : 1 yoctoNEAR du compte vers lui-même | `2umNF7mMRM37HgbFozbEtyYxnJFyk5P8f2xRDaAbKgQ1` |
+| g) DeleteKey de l'ancienne clé, signée par la nouvelle | OK | `CGW41ncCqP7QryKXBL83ygtDjMsnohbWB75v8wxCDLFd` |
+| Vérification finale | seule clé restante : `ed25519:4dXQ...nReh` (full) ; l'ancienne a disparu | liste des clés |
+| Contrôle après suppression | OK, compte utilisable | `EajzUV4zx5579aVngK7wEVAmEQJepm1iovEowaQ15yif` |
+
+Les hashes se consultent sur `https://testnet.nearblocks.io/txns/<hash>`. Aucune clé complète dans ce document, les journaux ni les commits ; `.env` reste ignoré par git.
+
+### 6.2 Résidus constatés
+
+- `~/.near-credentials/testnet/darwin-master-7k2.testnet/` (trousseau near-cli) contient encore l'ANCIENNE clé, désormais morte on-chain donc sans danger ; à supprimer pour éviter la confusion. Le compte contrat `darwin-contract-7k2.testnet` a sa propre clé (non touchée ; `contracts/deploy-testnet.sh` signe avec elle).
+- Les sauvegardes hors dépôt (ancien `.env` avec ancienne clé et ancienne clé NEAR AI encore valide, nouvelle clé) sont dans le dossier temporaire de la session de l'agent : les supprimer une fois la rotation validée.
+- Le nouveau `NEAR_MASTER_PRIVATE_KEY` n'est que dans le `.env` du dépôt principal. Les autres copies de `.env` (autres postes, worktrees) auraient l'ancienne clé : à mettre à jour.
+
+### 6.3 À FAIRE PAR L'HUMAIN (à reprendre dans `docs/BESOINS_HUMAIN.md`)
+
+1. Relancer un test testnet complet avec le nouveau `.env` (ex. `npm run start`) pour confirmer, côté application, que le compte maître signe bien ; supprimer `~/.near-credentials/testnet/darwin-master-7k2.testnet*` (clé morte).
+2. Supprimer les sauvegardes hors dépôt de la rotation (voir 6.2) après vérification.
+3. Régénérer la clé NEAR AI (`NEARAI_API_KEY`, console cloud.near.ai) et le jeton `DARWIN_ADMIN_TOKEN` s'ils ont quitté ce poste : une rotation de clé de plateforme se fait dans la console du fournisseur, pas par cet agent. Non faite.
+4. Facultatif : réécriture de l'historique (§2.1, option B) si le jury doit scanner avec gitleaks ; décision irréversible réservée à l'humain.
+
+## 7. Revue de la branche `lot/L17-integration` avant fusion dans `main` (2026-11-12)
+
+Périmètre : `git diff main..HEAD` (159 fichiers, HEAD 0d76273). Lecture seule sur le code ; aucun appel réseau ; aucun secret affiché. Revue de code manuelle, pas de test d'intrusion dynamique.
+
+**Avis : GO SOUS RÉSERVES.** Aucun secret détecté, aucune faille exploitable à distance pour voler des fonds ou exécuter du code. Réserves à lever avant la démo publique : constats 1 à 4. Les autres sont des durcissements.
+
+### 7.1 Constats
+
+| # | Gravité | Où | Constat | Correctif |
+|---|---|---|---|---|
+| 1 | Moyenne | `.env.example` (aucune occurrence de `REPLAY`) | `DARWIN_REPLAY_FILE`, `_SPEED`, `_LOOP`, `_MAX_GAP_MS`, `_LABEL`, `_CONTROL` (replay-main.ts:1-2, 33-47) et `DARWIN_PRICE_SCALE`, `DARWIN_VISITOR_BID_WINDOW_TICKS`, `DARWIN_VISITOR_TASK_DEADLINE_TICKS` (shared/config.ts) ne sont pas documentés : `.env.example` n'est plus « complet ». Les valeurs sensibles restent sûres : `INTENTS_ENABLED=false`, `INTENTS_DRY_ONLY=true`, `HOST=127.0.0.1`. | Ajouter ces variables, commentées, avec `DARWIN_REPLAY_CONTROL=` vide et la mention « `locked` pour toute démo publique » (architecte + sécurité). |
+| 2 | Moyenne (disponibilité de la démo, pas d'attaque distante) | `backend/replay.ts:443` (`state.apply(ev)` dans le minuteur), `replay.ts:175-309`, `:186-187`, `:216-224`, `:288` | `parseReplay` ne valide que l'enveloppe (`type`, `ts`, `tick`, `data` objet). Un événement dont `data` n'a pas la forme du type (`agent.born` sans `agent`, `task.posted` sans `task`, `deliverable.produced` sans `files` tableau) lève dans le minuteur : exception non rattrapée, le processus s'arrête en pleine lecture. Le fichier est choisi par l'opérateur, donc pas d'exposition réseau. | Entourer `state.apply` d'un try/catch (passer en `ended` + `system.warning` masqué) ou valider la forme par type au chargement. Ramener `MAX_REPLAY_BYTES` (replay.ts:17) de 200 Mo à ~20 Mo (journal entier + clones en mémoire). |
+| 3 | Moyenne si exposé publiquement, acceptée en local (D-044) | `backend/app.ts:455-476`, `replay-main.ts:47-77` | Contrôle du rejeu ouvert par défaut : tout visiteur peut changer la vitesse (partagée), mettre en pause, relancer (`reset` envoyé à tous les clients). Pas de `bodyLimit` sur ces 4 POST (`c.req.json()` lit un corps de taille libre), contrairement à `POST /api/tasks` (16 Ko). Limité par le débit général (240 requêtes/min et par IP ; derrière un proxy toutes les requêtes ont la même IP : limite globale). Anti-CSRF correct (Origin refusée si différente, `Origin: null` refusée). Écriture (`/api/tasks`, `/api/sim/*`) bien refusée en 403 avant tout, même avec jeton. Aucune lecture de fichier ni SSRF possible via l'API : le fichier n'est lu qu'au démarrage, depuis l'environnement, et seul son nom sans dossier (`meta.file`) est exposé. | Ajouter `bodyLimit({maxSize: 1024})` sur `ctl(...)`. Documenter : démo publique = `DARWIN_REPLAY_CONTROL=locked` + `DARWIN_ADMIN_TOKEN` (24 caractères ou plus). |
+| 4 | Faible | `replay-main.ts:47`, `app.ts:455`, `app.ts:394-410` | « locked » sans `DARWIN_ADMIN_TOKEN` s'ouvre (le garde `admin` laisse tout passer sans jeton) : échec ouvert, seulement signalé par un message. Atténué : `assertSafeBinding` impose un jeton dès que `HOST` n'est pas loopback. | Refuser le démarrage (ou répondre 403 aux contrôles) si `locked` sans jeton. |
+| 5 | Faible | `app.ts:290`, `replay.ts:290-293` | En rejeu, `name` et `mime` d'un journal ne sont pas validés au chargement. La route valide le nom demandé (`FILE_RE`) et le `Content-Type` par regex (`text/html` passerait), mais la réponse porte `nosniff` + `CSP: default-src 'none'; sandbox` : aucun script ne s'exécute. `Content-Disposition` n'utilise que le nom validé. | Liste blanche des 4 types (`image/svg+xml`, `text/markdown`, `text/plain`, `text/vnd.mermaid`), repli `text/plain` ; valider `name` à l'ingestion du rejeu. |
+| 6 | Faible | `backend/runtime.ts:91`, `market/index.ts:424`, `backend/store.ts:75` | Le masquage (`redactText`) couvre `system.warning/error` pour le flux SSE et l'API, et tout le JSON du fichier `data/journal.jsonl`, mais PAS le contenu des livrables, les pitchs ni le texte des tâches servis en direct. Les agents n'ont aucun secret dans leur contexte ; le risque est un secret collé par un visiteur (le formulaire prévient que tout est public). Les motifs de `redactText` ne couvrent pas une clé nue (hex, base58 sans préfixe). | Appliquer `redactText` à `content` avant l'émission (market/index.ts:424) et au pitch ; ajouter un motif pour les clés base58 longues sans préfixe. |
+| 7 | Faible (trou de couverture du scanner) | `scripts/scan-secrets.mjs:57` | Les lignes de plus de 4000 caractères sont tronquées avant analyse. Avec D-045 un journal peut embarquer jusqu'à 24 000 caractères par fichier sur une seule ligne : un secret après le 4000e caractère ne serait pas vu. Les journaux actuels sont sûrs (ligne max 1433 caractères, rescannés sans limite). Les fichiers contenant un octet NUL (PNG) sont ignorés, donc les captures ne sont pas scannées. | Scanner par fenêtres de 4000 caractères avec recouvrement au lieu de tronquer. Captures : relecture visuelle (7.3). |
+| 8 | Faible | `scripts/rotate-master-key.mjs:23`, `:95-96`, `:119-126` ; `.gitignore` | `--backup-dir` n'est pas contrôlé : dans le dépôt, `new-master-key-*.json` (clé en clair) et `env-backup-*` ne sont couverts ni par `.gitignore` (`.env`, `.env.*`, `*.key`, `*.pem`, `data/`). Le scanner détecterait la clé (motif `ed25519:`), mais après coup. Le mode 0600 est sans effet sous Windows. Messages d'erreur AddKey/DeleteKey tronqués sans `redactText` (la signature est locale, aucune clé n'est envoyée au RPC). Réseau : testnet et https imposés ; la clé n'est jamais affichée (fragments de clé publique). | Refuser un `--backup-dir` situé dans l'arbre git ; ajouter à `.gitignore` : `new-master-key-*.json`, `env-backup-*`, `.darwin-secure/`. |
+| 9 | Faible | `docs/DECISIONS.md:8`, `docs/BESOINS_HUMAIN.md:116`, `docs/QA_RAPPORT.md:4` | Chemin local contenant le nom d'utilisateur Windows de l'opérateur, dans des documents publics (contredit la case « aucune donnée personnelle », §5.2). Pas un secret. | Remplacer par `<dépôt>` / `<dossier-node>` (propriétaires : architecte, chef de projet, qa). |
+| 10 | Info | `replay.ts:93-103`, `app.js:240-243`, `darwin.js:56-61` | Le bandeau « run réel testnet » se déduit du champ `chain` du journal lui-même : un journal modifié à la main serait étiqueté « réel ». Pas de signature. Seule vérification possible : les hashes de transaction sur nearblocks. | Publier les empreintes sha256 des journaux de preuve (7.4) dans `docs/PREUVES_TESTNET.md`. |
+| 11 | Info | `replay.ts:449` (app.ts) | `/api/replay/missions` reconstruit un index de tout le journal à chaque requête (O(n), débit limité) ; sans effet sur 1819 événements. | Mettre en cache par `lastSeq` si le journal grossit. |
+| 12 | Info | `market/validation.ts:87-94` | Le juge IA lit le résultat de l'agent (donnée délimitée, mais un modèle peut être influencé) : un agent pourrait tenter de gonfler son score. Atténué par les contrôles automatiques (`market/checks.ts`) et le seuil `acceptScore`. Résidu hérité de L16, non aggravé. | Aucun pour la V1 ; le dire dans le README (juge = oracle de l'opérateur, D-024). |
+
+### 7.2 Ce qui a été vérifié et jugé conforme
+
+1. **Rejeu, SSRF et fichiers** : `DARWIN_REPLAY_FILE` vient de l'environnement seulement, lu une fois au démarrage (taille plafonnée, lecture seule) ; aucun paramètre d'API ne désigne un fichier ; messages d'erreur sans contenu du journal ; le chemin complet n'apparaît que dans les messages de démarrage de l'opérateur. `replayEnv` force mock et retire toutes les variables `*_PRIVATE_KEY|*_API_KEY|*_JWT|*_SECRET` ; `replayConfig` vide clés et `intents.enabled`. Aucune écriture possible (`journal.emit` lève, façades en lecture seule).
+2. **Vitesse et boucle** : `parseSpeed` borne à 0,25-100 ; écart maximal entre événements 8 s ; une boucle ne peut pas tourner à vide (pause de 5 s entre passages, journal fini).
+3. **SSE** : plafonds 8 flux par IP et 300 au total, file limitée à 5000 avec fermeture du client lent, `reset` géré, `Last-Event-ID` borné par regex.
+4. **Journal enrichi (D-045)** : contenu borné (24 000 par fichier, 64 000 par livrable), SVG assaini côté serveur (`sanitizeSvg` : liste d'interdits, href et `url()` locaux seulement, balisage vérifié, rejet plutôt que réparation ; `<svg/onload=` rejeté par la vérification de balisage), nom de fichier `[a-z0-9._-]{1,64}`, écriture disque protégée contre la traversée de chemin (`store.ts` : id de tâche et nom validés, chemin résolu contrôlé).
+5. **Frontend** : aucun `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `eval`, `document.write` ni `srcdoc` dans `frontend/*.js` (recherche exhaustive hors `dev/`). `h()` utilise `textContent`/nœuds Text, `addEventListener` pour les `on*`, `style` via CSSOM. SVG d'agent uniquement en `<img src="data:image/svg+xml">` (aucun script en contexte image), Markdown rendu en nœuds DOM sans lien actif. Liens d'explorateur : `https`, hôtes `nearblocks.io`/`testnet.nearblocks.io` seulement, sans identifiants, sinon reconstruits depuis le hash ; tous en `target=_blank rel="noopener noreferrer"`. `boot.js` : `DOMParser` sur `CLASSIC_BODY`, constante statique du dépôt (aucune donnée externe) ; `?classique` n'est qu'un test de `location.search`. `/classique` redirige en dur vers `/?classique` (pas de redirection ouverte). Routage par `location.hash` filtré (`mission|lignees|preuves`). Bandeau de rejeu en `textContent` ; l'étiquette (`DARWIN_REPLAY_LABEL`) est bornée à 200 caractères et vient de l'opérateur.
+6. **CSP** : `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`. Pas d'`unsafe-inline` (0 attribut `style=` dans `index.html`, aucun script en ligne ; `theme-init.js` est externe). `data:` n'est autorisé que pour les images (SVG en `<img>`) et les polices. La CSP des fichiers de livrable (`style-src 'unsafe-inline'; sandbox`, `default-src 'none'`) n'accorde aucun script. Hôtes autorisés contrôlés (anti rebond DNS) ; statique en liste blanche (`dev/`, `screens/`, `.md` non servis, fichiers cachés refusés).
+7. **Injection de prompt** : le pitch n'est jamais réinjecté dans le prompt d'un autre agent (seul usage : `engine/index.ts:130` vers `placeBid`). Le texte du visiteur arrive en message `user`, délimité `<<<TACHE ... >>>`, délimiteurs neutralisés en boucle, borné à 4000 caractères ; le message `system` ne contient que le génome et les règles fixes. Le pitch affiché est assaini (`sanitizePitch` : une ligne, balises et Markdown retirés, liens réduits au libellé, 240 caractères) puis rendu en texte. Débit des appels de pitch : un appel au plus par couple (agent, tâche), 120 tokens de sortie, refusé si la réserve de l'agent serait entamée, plafonds USD du cerveau inchangés, repli déterministe sans appel en mock. Résidu : le texte d'un visiteur peut orienter le contenu d'un pitch public (texte brut, jamais cliquable).
+8. **Dépendances** : `package.json` ne change que les scripts (`replay`, `ai:logo-validation`, `start:demo`) ; dépendances d'exécution inchangées et épinglées (`@hono/node-server` 2.1.6, `hono` 4.13.17, `zod` 4.6.7). `near-api-js` n'est requis que par le script de rotation, hors `package.json` (installation manuelle épinglée 7.4.0).
+9. **Plafond de dépense** : `maxTokensHardCap` (4000) ne relève que le plafond de tokens demandé ; le plafond de coût par appel et les plafonds USD par exécution et par heure s'appliquent toujours (diff de `brain/near-ai-brain.ts` relu hors fins de ligne : 5 lignes). Les gros diffs de `accounts.test.ts`, `near-ai-brain.ts`, `policy.ts`, `runtime.ts` sont en grande partie des changements de fins de ligne (CRLF vers LF), sans effet fonctionnel.
+10. **Argent** : aucun changement des chemins de crédit, de séquestre ni d'Intents dans ce lot ; `INTENTS_ENABLED=false` et `INTENTS_DRY_ONLY=true` dans `.env.example` ; `intents.enabled` forcé à faux en rejeu.
+
+### 7.3 Scans
+
+- `npm run scan-secrets` (dossier de travail, 259 fichiers, + historique de toutes les refs, 100 commits) : **0 détection** ; 7 détections de l'historique exemptées par l'allowlist.
+- `node scripts/scan-secrets.mjs --no-allowlist --no-files` : exactement ces 7 détections, toutes dans `backend/backend.test.ts` au commit `4eb92ea` (6 affectations factices et 1 chaîne `sk-` factice de 25 caractères). Valeurs non reproduites ici. L'allowlist ne vaut que pour l'historique, exige commit + fichier + type + empreinte sha256 de la valeur, ne stocke aucune valeur ; une autre valeur, un autre fichier ou un autre commit reste détecté, et un secret dans l'arbre actuel n'est jamais exempté. Réserve mineure : l'identifiant de commit est comparé par préfixe de 7 caractères (`startsWith`) ; préférer l'identifiant complet.
+- Rescan indépendant sans limite de longueur de ligne (clés NEAR, JWT, `sk-`, Bearer, PEM, affectations de variables secrètes, phrases de récupération, courriels, chemins locaux, base58 longs) sur `docs/preuves/*.jsonl` (run5 à run9b), `docs/preuves/logo-validation/*` (SVG, `meta.json`, `reponse-brute.txt`), `docs/*.md` et `README.md` : **aucun secret**. Seules trouvailles : chemins locaux (constat 9) et un exemple factice `DARWIN_ADMIN_TOKEN = "<chaine-aleatoire...>"` dans `docs/RUN_9C.md:46` (marqueur de position, pas une valeur).
+- Journaux `run9a`/`run9b` : métadonnées de livrables seulement (nom, type, taille, empreinte), pas de contenu ; hashes de transaction publics, comptes testnet.
+- Captures `docs/captures/` : 4 relues avec `Read` (`l17-testnet-degrade`, `l17-recette-tn-preuves-t100`, `l17-rejeu-preuves-mobile`, `l17-recette-r9b-preuves-fin`) : interface seule, hashes de transactions et comptes testnet publics, aucun jeton, aucune clé, aucun terminal. Les 52 autres n'ont pas été ouvertes une à une (voir 7.5).
+- `.gitignore` : `.env`, `.env.*` (sauf `.env.example`), `data/`, `*.key`, `*.pem`, `.near-credentials/` ; `git check-ignore` confirme `.env` et `data/` ; aucun fichier `.env`, clé ou sauvegarde suivi par git.
+
+### 7.4 Empreintes sha256 des journaux de preuve (pour le constat 10)
+
+| Fichier | sha256 |
+|---|---|
+| `docs/preuves/run8-journal.jsonl` | `9647d982663bc2493a2ecf562d17837ef7ad1d32b9169bbf704afcedf3ba2110` |
+| `docs/preuves/run9a-journal.jsonl` | `b82aa257e853b076a01501c92b40319b6a4503a3f5977cb6998a94ff0a6628fb` |
+| `docs/preuves/run9b-journal.jsonl` | `fdb06603b6571207bcf11fc2b175826c798d85a61906829c83efdaffaf7dbf69` |
+
+(Calculées sur les fichiers de l'arbre de travail à HEAD 0d76273 ; une conversion de fins de ligne au checkout peut changer l'empreinte.)
+
+### 7.5 Non vérifié
+
+- Aucun test dynamique : pas de lancement du serveur, pas de requête, pas de fuzzing d'un journal hostile ; les constats 2, 3 et 5 viennent de la lecture du code.
+- `npm test` et `npm run typecheck` n'ont pas été relancés par cette revue.
+- 52 captures sur 56 non relues visuellement ; `frontend/screens/*.png` non relus.
+- `frontend/dev/` (faux serveur, scripts de recette) non relu : il n'est pas servi par le backend (liste blanche), donc hors surface publique.
+- Lecture intégrale de `frontend/lignees.js`, `mission.js`, `store.js`, `preuves.js` non faite ; vérification par recherche des motifs dangereux (innerHTML, eval, setAttribute de valeurs externes, `href`) et lecture de `format.js`, `deliverable.js`, `chat-deliverable.js`, `boot.js`.
+- `market/checks.ts`, `shared/catalogue.ts`, `scripts/assemble-preuves.mjs` et le contrat non relus ; l'effet réel d'une injection de prompt sur le modèle NEAR AI n'a pas été éprouvé (pas d'appel réseau).
+- Le format réel des clés NEAR AI (motif de masquage) n'a pas été vérifié dans la documentation du fournisseur.
+- L'accord humain pour l'appel payant déjà effectué par `ai:logo-validation` (preuves `logo-validation`) n'a pas été recontrôlé dans `docs/BESOINS_HUMAIN.md`.
