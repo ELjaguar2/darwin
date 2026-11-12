@@ -1,12 +1,12 @@
-# Repli D-016 / D-022 (contrat non deploye)
+# Fallback D-016 / D-022 (contract not deployed)
 
-Echeance : 2026-11-11 23:59 UTC. Si le contrat n'est pas compile par `cargo near build` ET deploye sur testnet a cette date, le chef de projet active le mode degrade :
+Deadline: 2026-11-11 23:59 UTC. If the contract is not built by `cargo near build` AND deployed on testnet by that date, the project lead activates degraded mode:
 
-- `NearChain` : sequestre = sous-compte `escrow.<maitre>` pilote par le moteur ; registre et reputation tenus dans le journal local.
-- `GET /api/health` expose `escrow: "operator-account"` ; badge permanent UI : « Sequestre degrade : compte pilote par l'operateur, sans contrat ».
-- Textes interdits en mode degrade : « on-chain » et « contrat intelligent » pour le registre, la reputation et le sequestre.
-- Le code du contrat reste dans le depot, presente comme « teste en unitaire, non deploye ».
+- `NearChain`: escrow = `escrow.<master>` sub-account driven by the engine; registry and reputation kept in the local journal.
+- `GET /api/health` exposes `escrow: "operator-account"`; permanent UI badge: "Degraded escrow: operator-driven account, no contract".
+- Forbidden wording in degraded mode: "on-chain" and "smart contract" for the registry, reputation and escrow.
+- The contract code stays in the repository, presented as "unit-tested, not deployed".
 
-Regle de preuve conservee en degrade : le moteur n'appelle jamais le transfert de liberation sans preuve `accepted` (garde `PROOF_REQUIRED` cote `Chain`).
+Proof rule kept in degraded mode: the engine never calls the release transfer without an `accepted` proof (`PROOF_REQUIRED` guard on the `Chain` side).
 
-Etat au 2026-11-09 : voir `contracts/README.md` (section Etat verifie) avant d'activer ce repli.
+State as of 2026-11-09: see `contracts/README.md` (section "Verified state") before activating this fallback.

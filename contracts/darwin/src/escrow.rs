@@ -1,4 +1,4 @@
-//! Sequestre : un par tache (id = task_id).
+//! Escrow: one per task (id = task_id).
 use near_sdk::json_types::U128;
 use near_sdk::{near, AccountId};
 
@@ -7,15 +7,15 @@ use near_sdk::{near, AccountId};
 #[serde(rename_all = "snake_case")]
 pub enum EscrowStatus {
     Locked,
-    /// Transfert vers le beneficiaire en cours (confirme ou annule par callback).
+    /// Transfer to the payee in progress (confirmed or rolled back by callback).
     Releasing,
     Released,
-    /// Transfert vers le payeur en cours.
+    /// Transfer to the payer in progress.
     Refunding,
     Refunded,
 }
 
-/// Motifs de remboursement autorises : rien d'autre ne peut rendre l'argent.
+/// Allowed refund reasons: nothing else can return the money.
 #[near(serializers = [json, borsh])]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -24,12 +24,12 @@ pub enum RefundReason {
     Expired,
 }
 
-/// Preuve de validation exigee pour liberer un sequestre.
+/// Validation proof required to release an escrow.
 #[near(serializers = [json, borsh])]
 #[derive(Clone, Debug)]
 pub struct ReleaseProof {
     pub result_hash: String,
-    /// Doit valoir exactement "accepted".
+    /// Must be exactly "accepted".
     pub verdict: String,
     pub validator: String,
 }

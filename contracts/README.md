@@ -1,41 +1,61 @@
 # contracts/darwin (lot L3)
 
-Contrat NEAR unique (Rust, `near-sdk` 5.30.1) : registre des agents et genealogie, sequestre des taches, reputation. Modele de confiance : l'operateur (compte maitre) est l'oracle de validation (D-015, D-024), ce n'est pas « trustless ».
+Single NEAR contract (Rust, `near-sdk` 5.30.1): agent registry and genealogy, task escrow, reputation. Trust model: the operator (master account) is the validation oracle (D-015, D-024); this is not "trustless".
 
-## Etat verifie (2026-11-09)
-| Element | Etat |
+## Verified state (2026-11-09)
+| Item | State |
 |---|---|
-| Chaine d'outils | Rust 1.99.1 (toolchain `stable-x86_64-pc-windows-gnu`, installee dans `~/.rustup`, `~/.cargo`, sans droits admin) + cible `wasm32-unknown-unknown`. |
-| Tests unitaires | `cargo test` : **35 tests verts** (natif). Sur cette machine il faut `AWS_LC_SYS_PREBUILT_NASM=1` (sinon `aws-lc-sys` exige NASM). |
-| Compilation WASM | `cargo build --target wasm32-unknown-unknown --release` : OK, `darwin.wasm` ~447 Ko. |
-| `cargo-near` | **Non installe, non utilise.** Le WASM n'a pas ete produit par `cargo near build` ; compatibilite du WASM (rustc 1.99, jeu d'instructions) avec le runtime NEAR **non verifiee**. |
-| Simulation sandbox / testnet | **Non faite.** Aucun deploiement, aucun appel reel : les transferts (`Promise`) ne sont testes qu'en unitaire (callback appele a la main). |
-| Deploiement testnet | **Non fait** : exige un compte maitre/contrat finance (voir `docs/BESOINS_HUMAIN.md`). |
+| Toolchain | Rust 1.99.1 (toolchain `stable-x86_64-pc-windows-gnu`, installed in `~/.rustup`, `~/.cargo`, no admin rights) + target `wasm32-unknown-unknown`. |
+| Unit tests | `cargo test`: **35 passing tests** (native; re-run 2026-11-12, still 35 green). On this machine `AWS_LC_SYS_PREBUILT_NASM=1` is required (otherwise `aws-lc-sys` demands NASM). |
+| WASM build | `cargo build --target wasm32-unknown-unknown --release`: OK, `darwin.wasm` ~447 KB. |
+| `cargo-near` | **Not installed, not used.** The WASM was not produced by `cargo near build`; compatibility of the WASM (rustc 1.99, instruction set) with the NEAR runtime was **not verified**. |
+| Sandbox / testnet simulation | **Not done.** No deployment, no real call: transfers (`Promise`) are only tested in unit tests (callback called by hand). |
+| Testnet deployment | **Not done** as of 2026-11-09: requires a funded master/contract account (see `docs/BESOINS_HUMAIN.md`). Check `docs/STATUS.md` for the current deployment state. |
 
-## Methodes
-Ecritures (operateur = `NEAR_MASTER_ACCOUNT_ID`, sauf mention) :
-- `new(operator)` : initialisation.
-- `register_agent(record)` : `agent_id`, `account_id`, `parent_id?`, `generation`, `genome_hash` (sha256 hex de `genome_json`, verifie), `genome_json` (JSON canonique), `birth_tick`. Parent connu et generation = parent+1 ; fondateur = generation 1 ; doublon refuse.
-- `mark_dead(agent_id, death_tick, cause)` : cause `starvation|manual|reset`. L'enregistrement reste (lignee conservee).
-- `reserve_task(task_id, payer)` : l'operateur reserve l'id de tache pour un payeur (anti-squat : les ids sont previsibles). `get_reservation` en vue.
-- `lock_escrow(task_id, payer)` payable : exige une reservation de CET id pour CE payeur (consommee au verrouillage) ; appelant = payeur (signataire, sous-compte d'agent ou compte visiteurs) ou operateur. Le payeur n'a donc pas besoin de l'operateur pour verrouiller, mais ne peut pas prendre un id non reserve.
-- `release_escrow(task_id, payee, proof{result_hash, verdict:"accepted", validator})` : preuve obligatoire ; transfert puis callback (`releasing` -> `released`, ou retour a `locked` si le transfert echoue).
-- `refund_escrow(task_id, reason)` : `reason` = `"rejected"` ou `"expired"` uniquement (enum).
-- `add_reputation(agent_id, task_id, delta, proof_hash)` : delta != 0, |delta| <= 100 ; credit seulement si le sequestre est `released` vers cet agent et `proof_hash` = `result_hash` de la preuve ; malus (delai manque inclus) apres remboursement `rejected` ou `expired` ; une ecriture par (tache, agent).
-- `on_settled` : callback prive.
+## Methods
+Writes (operator = `NEAR_MASTER_ACCOUNT_ID`, unless noted):
+- `new(operator)`: initialization.
+- `register_agent(record)`: `agent_id`, `account_id`, `parent_id?`, `generation`, `genome_hash` (sha256 hex of `genome_json`, verified), `genome_json` (canonical JSON), `birth_tick`. Parent must be known and generation = parent + 1; founder = generation 1; duplicates refused.
+- `mark_dead(agent_id, death_tick, cause)`: cause `starvation|manual|reset`. The record stays (lineage kept).
+- `reserve_task(task_id, payer)`: the operator reserves the task id for a payer (anti-squatting: ids are predictable). `get_reservation` as a view.
+- `lock_escrow(task_id, payer)` payable: requires a reservation of THIS id for THIS payer (consumed on lock); caller = payer (signer, agent sub-account or visitors account) or operator. The payer therefore does not need the operator to lock, but cannot take an unreserved id.
+- `release_escrow(task_id, payee, proof{result_hash, verdict:"accepted", validator})`: proof mandatory; transfer then callback (`releasing` -> `released`, or back to `locked` if the transfer fails).
+- `refund_escrow(task_id, reason)`: `reason` = `"rejected"` or `"expired"` only (enum).
+- `add_reputation(agent_id, task_id, delta, proof_hash)`: delta != 0, |delta| <= 100; credit only if the escrow is `released` to this agent and `proof_hash` = the proof's `result_hash`; penalty (missed deadline included) after a `rejected` or `expired` refund; one write per (task, agent).
+- `on_settled`: private callback.
 
-Vues : `get_agent`, `list_agents(from, limit)` (max 100), `agents_count`, `get_escrow`, `get_reputation`, `get_operator`. Evenements NEP-297 `EVENT_JSON:{"standard":"darwin","version":"1.0.0",...}` pour chaque ecriture.
+Views: `get_agent`, `list_agents(from, limit)` (max 100), `agents_count`, `get_escrow`, `get_reputation`, `get_operator`. NEP-297 events `EVENT_JSON:{"standard":"darwin","version":"1.0.0",...}` for every write.
 
-## Ecarts avec ARCHITECTURE.md / `shared/chain.ts` (a traiter par dev-comptes-wallets, L2)
-1. `registerAgent` : le contrat attend `genome_json` (JSON canonique, `canonicalJson`) en plus de `genome_hash` ; `NearChain` doit envoyer la chaine canonique dont `genomeHash` est le sha256.
-2. `refundEscrow({reason})` : le contrat n'accepte que `rejected` ou `expired` ; `NearChain` doit mapper.
-3. `addReputation` est plus strict que `MockChain` : il exige un sequestre libere (ou rembourse pour rejet) pour la meme tache. Le marche doit liberer avant de crediter, et appeler `reserve_task` (operateur) avant chaque `lock_escrow` (nouvel appel, absent de `Chain` : `NearChain` doit l'enchainer dans `lockEscrow`) ; delta entier.
-4. Statuts transitoires `releasing`/`refunding` en plus de `locked/released/refunded` (a traiter comme « en cours »). Montants en chaine decimale (`U128`).
-5. `lock_escrow` : le depot vient du compte qui signe (operateur ou payeur). Si l'operateur signe, les fonds sont ceux de l'operateur, pas ceux du sous-compte payeur : pour un vrai debit du payeur, le moteur doit signer avec la cle du sous-compte.
+### Error strings (kept verbatim)
+The contract is already deployed and clients may match its panic messages, so they are NOT translated. English codes: `ALREADY_REGISTERED`, `UNKNOWN_PARENT`, `UNKNOWN_AGENT`, `ESCROW_EXISTS`, `ESCROW_UNKNOWN`, `ESCROW_SETTLED`, `TASK_NOT_RESERVED`, `TASK_ALREADY_RESERVED`, `PROOF_REQUIRED`. French sentences, with their meaning:
+- "Reserve a l'operateur": operator only.
+- "Reserve a l'operateur ou au payeur": operator or payer only.
+- "agent_id invalide" / "task_id invalide": invalid id.
+- "genome trop gros": genome too large.
+- "genome_hash ne correspond pas au genome": genome hash mismatch.
+- "un fondateur est de generation 1": a founder has generation 1.
+- "generation incoherente avec le parent": generation inconsistent with parent.
+- "agent deja mort": agent already dead.
+- "death_tick avant la naissance": death_tick before birth.
+- "Depot attache requis": attached deposit required.
+- "delta hors bornes": delta out of bounds.
+- "reputation deja ecrite pour cette tache": reputation already written for this task.
+- "malus seulement apres un sequestre rembourse (rejected ou expired)": penalty only after a refunded escrow.
+- "le beneficiaire n'est pas cet agent": the payee is not this agent.
+- "etat de sequestre inattendu": unexpected escrow state.
 
-## Commandes
-- Tests : `cd contracts/darwin && cargo test` (Windows sans NASM : `AWS_LC_SYS_PREBUILT_NASM=1`).
-- Build : `npm run contracts:build` (cargo-near requis).
-- Deploiement : `NEAR_CONTRACT_ID=... NEAR_MASTER_ACCOUNT_ID=... bash contracts/deploy-testnet.sh`. Signature par le trousseau du CLI NEAR (`near login`), aucune cle dans le depot. La syntaxe `near contract deploy ... with-init-call` n'a pas pu etre verifiee contre la doc officielle ni executee.
+They can be translated at the next redeployment, together with the unit tests that assert them.
 
-Repli : `contracts/FALLBACK.md`.
+## Gaps with ARCHITECTURE.md / `shared/chain.ts` (to be handled by dev-comptes-wallets, L2)
+1. `registerAgent`: the contract expects `genome_json` (canonical JSON, `canonicalJson`) in addition to `genome_hash`; `NearChain` must send the canonical string whose sha256 is `genomeHash`.
+2. `refundEscrow({reason})`: the contract only accepts `rejected` or `expired`; `NearChain` must map.
+3. `addReputation` is stricter than `MockChain`: it requires a released escrow (or refunded for rejection) for the same task. The market must release before crediting, and call `reserve_task` (operator) before every `lock_escrow` (new call, absent from `Chain`: `NearChain` must chain it inside `lockEscrow`); integer delta.
+4. Transient statuses `releasing`/`refunding` in addition to `locked/released/refunded` (treat as "in progress"). Amounts as decimal strings (`U128`).
+5. `lock_escrow`: the deposit comes from the signing account (operator or payer). If the operator signs, the funds are the operator's, not the payer sub-account's: for a real debit of the payer, the engine must sign with the sub-account key.
+
+## Commands
+- Tests: `cd contracts/darwin && cargo test` (Windows without NASM: `AWS_LC_SYS_PREBUILT_NASM=1`).
+- Build: `npm run contracts:build` (cargo-near required).
+- Deployment: `NEAR_CONTRACT_ID=... NEAR_MASTER_ACCOUNT_ID=... bash contracts/deploy-testnet.sh`. Signing via the NEAR CLI keychain (`near login`), no key in the repository. The `near contract deploy ... with-init-call` syntax could not be verified against the official docs nor executed.
+
+Fallback: `contracts/FALLBACK.md`.
