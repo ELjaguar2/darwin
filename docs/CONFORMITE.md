@@ -1,7 +1,50 @@
 # CONFORMITE — grille à cocher
 
 > **English summary.** Compliance grid maintained by the specs guardian (`gardien-des-specs`): each box checks the V1 definition and the official hackathon requirements (IDs refer to `docs/SPECS.md`). Green = compliant; red = non-compliant or unverifiable, with a justification.
-> **State (final opinion of 2026-11-12 on `lot/L17-integration`, HEAD `787d11a`):** veto lifted, GO for merging into `main`. Two text corrections (G-1, G-2, about the accuracy of the statements on runs 9a/9b) are mandatory before the repository is made public. The remaining red boxes depend on the human and are justified. The rest of this file is kept in its original French (internal working document, translated on demand).
+> **State (final compliance review of `main` after the English switch L19, HEAD `90c6bc0`, 2026-11-12): GO WITH RESERVATIONS.** No veto. G-1 and G-2 of the previous opinion are fixed. Reservations H-1 to H-5 are mandatory before the repository is made public; H-6 to H-14 are optional. See "Final review of `main` after L19" right below. The rest of this file is kept in its original French (internal working document, translated on demand).
+
+## Final review of `main` after L19 (English), HEAD `90c6bc0`, 2026-11-12
+
+**Verdict: GO WITH RESERVATIONS.** Concept unchanged, no unproven public claim found, closing sentence present, Intents off, replay always labelled. Five mandatory text fixes (H-1 to H-5) before the repository is made public.
+
+**Limit of this review (stated, not hidden).** My tool set in this session had **no shell**: I could not run `npx vitest run`, `npx tsc --noEmit`, `node scripts/check-formulaire.mjs`, `npm run scan-secrets`, `npm run replay` or `npm run start:mock`, nor commit. Everything below comes from reading the code and documents at `90c6bc0`. **Condition of this GO**: the project lead (or QA) runs these six commands on `90c6bc0` and confirms: 387 tests green, `tsc` 0 error, `idea` <= 2000 characters, scan OK, the three `[darwin]` lines of README §7 and the five lines of §6b step 1, `POST /api/tasks` -> 201 (mock) and 403 `REPLAY_READ_ONLY` (replay), then frees the ports. If one of them fails, this opinion becomes a VETO on publication.
+
+### Checks done by reading
+1. **README vs code.** Startup lines of §7 = `backend/main.ts:64-65,82`; the five lines of §6b step 1 = `backend/replay-main.ts:67-69,86-87`; 403 message of §6b step 6 = `backend/replay-runtime.ts:9` + `backend/app.ts:155`. UI labels quoted in the README exist in `frontend/`: tabs Mission/Lineage/Proof (`index.html:19-21`), "Describe your mission…" and "Missions disabled during replay" (`mission.js:374`), "Send the mission" (`index.html:52`), "Public data: …" note (`index.html:57`), pill "MOCK" + "simulated chain and AI" and "REPLAY" + "recorded real run" (`darwin.js:36-37`), banner "Replay of a real testnet run from November 10, 2026" (`darwin.js:59-61`, `index.html:33`), "playing · N%" (`darwin.js:62-69`), "Generation N · X alive · Y dead" (`lignees.js:310`), "generations/alive/missions paid" (`preuves.js:23`), "paid ✓" and "simulated" tag (`mission.js:117,183`). API badges are English (`market/index.ts:29-31`), legacy French values only mapped. Selection preset of the README = `shared/config.ts:81-84`. The README is entirely in English (no French found outside protocol values of old runs, quoted journal content and the deployed contract's error messages in `contracts/README.md:37,42`, translated there). "first" is never claimed (README:32 "not the first attempt"; other hits are temporal). §13 of PREUVES (English output validation) supports the "Language of the proof runs" paragraph (README:100).
+2. **FORMULAIRE / POST_X / VIDEO_SCRIPT.** English. Closing sentence present: README:44, FORMULAIRE:38, VIDEO_SCRIPT:4 and :51 (and POST_X 4/). `idea` estimated by hand at about 1,975 characters (not run through the script). Single post: 267 characters counted by hand, @NEARProtocol and #NEARHackathon present, video marked mandatory (POST_X:3,14). Video: 10+12+10+18+16+14+20+14+22 = 136 s = 2 min 16 < 2 min 20; shots 7 and 8 (replay) say "not live" on screen and in the voice-over.
+3. **Concept.** No drift: 8 genes, cycle, escrow/validation/reputation, subcontracting; simulated client labelled (`mission.js:117`, `market/index.ts:30`); replay never presented as live (pill, banner, 403); `INTENTS_ENABLED=false` and `INTENTS_DRY_ONLY=true` (`.env.example:97,102`, `shared/config.ts:231,234`); generation 3 attributed to run 8 only (README:5,9,93,172,174,255; FORMULAIRE:40; POST_X; VIDEO); runs 9a/9b stated as extinct in generation 1 (README:174,255): G-2 fixed; visitor orders of 9a and 9b stated exactly (README:9,97,133): G-1 fixed, consistent with PREUVES §11.
+4. **RUN_9C.** Up to date: command (§2), variables (`DARWIN_PRESET`, `DARWIN_ADMIN_TOKEN`, `DARWIN_REPLAY_FILE`), thresholds (§4), fallback (§7), line "Result of run 9c: TO BE FILLED IN" (`docs/RUN_9C.md:109`), mirrored in README:175 and :255.
+
+### Mandatory before making the repository public (H-1 to H-5)
+- **H-1 `README.md:222`** (redacteur): "26 test files and 381 tests passed" does not match the 387 expected on `90c6bc0` (the L19 badge commit came after that count). Fix: replace with the count printed by `npx vitest run` on `90c6bc0` (e.g. "26 test files and 387 tests passed, 2026-11-12").
+- **H-2 `README.md:244-245`** (redacteur), disclosure (HACKATHON.md Q-005): `package.json:37,40` has two dev dependencies not listed: `@phala/dcap-qvl` 0.7.1 and `ethers` 6.17.0 (used by `scripts/verify-attestation.mjs:114,147`), and the attestation check calls Phala's PCCS (`docs/ATTESTATION_TEE.md:26`). Fix: add to the library list "`@phala/dcap-qvl` 0.7.1 and `ethers` 6.17.0 (dev only, TEE attestation check, `scripts/verify-attestation.mjs`)" and to "External services": "Phala PCCS (collateral for the TEE attestation check)".
+- **H-3 `docs/POST_X.md:32`** (redacteur), tweet 4/: 267 characters as plain text, but X auto-links "Spore.fun" (`.fun` is a valid TLD) and counts it as a 23-character URL, which gives about 281 > 280. Fix: drop "agents " ("Spore.fun selected by token price: …"), giving about 274, and check in the X editor.
+- **H-4 Visible French in runtime messages** (owners: dev-backend, dev-cerveau-ia, via the project lead):
+  - `backend/main.ts:41`: `AVERTISSEMENT :` -> `WARNING:`.
+  - `brain/near-ai-brain.ts:276`: `Garde-fou anti-boucle : ${n} appels en ${ms} ms pour ${agent}` -> `Anti-loop guard: ${n} calls in ${ms} ms for ${agent}`.
+  - `brain/near-ai-brain.ts:292`: `NEARAI_API_KEY absente : utiliser le mode mock` -> `NEARAI_API_KEY missing: use mock mode`.
+  - `package.json:6` (description, shown on GitHub/npm): `Darwin : agents IA qui gagnent leur vie, …` -> `Darwin: AI agents that earn their living, pay for their brain, reproduce and die (NEAR testnet).`
+  These are short string changes; tests asserting these messages, if any, must follow.
+- **H-5 Re-run of the six commands** listed in "Limit of this review" above, with the counts written in STATUS.
+
+### Optional (H-6 to H-14)
+- **H-6 `frontend/app.js:430`** (classic page `/?classique`): "Lineages that specialize where demand is strong thrive, the others die out." is stated as a fact; align with `preuves.js:56`: "Hypothesis: lineages specialized where demand is strong should survive better."
+- **H-7 `docs/VIDEO_SCRIPT.md:53`** and shots 4-5 (`:46-47`): shot 1 may be shot "in replay, your choice" but its voice-over does not say "not live"; shots 4-5 say "not live" on screen only. Fix: "shot 1 in live mock only", or add "Replay, not live." to the voice-over of any shot recorded in replay (as the preparation rule `:28` requires).
+- **H-8 `docs/RUN_9C.md:50`**: the pill reads "NEAR TESTNET" (`frontend/darwin.js:36`), not "TESTNET NEAR". `:36`: folder name `data-sauvegarde-` -> `data-backup-`.
+- **H-9 `docs/PREUVES_TESTNET.md:5`**: add "§13 = English output validation" to the header; `:19` "`refund_escrow` proven once" is stale (README:85 and §11: refunds in runs 7, 8, 9a, 9b): "Proven (§8, §11)".
+- **H-10 Scripts with French output** (operator tools, not in the README steps): `scripts/rotate-master-key.mjs:78,120,145,184,217,220`; `brain/tools/probe-models.ts:18,24,26,30`; `brain/tools/logo-validation.ts:44,65`; `scripts/scan-secrets.mjs:100` (finding type `fichier-.env-suivi-par-git` -> `tracked-.env-file`).
+- **H-11 Test names in French** (`*.test.ts`, e.g. `market/market.test.ts`, `brain/brain.test.ts`, `shared/pitch.test.ts`): only visible in the source or on a failure. Accepted as is; translate if time allows.
+- **H-12 `README.md:153-164`**: the command table omits `npm run replay` (described in §6b); add one line.
+- **H-13 `README.md:188`** says the model is checked against `/v1/models`, while §5 (`:86`, `:106`) and `brain/model-list.ts` use `/v1/model/list` (with `/models` as fallback): harmonise.
+- **H-14 `.gitignore:13`**: comment `# worktrees des agents` -> `# agent worktrees`.
+
+### V1 grid (section A) at `90c6bc0`
+- [x] Fresh clone + README commands: QA fresh clone of L17 (`0d76273`); after L19, README §9 says all steps were re-run on 2026-11-12 after the translation; **to be confirmed by H-5** (I could not run it).
+- [x] >= 3 generations without intervention: run 8 (PREUVES §8) and mock (`engine/simulation.test.ts`, `engine/selection.test.ts`). 9a/9b extinct, stated.
+- [x] Market, [x] Letters, [x] Live web page: unchanged by L19 except language; labels checked in `frontend/`.
+- [ ] Tests green: **not re-run by me** (no shell); turns green when H-5 confirms 387/387 and `tsc` 0.
+- [ ] README compliant, steps verified by QA: green once H-1 and H-5 are done (H-2 to H-4 are on other files).
+- [x] This grid up to date, red boxes justified (sections B to D still depend on the human: public repository, video, X post, form, mainnet address).
 
 > **Avis final du 2026-11-12 sur `lot/L17-integration` (HEAD `787d11a`) : VETO LEVÉ, GO pour la fusion dans `main`.** Voir « Avis final L17-integration » en fin de fichier. Deux corrections de texte (G-1, G-2) sont **obligatoires avant de rendre le dépôt public** ; elles ne bloquent pas la fusion.
 
@@ -102,6 +145,7 @@
 | L0 | n/a (rédaction des specs) | 2026-11-09 | SPECS.md et CONFORMITE.md rédigés ; réserves : pages `authentication.md` 1Click, OpenAPI, RPC providers, `private-inference` non lues ; fiabilité des résumés WebFetch à re-vérifier avant soumission. |
 | L1 | VALIDÉ SOUS RÉSERVES (R1 à R10, voir « Avis L1 ») | 2026-11-09 | Architecture conforme aux specs et au concept ; 11 tests verts, typecheck OK ; 6 questions tranchées ; réserves à traiter par lot. |
 | V1 (recette) | VALIDÉE SOUS RÉSERVES (mock) ; testnet non validé | 2026-11-09 | Voir « Avis final V1 » : E1 à E11, R1 à R10 traitées sauf R2 (partielle) et R3 (en cours). |
+| `main` after L19 (English), `90c6bc0` | **GO WITH RESERVATIONS**: H-1 to H-5 mandatory before publication, H-6 to H-14 optional | 2026-11-12 | Read-only review without a shell: commands not re-run by the guardian (H-5). G-1 and G-2 fixed. See "Final review of `main` after L19" at the top. |
 | L16 + L17 + L18 (`lot/L17-integration`, `787d11a`) | **VETO LEVÉ : GO pour la fusion dans `main`** ; G-1 et G-2 obligatoires avant de rendre le dépôt public | 2026-11-12 | V-1 à V-5 et V-10 à V-14 vérifiés ; QA clone neuf GO (319 tests) ; sécurité GO sous réserves. Voir « Avis final L17-integration ». |
 | L16 + L17 + L18 (`lot/L17-integration`, `c19235a`) | **VETO sur la fusion en l'état**, levé dès que V-1 à V-5 sont corrigés et que la QA a rejoué §6b et §9 avec tests verts ; ensuite GO SOUS RÉSERVES (V-6 à V-16) | 2026-11-12 | Le concept n'a pas dérivé et le rejeu est honnête, mais le README ne correspond plus au code (étape 6 refusée en 400, étape 14, preset `selection`) : c'est exactement ce que le tri par IA vérifie (J-01). Voir « Avis L16-L17-L18 ». |
 
