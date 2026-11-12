@@ -6,10 +6,10 @@ import { resolveModel } from "./economy.ts";
 import { INTEGRATION_MARGIN_TICKS, SUBCONTRACT_PLAN } from "./subcontract-plan.ts";
 
 /** Estimated AI cost of one execution (prompt + half the output cap), at the price of the gene's model. */
-export function estimateCost(ctx: Ctx, a: Agent, task: Task): bigint {
+export function estimateCost(ctx: Ctx, a: Agent, task: Task, completionCap?: number): bigint {
   const price = resolveModel(ctx, a);
   const promptTokens = Math.ceil((a.genome.personality.length + task.prompt.length) / 4) + 20;
-  const completionTokens = Math.ceil(ctx.deps.config.sim.maxTokensPerCall / 2);
+  const completionTokens = Math.ceil((completionCap ?? ctx.deps.config.sim.maxTokensPerCall) / 2);
   const usage = { promptTokens, completionTokens, reasoningTokens: 0, totalTokens: promptTokens + completionTokens };
   return costYocto(usage, price, ctx.deps.config.sim.nearUsdRate);
 }
@@ -21,11 +21,11 @@ export function reserve(ctx: Ctx, a: Agent): bigint {
 }
 
 /** The agent's bid on a task, or null. Price = askRatio x budget, floor = estimated AI cost x 1.1, ceiling = budget. */
-export function decideBid(ctx: Ctx, a: Agent, task: Task): { price: bigint; etaTicks: number } | null {
+export function decideBid(ctx: Ctx, a: Agent, task: Task, committed = 0n): { price: bigint; etaTicks: number } | null {
   if (task.profession !== a.genome.profession) return null;
   if (task.requester.kind === "agent" && task.requester.agentId === a.id) return null;
   const cost = estimateCost(ctx, a, task);
-  if (bal(a) - cost < reserve(ctx, a)) return null;
+  if (bal(a) - committed - cost < reserve(ctx, a)) return null;
   const budget = BigInt(task.budget);
   let price = (budget * BigInt(Math.round(a.genome.askRatio * 1000))) / 1000n;
   const floor = (cost * 11n) / 10n;
@@ -68,7 +68,7 @@ export interface SubcontractDecision {
  * INTEGRATION_MARGIN_TICKS ticks after the end of the sub-task and at least one tick after the child's bidding window.
  * Otherwise (not feasible, or the agent would dip under its reserve): no subcontracting.
  */
-export function decideSubcontract(ctx: Ctx, a: Agent, task: Task, price: bigint): SubcontractDecision | null {
+export function decideSubcontract(ctx: Ctx, a: Agent, task: Task, price: bigint, committed = 0n): SubcontractDecision | null {
   if (task.requester.kind === "agent" || task.parentTaskId) return null;
   if (ctx.deps.rng.next() >= subcontractProbability(ctx, a.genome.cooperation)) return null;
   const sim = ctx.deps.config.sim;
@@ -80,7 +80,7 @@ export function decideSubcontract(ctx: Ctx, a: Agent, task: Task, price: bigint)
   let budget = (price * delegatedShareBp(a.genome.cooperation)) / 10000n;
   if (budget < floor) budget = floor;
   if (budget > maxBudget) budget = maxBudget;
-  if (budget <= 0n || budget >= price || bal(a) - budget < reserve(ctx, a)) return null;
+  if (budget <= 0n || budget >= price || bal(a) - committed - budget < reserve(ctx, a)) return null; // budgets already promised by running jobs are not spendable
   const biddingEnds = ctx.tick + sim.bidWindowTicks;
   const deadlineTick = Math.min(task.deadlineTick - INTEGRATION_MARGIN_TICKS, biddingEnds + sim.taskDeadlineTicks);
   if (deadlineTick < biddingEnds + 1) return null; // no time left for the child to be awarded, deliver and be paid

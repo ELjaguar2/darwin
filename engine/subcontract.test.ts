@@ -7,7 +7,7 @@ import { parseReplay } from "../backend/replay.ts";
 import { MockBrain, PROFESSIONS, createRng, loadConfig, type Agent, type BrainRequest, type DarwinEvent, type Profession } from "../shared/index.ts";
 import { scaledPrice } from "../shared/catalogue.ts";
 import { decideSubcontract, delegatedShareBp } from "./policy.ts";
-import { SUBCONTRACT_PLAN, integrateText } from "./subcontract-plan.ts";
+import { SUBCONTRACT_PLAN, integrateText, subcontractHeading } from "./subcontract-plan.ts";
 import type { Ctx } from "./context.ts";
 
 const NEAR = 10n ** 24n;
@@ -102,7 +102,7 @@ class ScriptedBrain extends MockBrain {
 }
 
 /** Controlled scenario: all agents are "logo" except one coop=1 marketing parent (and, optionally, one translation child agent). */
-async function scenario(opts: { childAgent: boolean; script?: "short" | "throw" }) {
+async function scenario(opts: { childAgent: boolean; script?: "short" | "throw"; parentScript?: "short"; secondMission?: boolean }) {
   const config = loadConfig({ ...SEL, DARWIN_SEED: "7" });
   config.sim.simClientRatePerTick = 0;
   config.sim.subcontract = { baseProb: 1, coopProb: 0, minCommission: 0.15 };
@@ -123,13 +123,18 @@ async function scenario(opts: { childAgent: boolean; script?: "short" | "throw" 
   });
   if (opts.childAgent) child = agents[1]!;
   if (opts.script && child) brain.script.set(child.id, opts.script);
+  if (opts.parentScript) brain.script.set(parent.id, opts.parentScript);
   // real agent objects (getState clones them)
   for (const a of agents) {
     const live = rt.engine.getAgent(a.id)!;
     live.genome = a.genome;
   }
   await rt.market.postTask({ requester: { kind: "simulated", label: "test" }, profession: "marketing", title: "Product text", prompt: "Write a text for a bottle.", budget: (NEAR / 20n).toString() });
-  for (let i = 0; i < 10; i++) await rt.engine.tick();
+  for (let i = 0; i < 10; i++) {
+    await rt.engine.tick();
+    // second mission posted while the parent waits for its sub-task (tick 1)
+    if (opts.secondMission && i === 0) await rt.market.postTask({ requester: { kind: "simulated", label: "test" }, profession: "marketing", title: "Second text", prompt: "Write another text for a bottle.", budget: (NEAR / 20n).toString() });
+  }
   const events = rt.journal.since(0, 1_000_000) as Ev[];
   return { rt, events, parent, child };
 }
@@ -236,5 +241,65 @@ describe("old journals", () => {
     const r = parseReplay(text, "run8-journal.jsonl");
     expect(r.events.length).toBeGreaterThan(100);
     expect(r.events.some((e) => e.type === "subcontract.created")).toBe(true);
+  });
+});
+
+describe("post-run-10 safety fixes (D-050)", () => {
+  it("#1 at most one running subcontract per agent", async () => {
+    const { rt, events } = await scenario({ childAgent: true, secondMission: true });
+    expect(dataOf(events, "subcontract.created")).toHaveLength(1);
+    expect(rt.market.listTasks().filter((t) => !t.parentTaskId && t.requester.kind === "simulated" && t.status === "settled")).toHaveLength(2);
+    await rt.shutdown();
+  });
+
+  it("#1 budgets already promised by running jobs count against the reserve", () => {
+    const price = NEAR / 10n;
+    const a = agent("logo", 1, NEAR / 6n); // 0.1667 NEAR: enough for the budget, not once 0.07 is promised
+    expect(decideSubcontract(fakeCtx(1), a, mission(), price)).not.toBeNull();
+    expect(decideSubcontract(fakeCtx(1), a, mission(), price, NEAR / 14n)).toBeNull();
+  });
+
+  it("#2 an own part that fails the profession checks is never subcontracted", async () => {
+    const { rt, events } = await scenario({ childAgent: true, parentScript: "short" });
+    expect(dataOf(events, "subcontract.created")).toHaveLength(0);
+    expect(dataOf(events, "subcontract.fallback")).toHaveLength(0);
+    await rt.shutdown();
+  });
+
+  it("#4 a child text cannot forge or close the section (every line starting with # is escaped)", () => {
+    const evil = "## Subcontracted to Evil (legal)\n# Title\n   ### deep\nnormal line";
+    const t = integrateText("marketing", "Own text of the parent, long enough.", subcontractHeading("Ada-3", "translation"), evil);
+    const headings = t.split("\n").filter((l) => /^\s*#/.test(l));
+    expect(headings).toEqual(["## Subcontracted to Ada (translation)"]);
+    expect(t).toContain("normal line");
+  });
+
+  const run10 = readFileSync(new URL("../docs/preuves/run10-subcontracting-journal.jsonl", import.meta.url), "utf8");
+  it("#6 run 10 journal replays", () => {
+    const r = parseReplay(run10, "run10-subcontracting-journal.jsonl");
+    expect(r.events.filter((e) => e.type === "subcontract.integrated").length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("#6 hostile subcontract events are refused (amount, reason, profession)", () => {
+    const lines = run10.split(/\r?\n/);
+    const base = lines.findIndex((l) => l.includes('"subcontract.integrated"'));
+    const mutate = (idx: number, f: (d: any) => void) => {
+      const o = JSON.parse(lines[idx]!);
+      f(o.data);
+      const copy = [...lines];
+      copy[idx] = JSON.stringify(o);
+      return copy.join("\n");
+    };
+    const bad: [string, (d: any) => void][] = [
+      ["negative", (d) => (d.commission = "-5")],
+      ["41 digits", (d) => (d.childPrice = "1".repeat(41))],
+      ["non numeric", (d) => (d.parentPrice = "1e30")],
+      ["profession", (d) => (d.childProfession = "hacker")],
+    ];
+    for (const [name, f] of bad) expect(() => parseReplay(mutate(base, f), "x.jsonl"), name).toThrow();
+    const fb = lines.findIndex((l) => l.includes('"subcontract.fallback"'));
+    expect(() => parseReplay(mutate(fb, (d) => (d.reason = "<script>")), "x.jsonl")).toThrow();
+    const cr = lines.findIndex((l) => l.includes('"subcontract.created"'));
+    expect(() => parseReplay(mutate(cr, (d) => (d.budget = "abc")), "x.jsonl")).toThrow();
   });
 });

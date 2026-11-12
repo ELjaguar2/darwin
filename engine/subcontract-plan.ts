@@ -125,7 +125,8 @@ export const inHouseHeading = (reason: string) => `## Done in-house (subcontract
 
 /** Embedded text is untrusted: no code fence (it could add or break the parent's SVG/Mermaid blocks), bounded length. */
 export function sanitizeEmbedded(text: string, max: number): string {
-  const t = text.replace(/```/g, "'''").trim();
+  // Any line starting with `#` is escaped: the child cannot forge or close the "## Subcontracted to ..." section of the parent.
+  const t = text.replace(/```/g, "'''").replace(/^([ \t]*)#/gm, "$1\\#").trim();
   return t.length > max ? `${t.slice(0, max).trimEnd()}\n[...]` : t;
 }
 

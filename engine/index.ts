@@ -58,7 +58,7 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
   const stats = { tasksSettled: 0 };
   const bidsPlaced = new Set<string>();
   /** L21: missions whose agent waits for its sub-task (state machine: awarded -> own part -> sub-task posted -> waiting -> integration -> submission). */
-  interface SubJob { parentId: string; agentId: string; childId: string; childProfession: Profession; ownText: string; parentPrice: bigint; brief: ChildBrief }
+  interface SubJob { parentId: string; agentId: string; childId: string; childProfession: Profession; ownText: string; parentPrice: bigint; budget: bigint; brief: ChildBrief }
   const jobs = new Map<string, SubJob>();
   const wonPrices = new Map<string, bigint>(); // agentId|taskId -> price of the bid placed (= winning price once awarded)
 
@@ -116,6 +116,9 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
     }
   }
 
+  /** Budgets promised to sub-tasks by the agent's running jobs (not spendable). */
+  const committedOf = (agentId: string) => [...jobs.values()].filter((j) => j.agentId === agentId).reduce((s, j) => s + j.budget, 0n);
+
   /** A free agent bids on at most one open task (the most profitable for it). */
   async function bidding() {
     const open = market.openTasks();
@@ -128,7 +131,7 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
       let best: { task: Task; price: bigint; etaTicks: number } | null = null;
       for (const t of open) {
         if (bidsPlaced.has(`${a.id}|${t.id}`)) continue;
-        const d = decideBid(ctx, a, t);
+        const d = decideBid(ctx, a, t, committedOf(a.id));
         if (d && (!best || d.price > best.price)) best = { task: t, ...d };
       }
       if (!best) continue;
@@ -153,11 +156,19 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
       });
       await chargeBrain(ctx, a, "execute_task", resp, price);
       const wonPrice = wonPrices.get(`${a.id}|${t.id}`);
-      const d = wonPrice !== undefined ? decideSubcontract(ctx, a, t, wonPrice) : null;
+      // At most ONE running subcontract per agent, and only if its own part already passes the market's checks
+      // (otherwise the mission would be rejected whatever the child does: certain loss of the child's price).
+      const hasJob = [...jobs.values()].some((j) => j.agentId === a.id);
+      const d = wonPrice !== undefined && !hasJob ? decideSubcontract(ctx, a, t, wonPrice, committedOf(a.id)) : null;
+      if (d && !passesChecks(a, t, resp.text)) {
+        warnOnce(ctx, "SUBCONTRACT_SKIPPED", `${t.id}: own part fails the profession checks, not delegating`);
+        await market.submitResult({ taskId: t.id, agentId: a.id, text: resp.text });
+        return;
+      }
       if (d) {
         // Real subcontracting: the own part is done, the sub-task brief is derived from the mission and from this partial result.
         const brief = SUBCONTRACT_PLAN[a.genome.profession].brief(t.id, { title: t.title, prompt: t.prompt, ownText: resp.text });
-        const job: SubJob = { parentId: t.id, agentId: a.id, childId: "", childProfession: d.profession, ownText: resp.text, parentPrice: wonPrice!, brief };
+        const job: SubJob = { parentId: t.id, agentId: a.id, childId: "", childProfession: d.profession, ownText: resp.text, parentPrice: wonPrice!, budget: d.budget, brief };
         try {
           const child = await market.postTask({
             requester: { kind: "agent", agentId: a.id }, profession: d.profession, parentTaskId: t.id,
@@ -190,7 +201,8 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
   /** Extra AI call of the parent for the part that was not subcontracted (plan B). Bounded: one call, debited from the agent, reserve respected. */
   async function doInHouse(a: Agent, job: SubJob): Promise<string | null> {
     try {
-      if (bal(a) - estimateCost(ctx, a, { prompt: job.brief.prompt } as Task) < reserve(ctx, a)) return null;
+      const cap = Math.max(sim.maxTokensPerCall, CATALOGUE[job.childProfession].maxOutputTokens); // the cap actually requested below
+      if (bal(a) - estimateCost(ctx, a, { prompt: job.brief.prompt } as Task, cap) < reserve(ctx, a)) return null;
       const price = resolveModel(ctx, a);
       const resp = await deps.brain.complete({
         agentId: a.id, purpose: "execute_task", model: price.id, maxTokens: Math.max(sim.maxTokensPerCall, CATALOGUE[job.childProfession].maxOutputTokens),
@@ -204,12 +216,26 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
     }
   }
 
+  /** Forgets the bid prices of a concluded job (memory: they are no longer needed). */
+  function purgePrices(job: SubJob) {
+    wonPrices.delete(`${job.agentId}|${job.parentId}`);
+    if (job.childId) for (const k of [...wonPrices.keys()]) if (k.endsWith(`|${job.childId}`)) wonPrices.delete(k);
+  }
+
   /**
    * Ends a subcontract and submits the mission, ALWAYS (the client is never penalised):
    * - child delivered and paid (reason undefined): integration in a "Subcontracted to <name> (<profession>)" section, `subcontract.integrated`;
    * - otherwise: `subcontract.fallback` (commission 0), the parent does the part itself ("Done in-house (...)" section) or adds nothing.
    */
   async function concludeJob(a: Agent, t: Task, job: SubJob, child: Task | undefined, failure?: "no_bids" | "rejected" | "deadline" | "failed") {
+    try {
+      await concludeJobInner(a, t, job, child, failure);
+    } finally {
+      purgePrices(job);
+    }
+  }
+
+  async function concludeJobInner(a: Agent, t: Task, job: SubJob, child: Task | undefined, failure?: "no_bids" | "rejected" | "deadline" | "failed") {
     let reason = failure;
     let text = job.ownText;
     const ownOk = passesChecks(a, t, job.ownText);
@@ -231,7 +257,8 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
     }
     if (reason) {
       journal.emit({ type: "subcontract.fallback", data: { parentTaskId: t.id, ...(job.childId ? { childTaskId: job.childId } : {}), reason, commission: "0" } });
-      const extra = await doInHouse(a, job);
+      // A child already `submitted` (verdict pending) at the integration limit: no extra AI call, the mission goes out with the own part alone.
+      const extra = child?.status === "submitted" ? null : await doInHouse(a, job);
       if (extra) {
         const candidate = integrateText(t.profession, job.ownText, inHouseHeading(reason), extra);
         if (!ownOk || passesChecks(a, t, candidate)) text = candidate;
