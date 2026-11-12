@@ -4,6 +4,7 @@ import { store, core, ledger, on, aliveAgents, labelOfJob, txUrl } from "./core.
 import { h, formatNear, formatNearSmall, shortHash, big, nearNumber } from "./format.js";
 import { jobOf, icon, firstName } from "./jobs.js";
 import { subs, FALLBACK_REASON } from "./subcontract.js";
+import { letterReceipts, letterCountText } from "./letters.js";
 
 /** Models marked attestable (TEE) in docs/ATTESTATION_TEE.md section 1 (brain allowlist). The others are external: nothing is proven for them. */
 export const TEE_MODELS = new Set(["Qwen/Qwen3.8-27B", "z-ai/glm-5.3-flash", "Qwen/Qwen3.6-35B-A3B-FP8", "deepseek-ai/DeepSeek-V4.1-Flash-1017"]);
@@ -70,6 +71,8 @@ function renderFlows() {
     h("thead", null, h("tr", null, ["Generation", "Earned", "Brain", "Passed"].map((x) => h("th", { scope: "col" }, x)))),
     h("tbody", null, gens.map((g) => { const r = ledger.byGen.get(g); return h("tr", null, h("th", { scope: "row" }, `Gen. ${g}`), h("td", { class: "earn" }, formatNear(r.earned, 2)), h("td", { class: "brain" }, formatNearSmall(r.brain)), h("td", { class: "pass" }, formatNear(r.passed, 2))); })),
   ] : []));
+  const lt = letterCountText(letterReceipts.summary());
+  $("letterCount").hidden = !lt; $("letterCount").textContent = lt ?? "";
   $("flowNote").textContent = t.fees > 0n ? `Network fees paid by the agents: ${formatNear(t.fees, 3)} NEAR (not included above).` : "";
 }
 

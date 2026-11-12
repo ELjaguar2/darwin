@@ -4,7 +4,7 @@ import { explorerUrl, txKindLabel, big } from "./format.js";
 
 export const EVENT_TYPES = [
   "sim.started", "sim.paused", "sim.resumed", "sim.stopped", "sim.tick",
-  "agent.born", "agent.reproduced", "agent.died", "letter.written",
+  "agent.born", "agent.reproduced", "agent.died", "letter.written", "letter.received",
   "task.posted", "bid.placed", "task.awarded", "task.expired", "escrow.locked", "task.submitted",
   "task.validated", "escrow.released", "escrow.refunded", "subcontract.created", "subcontract.integrated", "subcontract.fallback", "reputation.updated",
   "brain.charged", "balance.changed", "funding.received",

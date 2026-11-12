@@ -5,6 +5,7 @@ import { h, formatNear, formatNearSmall, signedNear, nearNumber, big } from "./f
 import { jobOf, icon, avatar, firstName } from "./jobs.js";
 import { TEE_MODELS } from "./preuves.js";
 import { subs, FALLBACK_REASON } from "./subcontract.js";
+import { letterReceipts } from "./letters.js";
 
 const NS = "http://www.w3.org/2000/svg";
 const svgEl = (tag, attrs = {}, text) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (text != null) e.textContent = text; return e; };
@@ -285,7 +286,14 @@ async function renderPanel() {
     return null;
   };
   const recv = a.letterId ? await fetchLetter(a.letterId) : [...store.letters.values()].find((l) => l.toAgentId === a.id) ?? null;
-  if (recv) letters.push(await letterBlock(recv, `Letter received from ${firstName(parent) || "its parent"}`, true));
+  const rc = letterReceipts.get(a.id); // L25: letter.received (absent from older journals: then the letter.written letter is shown as before)
+  const from = firstName(parent) || "its parent";
+  if (rc?.status === "empty") letters.push(h("p", { class: "muted letter-empty" }, "No letter received (empty)"));
+  else if (rc) {
+    const text = recv?.text ?? `${rc.excerpt}${rc.length > rc.excerpt.length ? "…" : ""}`;
+    if (rc.fallback) letters.push(h("p", { class: "letter-fallback" }, "Fallback letter received"));
+    letters.push(await letterBlock({ ...(recv ?? {}), text }, `Letter received from ${from}`, true));
+  } else if (recv) letters.push(await letterBlock(recv, `Letter received from ${from}`, true));
   const sent = [...store.letters.values()].filter((l) => l.fromAgentId === a.id).sort((x, y) => (x.id < y.id ? -1 : 1));
   for (const l of sent) letters.push(await letterBlock(l, `Letter written to ${firstName(store.agents.get(l.toAgentId))}`, !recv && letters.length === 0));
   if (selected !== a.id) return; // the selection changed during loading
@@ -349,6 +357,7 @@ export function initLignees() {
   on("event", (ev) => {
     const d = ev.data ?? {};
     switch (ev.type) {
+      case "letter.received": refreshPanel(); break;
       case "agent.born": case "agent.died": case "agent.reproduced": tree.schedule(); renderLegend(); renderCounters(); refreshPanel(); break;
       case "balance.changed":
         tree.schedule(); refreshPanel();
