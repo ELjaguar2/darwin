@@ -165,9 +165,9 @@ const ok = (c, m) => { c ? pass++ : fail++; console.log((c ? "OK   " : "FAIL ") 
       const s = t.summary();
       return { count: s.count, awarded: s.awarded, paid: s.paid, expired: s.expired, delegated: String(s.delegated / Y), paidTotal: String(s.paidTotal / Y), commission: String(s.commission / Y), c1: String(t.record("C1").commission / Y), c2: String(t.record("C2").commission / Y), st: [t.record("C1").status, t.record("C2").status] };
     });
-    ok(JSON.stringify(r) === JSON.stringify({ count: 2, awarded: 1, paid: 1, expired: 1, delegated: "70", paidTotal: "35", commission: "50", c1: "50", c2: "60", st: ["paid", "expired"] }), "L21: tracker with / without optional fields " + JSON.stringify(r));
-    const dt = await p.evaluate(async () => { const m = await import("/mission.js"); const Y = 10n ** 21n; return [m.delegationText("Ada", "Translation", { budget: 40n * Y, commission: 50n * Y }), m.delegationText("Ada", null, {})]; });
-    ok(/^Ada delegates a Translation sub-task to the market for [\d.]+ NEAR and keeps [\d.]+ NEAR commission$/.test(dt[0]) && dt[1] === "Ada delegates a sub-task to the market", "L21: delegation sentence with / without optional parts: " + dt.join(" || "));
+    ok(JSON.stringify(r) === JSON.stringify({ count: 2, awarded: 1, paid: 1, expired: 1, delegated: "35", paidTotal: "35", commission: "55", c1: "55", c2: "0", st: ["paid", "expired"] }), "L21: tracker with / without optional fields " + JSON.stringify(r));
+    const dt = await p.evaluate(async () => { const m = await import("/mission.js"); const Y = 10n ** 21n; return [m.delegationText("Ada", "Translation", { budget: 40n * Y, price: 35n * Y, commission: 55n * Y, commissionKind: "actual" }), m.delegationText("Ada", null, {}), m.delegationText("Ada", "Logo", { budget: 40n * Y, commission: 50n * Y, commissionKind: "max" }), m.delegationText("Ada", "Logo", { budget: 40n * Y, commissionKind: "none", commission: 0n })]; });
+    ok(/^Ada delegates a Translation sub-task to the market for [\d.]+ NEAR and keeps [\d.]+ NEAR commission$/.test(dt[0]) && dt[1] === "Ada delegates a sub-task to the market" && /keeps up to [\d.]+ NEAR commission$/.test(dt[2]) && /no money moved, delegator keeps the whole price$/.test(dt[3]), "L21: delegation sentence with / without optional parts: " + dt.join(" || "));
   }
 
   // Lineage

@@ -86,13 +86,13 @@ function renderSubcontracting() {
   box.replaceChildren(
     h("h3", { id: "hSub" }, "Agent-to-agent subcontracting"),
     h("ul", { class: "sub-kpis" },
-      [[sm.count, "subcontracts"], [sm.awarded, "awarded"], [sm.paid, "paid"], [sm.expired, "expired (no bidder)"], [near(sm.delegated), "delegated (budgets)"], [near(sm.paidTotal), "paid to agents"], [near(sm.commission), "commission kept (paid ones)"]]
+      [[sm.count, "subcontracts"], [sm.awarded, "awarded"], [sm.paid, "paid"], [sm.expired, "expired (no bidder)"], [near(sm.delegated), "delegated (escrowed)"], [near(sm.paidTotal), "paid to agents"], [near(sm.commission), "commission kept (real)"]]
         .map(([v, l]) => h("li", null, h("b", null, String(v)), h("span", null, l)))),
     h("div", { class: "sub-wrap" }, h("table", { class: "sub-table" },
       h("thead", null, h("tr", null, ["Delegating agent → paid agent", "Trade", "Amount", "Commission", "Status", "Escrow", "Release"].map((x) => h("th", { scope: "col" }, x)))),
       h("tbody", null, rows.map((r) => { const st = STATE[r.status] ?? [r.status, ""]; const payee = r.payee ? (store.agentByAccount(r.payee) ? firstName(store.agentByAccount(r.payee)) : String(r.payee).split(".")[0]) : r.winnerId ? name(r.winnerId) : "no bidder";
-        return h("tr", null, h("td", null, `${name(r.byAgentId)} → ${payee}`), h("td", null, r.profession ? labelOf(r.profession) : "–"), h("td", null, r.status === "paid" && r.paidAmount != null ? near(r.paidAmount) : r.budget != null ? near(r.budget) : "–"), h("td", null, r.commission != null ? near(r.commission) : "–"), h("td", { class: st[1] }, st[0]), h("td", null, link(r.lockTx, "Sub-task escrow")), h("td", null, link(r.releaseTx, "Sub-task payment"))); })))),
-    h("p", { class: "note" }, "A delegating agent hires another agent through the market, escrows the sub-task budget itself, and keeps the difference with the price its own client pays (the commission). Totals come from the received log; commission only counts paid sub-tasks."));
+        return h("tr", null, h("td", null, `${name(r.byAgentId)} → ${payee}`), h("td", null, r.profession ? labelOf(r.profession) : "–"), h("td", null, r.price != null ? near(r.price) : r.budget != null ? `${near(r.budget)} (offered)` : "–"), h("td", null, r.commissionKind === "none" ? "none, no money moved" : r.commission != null ? `${r.commissionKind === "max" ? "up to " : ""}${near(r.commission)}` : "–"), h("td", { class: st[1] }, st[0]), h("td", null, link(r.lockTx, "Sub-task escrow")), h("td", null, link(r.releaseTx, "Sub-task payment"))); })))),
+    h("p", { class: "note" }, "A delegating agent hires another agent through the market, escrows the sub-task budget itself, and keeps the difference with the price its own client pays (the commission). Commission = the price its own client pays minus the amount actually escrowed for the sub-task (before the award: an upper bound; expired sub-tasks move no money). Totals come from the received log."));
 }
 
 function renderTxs() {

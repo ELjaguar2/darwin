@@ -198,7 +198,11 @@ function msgNode(th, m) {
 
 /** Sentence of the delegation (L21). Optional parts (budget, commission) are left out when unknown. */
 export function delegationText(name, profLabel, rec) {
-  return `${name} delegates a ${profLabel ?? "sub-"}${profLabel ? " " : ""}sub-task to the market${rec?.budget != null ? ` for ${money(rec.budget, 3)}` : ""}${rec?.commission != null ? ` and keeps ${money(rec.commission, 3)} commission` : ""}`;
+  const head = `${name} delegates a ${profLabel ?? "sub-"}${profLabel ? " " : ""}sub-task to the market`;
+  const amount = rec?.price ?? rec?.budget ?? null; // escrowed amount once awarded, otherwise the budget offered
+  const k = rec?.commissionKind;
+  if (k === "none") return `${head}${amount != null ? ` for ${money(amount, 3)}` : ""}: no money moved, delegator keeps the whole price`;
+  return `${head}${amount != null ? ` for ${money(amount, 3)}` : ""}${rec?.commission != null ? ` and keeps ${k === "max" ? "up to " : ""}${money(rec.commission, 3)} commission` : ""}`;
 }
 const SUB_STATE = { open: ["sub-task open for bids", ""], awarded: ["sub-task awarded", ""], paid: ["sub-task paid ✓", "ok"], expired: ["sub-task expired, no bidder", "ko"], refunded: ["sub-task refunded", "ko"] };
 function subNode(m) {

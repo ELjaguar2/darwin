@@ -219,7 +219,9 @@ export function subRowsOf(a, near = (v) => formatNear(v, 3)) {
     const prof = r.profession ? labelOf(r.profession) : "";
     if (r.byAgentId === a.id) {
       const st = r.status === "paid" ? "paid" : r.status === "expired" ? "expired, no bidder" : r.status === "refunded" ? "refunded" : r.status === "awarded" ? "awarded" : "open";
-      out.push({ tick: r.tick, delta: -(r.budget ?? 0n), text: `delegated ${prof ? prof + " " : ""}sub-task${r.budget != null ? ` · ${near(r.budget)}` : ""}${r.commission != null ? ` · commission ${near(r.commission)}` : ""}`, sub: st, amount: r.budget != null ? `-${near(r.budget)}` : "–" });
+      const amt = r.price ?? (r.commissionKind === "none" ? null : r.budget);
+      const com = r.commissionKind === "none" ? " · no money moved, delegator keeps the whole price" : r.commission != null ? ` · ${r.commissionKind === "max" ? "up to " : ""}${near(r.commission)} commission` : "";
+      out.push({ tick: r.tick, delta: r.price != null ? -r.price : 0n, text: `delegated ${prof ? prof + " " : ""}sub-task${amt != null ? ` · ${near(amt)}` : ""}${com}`, sub: st, amount: r.price != null ? `-${near(r.price)}` : "–" });
     }
     if (r.status === "paid" && r.payee && r.payee === a.accountId) {
       const by = store.agents.get(r.byAgentId);
