@@ -105,7 +105,7 @@ export class SubTracker {
       fallback: rs.filter((r) => r.status === "fallback").length, fallbackByReason: byReason,
       awarded: rs.filter((r) => ["awarded", "paid", "integrated"].includes(r.childStatus) || r.status === "integrated" || (r.childStatus === "refunded" && r.winnerId)).length,
       paid: rs.filter((r) => r.childStatus === "paid").length,
-      expired: rs.filter((r) => r.childStatus === "expired").length,
+      expired: rs.filter((r) => r.status === "expired").length, // expired and not followed by a fallback (legacy logs): fallbacks are counted by reason
       delegated: sum(rs.map((r) => r.price)), paidTotal: sum(paidRs.map((r) => r.paidAmount ?? r.price)),
       commission: sum(rs.map((r) => (r.commissionKind === "actual" ? r.commission : null))),
     };

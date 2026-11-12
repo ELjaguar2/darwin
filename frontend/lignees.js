@@ -213,7 +213,7 @@ class LineageTree {
 let tree = null, selected = null, panelTimer = 0;
 const REASON = { birth: "Birth capital", task: "Mission paid", brain: "AI brain paid", chain_fee: "Network fee", death: "Death: balance recovered", metabolism: "Cost of living", reproduction: "Capital given to a child" };
 /** L21: "delegated ..." / "subcontract earned ..." lines of an agent (agent-to-agent subcontracting). */
-export function subRowsOf(a, near = (v) => formatNear(v, 3)) {
+export function subRowsOf(a, near = (v) => formatNear(v, 4)) {
   const out = [];
   for (const r of subs.records()) {
     const prof = r.profession ? labelOf(r.profession) : "";
