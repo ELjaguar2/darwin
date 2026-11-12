@@ -1,24 +1,24 @@
-// Brain composite : NEAR AI Cloud d'abord, fournisseur OpenAI-compatible de secours après des échecs RÉPÉTÉS.
-// Ne bascule jamais sur un refus de budget (le plafond est commun) ni sur un garde-fou anti-boucle ou une erreur de requête.
+// Composite brain: NEAR AI Cloud first, OpenAI-compatible fallback provider after REPEATED failures.
+// Never switches on a budget refusal (the cap is shared), nor on an anti-loop guardrail or a request error.
 import {
   BrainError, type Brain, type BrainRequest, type BrainResponse, type ModelInfo,
 } from "../shared/index.ts";
 
 export interface FallbackBrainOptions {
-  /** Échecs consécutifs du principal avant bascule (défaut 3). */
+  /** Consecutive failures of the primary before switching (default 3). */
   maxConsecutiveFailures?: number;
-  /** Une fois basculé, le principal est réessayé après ce délai (défaut 60 s). */
+  /** Once switched, the primary is retried after this delay (default 60 s). */
   retryPrimaryAfterMs?: number;
   now?: () => number;
   onWarning?: (w: { code: string; message: string }) => void;
 }
 
-/** Erreurs qui indiquent une panne du fournisseur (et non un refus volontaire ou une requête invalide). */
+/** Errors that indicate a provider outage (not a deliberate refusal or an invalid request). */
 export function isProviderOutage(e: unknown): boolean {
   if (!(e instanceof BrainError)) return false;
   if (e.code === "TIMEOUT" || e.code === "NO_API_KEY") return true;
   if (e.code === "HTTP_ERROR") return e.status === undefined || e.status >= 500 || e.status === 401 || e.status === 402 || e.status === 403;
-  if (e.code === "RATE_LIMITED") return e.status === 429; // sans status = garde-fou local, jamais une panne
+  if (e.code === "RATE_LIMITED") return e.status === 429; // no status = local guardrail, never an outage
   return false;
 }
 
@@ -32,7 +32,7 @@ export class FallbackBrain implements Brain {
     this.now = o.now ?? (() => Date.now());
   }
 
-  /** Vrai tant que le secours est utilisé. */
+  /** True while the fallback is in use. */
   get usingSecondary(): boolean {
     return this.openedAt !== undefined && this.now() - this.openedAt < (this.o.retryPrimaryAfterMs ?? 60_000);
   }
@@ -59,7 +59,7 @@ export class FallbackBrain implements Brain {
 
   async complete(req: BrainRequest): Promise<BrainResponse> {
     if (!this.usingSecondary) {
-      if (this.openedAt !== undefined) { this.openedAt = undefined; this.failures = 0; } // nouvel essai du principal
+      if (this.openedAt !== undefined) { this.openedAt = undefined; this.failures = 0; } // new attempt on the primary
       try {
         const r = await this.primary.complete(req);
         this.failures = 0;
@@ -70,7 +70,7 @@ export class FallbackBrain implements Brain {
         const max = this.o.maxConsecutiveFailures ?? 3;
         if (this.failures < max) throw e;
         this.openedAt = this.now();
-        this.o.onWarning?.({ code: "BRAIN_FALLBACK_ACTIVE", message: `NEAR AI Cloud en échec répété (${this.failures}) : bascule sur le fournisseur de secours` });
+        this.o.onWarning?.({ code: "BRAIN_FALLBACK_ACTIVE", message: `NEAR AI Cloud failing repeatedly (${this.failures}): switching to the fallback provider` });
       }
     }
     const sec = await this.secondary.defaultModel();

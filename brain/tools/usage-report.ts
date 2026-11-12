@@ -1,5 +1,5 @@
-// `npm run ai:usage-report [-- --dir data] [--last 15]` : section Markdown « consommation IA réelle » à coller dans docs/PREUVES_TESTNET.md.
-// Source : data/ai-usage.jsonl (une ligne par appel facturé). Aucune clé n'y figure.
+// `npm run ai:usage-report [-- --dir data] [--last 15]` : "real AI consumption" Markdown section to paste into docs/PREUVES_TESTNET.md.
+// Source: data/ai-usage.jsonl (one line per billed call). No key appears in it.
 import { join } from "node:path";
 import { USAGE_FILE, readUsage, type UsageRecord } from "../budget.ts";
 
@@ -7,31 +7,31 @@ export function usageReport(recs: readonly UsageRecord[], opts: { last?: number;
   const last = opts.last ?? 15;
   const sum = (f: (r: UsageRecord) => number, rs: readonly UsageRecord[] = recs) => rs.reduce((n, r) => n + f(r), 0);
   const fmt = (n: number, d = 6) => n.toFixed(d);
-  const lines: string[] = ["## Consommation IA réelle (NEAR AI Cloud)", ""];
+  const lines: string[] = ["## Real AI consumption (NEAR AI Cloud)", ""];
   if (recs.length === 0) {
-    lines.push("Aucun appel facturé enregistré (`data/ai-usage.jsonl` absent ou vide) : la simulation a tourné en mode mock.", "");
+    lines.push("No billed call recorded (`data/ai-usage.jsonl` missing or empty): the simulation ran in mock mode.", "");
     return lines.join("\n");
   }
   const rate = recs[recs.length - 1]!.eurUsdRate;
   lines.push(
-    `Journal : \`data/ai-usage.jsonl\` (${recs.length} appels, du ${recs[0]!.ts} au ${recs[recs.length - 1]!.ts}). Coût = tokens \`usage\` x prix du catalogue \`GET /v1/model/list\` ; EUR = USD / ${rate} (taux configuré \`DARWIN_EUR_USD_RATE\`, prudent).`,
+    `Journal: \`data/ai-usage.jsonl\` (${recs.length} calls, from ${recs[0]!.ts} to ${recs[recs.length - 1]!.ts}). Cost = \`usage\` tokens x catalogue price \`GET /v1/model/list\`; EUR = USD / ${rate} (configured rate \`DARWIN_EUR_USD_RATE\`, conservative).`,
     "",
-    "| Total | Valeur |", "|---|---|",
-    `| Appels | ${recs.length} |`,
-    `| Tokens d'entrée | ${sum((r) => r.promptTokens)} |`,
-    `| Tokens de sortie | ${sum((r) => r.completionTokens)} (dont raisonnement ${sum((r) => r.reasoningTokens)}) |`,
-    `| Coût USD | ${fmt(sum((r) => r.costUsd))} |`,
-    `| Coût EUR | ${fmt(sum((r) => r.costEur))} |`,
+    "| Total | Value |", "|---|---|",
+    `| Calls | ${recs.length} |`,
+    `| Input tokens | ${sum((r) => r.promptTokens)} |`,
+    `| Output tokens | ${sum((r) => r.completionTokens)} (of which reasoning ${sum((r) => r.reasoningTokens)}) |`,
+    `| Cost USD | ${fmt(sum((r) => r.costUsd))} |`,
+    `| Cost EUR | ${fmt(sum((r) => r.costEur))} |`,
   );
-  if (opts.stopEur) lines.push(`| Plafond d'arrêt / budget total | ${opts.stopEur} EUR / ${opts.totalEur ?? "?"} EUR |`);
-  lines.push("", "### Par modèle", "", "| Modèle | Fournisseur | Appels | Tokens in | Tokens out | USD | EUR |", "|---|---|---|---|---|---|---|");
+  if (opts.stopEur) lines.push(`| Stop cap / total budget | ${opts.stopEur} EUR / ${opts.totalEur ?? "?"} EUR |`);
+  lines.push("", "### By model", "", "| Model | Provider | Calls | Tokens in | Tokens out | USD | EUR |", "|---|---|---|---|---|---|---|");
   const byModel = new Map<string, UsageRecord[]>();
   for (const r of recs) byModel.set(`${r.model}|${r.provider}`, [...(byModel.get(`${r.model}|${r.provider}`) ?? []), r]);
   for (const [k, rs] of [...byModel].sort((a, b) => sum((r) => r.costUsd, b[1]) - sum((r) => r.costUsd, a[1]))) {
     const [model, provider] = k.split("|");
     lines.push(`| ${model} | ${provider} | ${rs.length} | ${sum((r) => r.promptTokens, rs)} | ${sum((r) => r.completionTokens, rs)} | ${fmt(sum((r) => r.costUsd, rs))} | ${fmt(sum((r) => r.costEur, rs))} |`);
   }
-  lines.push("", `### ${Math.min(last, recs.length)} derniers appels`, "", "| Horodatage (UTC) | Modèle | In | Out | USD | Agent | Usage | Id de réponse |", "|---|---|---|---|---|---|---|---|");
+  lines.push("", `### ${Math.min(last, recs.length)} last calls`, "", "| Timestamp (UTC) | Model | In | Out | USD | Agent | Purpose | Response id |", "|---|---|---|---|---|---|---|---|");
   for (const r of recs.slice(-last)) {
     lines.push(`| ${r.ts} | ${r.model} | ${r.promptTokens} | ${r.completionTokens} | ${fmt(r.costUsd)} | ${r.agentId} | ${r.purpose} | \`${r.responseId ?? "-"}\` |`);
   }

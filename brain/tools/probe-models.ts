@@ -1,5 +1,5 @@
-// `npm run ai:probe` : un vrai appel minuscule sur chaque modèle de la liste blanche (coût ~0.0003 USD au total, journalisé et compté
-// dans le budget). Nécessite NEARAI_API_KEY (environnement ou fichier pointé par DARWIN_ENV_FILE, défaut .env). N'affiche jamais la clé.
+// `npm run ai:probe`: one tiny real call on each whitelisted model (cost ~0.0003 USD in total, journaled and counted
+// in the budget). Requires NEARAI_API_KEY (environment or file pointed to by DARWIN_ENV_FILE, default .env). Never prints the key.
 import { loadConfig } from "../../shared/index.ts";
 import { createBrain, MODEL_WHITELIST, NearAiBrain } from "../index.ts";
 
@@ -8,7 +8,7 @@ try { process.loadEnvFile(envFile); } catch { /* absent : variables d'environnem
 
 const config = loadConfig({ ...process.env, DARWIN_BRAIN: "nearai", DARWIN_MODE: "mock", AI_API_KEY: "", AI_BASE_URL: "", AI_MODEL: "" });
 if (!config.nearai.apiKey) {
-  console.error("NEARAI_API_KEY absente : rien à tester (mode mock).");
+  console.error("NEARAI_API_KEY missing: nothing to test (mock mode).");
   process.exit(2);
 }
 const brain = createBrain(config, { onWarning: (w) => console.error(`[warn] ${w.code}: ${w.message}`) }) as NearAiBrain;
@@ -19,7 +19,7 @@ for (const w of MODEL_WHITELIST) {
   try {
     const r = await brain.complete({
       agentId: "probe", purpose: "other", model: w.id, maxTokens: 200,
-      messages: [{ role: "user", content: "Réponds uniquement par le mot OK." }],
+      messages: [{ role: "user", content: "Reply only with the word OK. Always answer in English." }],
     });
     console.log(`OK      ${w.id}  in=${r.usage.promptTokens} out=${r.usage.completionTokens} raisonnement=${r.usage.reasoningTokens} texte=${JSON.stringify(r.text.slice(0, 30))} servi=${r.model}`);
   } catch (e) {
@@ -28,4 +28,4 @@ for (const w of MODEL_WHITELIST) {
   }
 }
 console.log(`budget : ${JSON.stringify(((brain as unknown) as { opts: { budget: { state(): unknown } } }).opts.budget.state())}`);
-if (failed.length) { console.log(`À retirer de la liste blanche : ${failed.join(", ")}`); process.exitCode = 1; }
+if (failed.length) { console.log(`To remove from the whitelist: ${failed.join(", ")}`); process.exitCode = 1; }

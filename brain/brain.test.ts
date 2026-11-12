@@ -203,7 +203,7 @@ describe("plafond global de dépense", () => {
     const before = calls.length;
     await expect(brain.complete(req(big(3)))).rejects.toMatchObject({ code: "RATE_LIMITED" });
     expect(calls.length).toBe(before);
-    expect(warnings.some((w) => w.code === "BRAIN_BUDGET_CAP" && w.message.includes("par run"))).toBe(true);
+    expect(warnings.some((w) => w.code === "BRAIN_BUDGET_CAP" && w.message.includes("per run"))).toBe(true);
     expect(brain.spend().run).toBeGreaterThan(0);
   });
   it("par heure : la fenêtre glisse", async () => {
@@ -212,7 +212,7 @@ describe("plafond global de dépense", () => {
     await brain.complete(req(big(1)));
     await brain.complete(req(big(2)));
     await expect(brain.complete(req(big(3)))).rejects.toMatchObject({ code: "RATE_LIMITED" });
-    expect(warnings.some((w) => w.message.includes("par heure"))).toBe(true);
+    expect(warnings.some((w) => w.message.includes("per hour"))).toBe(true);
     t = 3_700_000;
     await brain.complete(req(big(4)));
   });
