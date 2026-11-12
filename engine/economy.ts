@@ -103,3 +103,9 @@ export async function chargeBrain(ctx: Ctx, a: Agent, purpose: string, resp: Bra
 }
 
 export const fmt = (y: bigint | string) => formatNear(y, 4);
+
+/** Text of the parent's letter given to the agent as advice in every one of its AI calls (undefined: no letter or an empty one). */
+export function adviceOf(ctx: Ctx, a: Agent): string | undefined {
+  const l = a.letterId ? ctx.letters.get(a.letterId) : undefined;
+  return l && l.text.trim() ? l.text : undefined;
+}

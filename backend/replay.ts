@@ -80,6 +80,15 @@ function shapeError(type: string, d: Record<string, any>): string | undefined {
     case "agent.reproduced": return miss(needStr("parentId"));
     case "agent.died": return miss(needStr("agentId"));
     case "letter.written": return isObj(d.letter) && isStr(d.letter.id) && isStr(d.letter.toAgentId) ? undefined : "\"letter\" missing";
+    case "letter.received": {
+      if (!isStr(d.childId) || !isStr(d.parentId)) return '"childId"/"parentId" missing';
+      if (d.letterId !== undefined && !isStr(d.letterId)) return '"letterId" invalid';
+      if (typeof d.length !== "number" || !Number.isInteger(d.length) || d.length < 0 || d.length > 100_000) return '"length" invalid';
+      if (!isStr(d.excerpt) || d.excerpt.length > 160) return '"excerpt" invalid';
+      if (d.status !== "received" && d.status !== "empty") return '"status" invalid';
+      if (d.fallback !== undefined && typeof d.fallback !== "boolean") return '"fallback" invalid';
+      return undefined;
+    }
     case "balance.changed": case "brain.charged": case "reputation.updated": return miss(needStr("agentId"));
     case "task.posted": {
       const t = d.task;

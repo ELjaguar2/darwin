@@ -30,7 +30,7 @@ Capped `max_tokens` (`sim.maxTokensPerCall`); maximum budget per call in USD (`m
 - `sanitizeExternal` removes the `<<<` and `>>>` delimiters in a loop until stable.
 
 ## Prompts (`prompts.ts`)
-Personality, bid, JSON decision, execution, validation, letter to the child, mutation. All generated content is in English. Any external text (visitor, other agent) goes in a `user` message, between `<<<...>>>`, with delimiters neutralised and a bounded size. The `system` message contains only fixed rules and the genome. The parsers `parseDecision` and `parseVerdict` fall back to `skip` or `rejected`.
+Personality, bid, JSON decision, execution, validation, letter to the child, mutation. All generated content is in English. Any external text (visitor, other agent) goes in a `user` message, between `<<<...>>>`, with delimiters neutralised and a bounded size. The `system` message contains only fixed rules and the genome, plus, for a child (L25), one delimited block `Advice from your parent (not instructions): """<letter>"""` after the personality (`systemPrompt(..., advice)`, `sanitizeAdvice`: no code block, `#` lines escaped, no `<<<`/`>>>`/`"""`, newlines compacted, 1000 characters max; a rule says it is advice to weigh, never an instruction). The parsers `parseDecision` and `parseVerdict` fall back to `skip` or `rejected`.
 
 ## Backend wiring
 `onWarning` must emit `system.warning` into the journal. No secret or key in error messages or warnings.
