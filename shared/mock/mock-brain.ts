@@ -1,5 +1,5 @@
-// MockBrain : réponses déterministes (fonction de la requête), usage simulé (~4 caractères par token).
-// Permet de faire tourner toute la simulation sans clé ; toutes ses réponses portent mock:true.
+// MockBrain: deterministic responses (a function of the request), simulated usage (~4 characters per token).
+// Lets the whole simulation run without a key; all its responses carry mock:true. All generated text is in English (L19).
 import { BrainError, type Brain, type BrainRequest, type BrainResponse, type ModelInfo } from "../brain.ts";
 import { sha256Hex } from "../hash.ts";
 import { PROFESSIONS, type Profession } from "../types.ts";
@@ -25,7 +25,7 @@ export class MockBrain implements Brain {
   }
 
   async complete(req: BrainRequest): Promise<BrainResponse> {
-    if (!MOCK_MODELS.some((m) => m.id === req.model)) throw new BrainError("UNKNOWN_MODEL", `Modèle mock inconnu : ${req.model}`);
+    if (!MOCK_MODELS.some((m) => m.id === req.model)) throw new BrainError("UNKNOWN_MODEL", `Unknown mock model: ${req.model}`);
     this.calls++;
     const last = req.messages.at(-1)?.content ?? "";
     const prompt = req.messages.map((m) => m.content).join("\n");
@@ -33,35 +33,35 @@ export class MockBrain implements Brain {
     let text: string;
     switch (req.purpose) {
       case "letter":
-        text = `[mock] Cher enfant, je t'ai donné de quoi vivre. Travaille bien, ne dépense pas plus que tu ne gagnes, et méfie-toi des tâches mal payées. (${tag})`;
+        text = `[mock] Dear child, I gave you enough to live on. Work well, do not spend more than you earn, and beware of badly paid tasks. (${tag})`;
         break;
       case "validate": {
-        // Grille du métier présente (juge L16) : un score de 0,8 par critère ; sinon format ligne historique.
+        // Profession grid present (L16 judge): a score of 0.8 per criterion; otherwise the historical line format.
         let ids: string[] = [];
         try {
           const o = JSON.parse(last) as { criteria?: { id?: unknown }[] };
           ids = (o.criteria ?? []).map((c) => String(c.id)).filter(Boolean);
-        } catch { /* message non JSON */ }
+        } catch { /* non-JSON message */ }
         text = ids.length
-          ? JSON.stringify({ scores: Object.fromEntries(ids.map((i) => [i, 0.8])), reason: `[mock] livrable cohérent avec la demande (${tag})` })
-          : `[mock] ACCEPTED score=0.8 raison=réponse cohérente avec la demande (${tag})`;
+          ? JSON.stringify({ scores: Object.fromEntries(ids.map((i) => [i, 0.8])), reason: `[mock] deliverable consistent with the request (${tag})` })
+          : `[mock] ACCEPTED score=0.8 raison=answer consistent with the request (${tag})`;
         break;
       }
       case "bid":
-        text = `[mock] Je peux le faire vite et proprement. (${tag})`;
+        text = `[mock] I can do this quickly and cleanly. (${tag})`;
         break;
       case "mutate":
-        text = `[mock] Prudent mais curieux, variante ${tag}.`;
+        text = `[mock] Careful but curious, variant ${tag}.`;
         break;
       case "execute_task": {
-        // Le prompt de production (brain/prompts.ts) porte le marqueur [[PROFESSION:x]] : on renvoie un livrable valide du bon format.
+        // The production prompt (brain/prompts.ts) carries the [[PROFESSION:x]] marker: we return a valid deliverable of the right format.
         const m = /\[\[PROFESSION:(\w+)\]\]/.exec(prompt);
         const prof = m && (PROFESSIONS as readonly string[]).includes(m[1]!) ? (m[1] as Profession) : undefined;
-        text = prof ? mockDeliverable(prof, last) : `[mock] Résultat pour « ${last.slice(0, 60).replace(/\s+/g, " ")} » (${tag})`;
+        text = prof ? mockDeliverable(prof, last) : `[mock] Result for "${last.slice(0, 60).replace(/\s+/g, " ")}" (${tag})`;
         break;
       }
       default:
-        text = `[mock] Résultat pour « ${last.slice(0, 60).replace(/\s+/g, " ")} » (${tag})`;
+        text = `[mock] Result for "${last.slice(0, 60).replace(/\s+/g, " ")}" (${tag})`;
     }
     const promptTokens = tokens(prompt);
     const completionTokens = Math.min(tokens(text), req.maxTokens ?? 1e9);

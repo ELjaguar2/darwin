@@ -1,8 +1,9 @@
-// Cycle de vie : naissance, reproduction (mutation + lettre), mort. Tout passe par Chain, Brain et le journal injectés.
+// Life cycle: birth, reproduction (mutation + letter), death. Everything goes through the injected Chain, Brain and journal.
 import { formatNear, hashObject, type Agent, type CauseOfDeath, type Genome, type Letter } from "../shared/index.ts";
 import { bal, type Ctx } from "./context.ts";
 import { chargeBrain, emitTx, flushAgent, resolveModel, warnOnce } from "./economy.ts";
 import { createFounderGenome, mutateGenome } from "./genome.ts";
+import { ENGLISH_RULE } from "../brain/prompts.ts";
 
 const NAMES = ["Ada", "Blaise", "Clara", "Darwin", "Emma", "Faraday", "Gaia", "Hugo", "Iris", "Jules", "Kepler", "Lina", "Mendel", "Nora", "Orion", "Pasteur"];
 const pad = (n: number) => String(n).padStart(4, "0");
@@ -24,16 +25,16 @@ async function bear(ctx: Ctx, genome: Genome, capital: bigint, parent?: Agent): 
       agentId: id, accountId, parentId: agent.parentId, generation, genomeHash: hashObject(genome), genome, birthTick: ctx.tick,
     });
   } catch (e) {
-    // Naissance annulée : on rapatrie les fonds du compte orphelin vers celui qui les a donnés.
+    // Birth cancelled: the funds of the orphan account are returned to whoever gave them.
     const funder = parent?.accountId ?? chain.info().masterId;
     let recovered = false;
     try {
       await chain.closeAccount({ accountId, beneficiary: funder });
       recovered = true;
     } catch (e2) {
-      journal.emit({ type: "system.error", data: { code: "BIRTH_ORPHAN_ACCOUNT", message: `compte orphelin ${accountId} non rapatrié : ${(e2 as Error).message}` } });
+      journal.emit({ type: "system.error", data: { code: "BIRTH_ORPHAN_ACCOUNT", message: `orphan account ${accountId} not recovered: ${(e2 as Error).message}` } });
     }
-    journal.emit({ type: "system.warning", data: { code: "BIRTH_ABORTED", message: `naissance de ${id} annulée (registre : ${(e as Error).message}) ; fonds ${recovered ? "rapatriés" : "NON rapatriés"}` } });
+    journal.emit({ type: "system.warning", data: { code: "BIRTH_ABORTED", message: `birth of ${id} cancelled (registry: ${(e as Error).message}); funds ${recovered ? "recovered" : "NOT recovered"}` } });
     return null;
   }
   ctx.agents.set(id, agent);
@@ -48,15 +49,15 @@ async function bear(ctx: Ctx, genome: Genome, capital: bigint, parent?: Agent): 
   return agent;
 }
 
-/** Génération 1 : `founders` agents financés par le compte maître. */
+/** Generation 1: `founders` agents funded by the master account. */
 export async function createFounders(ctx: Ctx): Promise<void> {
   const ids = ctx.models.map((m) => m.id);
   for (let i = 0; i < ctx.deps.config.sim.founders; i++) {
-    await bear(ctx, createFounderGenome(ctx.deps.rng, i, ids), ctx.deps.config.sim.birthCapital); // null = annulée (warning émis)
+    await bear(ctx, createFounderGenome(ctx.deps.rng, i, ids), ctx.deps.config.sim.birthCapital); // null = cancelled (warning emitted)
   }
 }
 
-/** Capital de l'enfant : birthCapital + generosity x surplus (au-dessus du seuil), borné pour que le parent garde 2 x minVital. */
+/** Child's capital: birthCapital + generosity x surplus (above the threshold), bounded so the parent keeps 2 x minVital. */
 export function childCapital(ctx: Ctx, p: Agent): bigint | null {
   const { birthCapital: B, minVital } = ctx.deps.config.sim;
   const threshold = (B * BigInt(Math.round(p.genome.reproThreshold * 1000))) / 1000n;
@@ -85,7 +86,7 @@ export async function reproduce(ctx: Ctx, parent: Agent): Promise<Agent | null> 
   if (capital === null) return null;
   const { genome, mutations } = mutateGenome(parent.genome, ctx.deps.rng, sim.mutationRate, sim.mutationSd, ctx.models.map((m) => m.id));
   const child = await bear(ctx, genome, capital, parent);
-  ctx.lastRepro.set(parent.id, ctx.tick); // même après échec : pas de nouvel essai immédiat
+  ctx.lastRepro.set(parent.id, ctx.tick); // even after a failure: no immediate retry
   if (!child) return null;
   parent.balance = (bal(parent) - capital).toString();
   ctx.deps.journal.emit({ type: "balance.changed", data: { agentId: parent.id, balance: parent.balance, delta: (-capital).toString(), reason: "birth" } });
@@ -94,13 +95,13 @@ export async function reproduce(ctx: Ctx, parent: Agent): Promise<Agent | null> 
   return child;
 }
 
-/** Lettre parent -> enfant, écrite par le cerveau du parent (coût débité au parent). Repli étiqueté mock si le cerveau échoue. */
+/** Parent -> child letter, written by the parent's brain (cost debited from the parent). Labelled fallback if the brain fails. Always in English. */
 async function writeLetter(ctx: Ctx, parent: Agent, child: Agent, mutations: Record<string, [unknown, unknown]>) {
   const { brain, journal, now, config } = ctx.deps;
-  const changed = Object.keys(mutations).join(", ") || "aucun";
+  const changed = Object.keys(mutations).join(", ") || "none";
   const user =
-    `Tu es ${parent.name}, génération ${parent.generation}. Ton enfant ${child.name} naît avec ${formatNear(child.birthCapital, 2)} NEAR. ` +
-    `Tu as accompli ${parent.tasksDone} tâches. Gènes modifiés chez lui : ${changed}. Écris-lui une courte « lettre à mon enfant » : tes conseils pour survivre.`;
+    `You are ${parent.name}, generation ${parent.generation}. Your child ${child.name} is born with ${formatNear(child.birthCapital, 2)} NEAR. ` +
+    `You have completed ${parent.tasksDone} tasks. Genes changed in your child: ${changed}. Write a short "letter to my child" with your survival advice. ${ENGLISH_RULE}`;
   let text: string;
   let model = parent.genome.model;
   let mock = true;
@@ -109,15 +110,15 @@ async function writeLetter(ctx: Ctx, parent: Agent, child: Agent, mutations: Rec
     model = price.id;
     const resp = await brain.complete({
       agentId: parent.id, purpose: "letter", model, maxTokens: config.sim.maxTokensPerCall,
-      messages: [{ role: "system", content: parent.genome.personality }, { role: "user", content: user }],
+      messages: [{ role: "system", content: `${parent.genome.personality}\n${ENGLISH_RULE}` }, { role: "user", content: user }],
     });
     await chargeBrain(ctx, parent, "letter", resp, price);
     text = resp.text;
     mock = resp.mock;
     model = resp.model;
   } catch (e) {
-    warnOnce(ctx, "LETTER_FALLBACK", `Lettre de repli (cerveau indisponible) : ${(e as Error).message}`);
-    text = `[repli] Cher ${child.name}, travaille, dépense peu, et reproduis-toi seulement quand tu as de la marge.`;
+    warnOnce(ctx, "LETTER_FALLBACK", `Fallback letter (brain unavailable): ${(e as Error).message}`);
+    text = `[fallback] Dear ${child.name}, work hard, spend little, and only reproduce when you have some margin.`;
   }
   const letter: Letter = {
     id: `l-${pad(++ctx.nextLetter)}`, fromAgentId: parent.id, toAgentId: child.id, generation: child.generation,
@@ -128,7 +129,7 @@ async function writeLetter(ctx: Ctx, parent: Agent, child: Agent, mutations: Rec
   journal.emit({ type: "letter.written", data: { letter: structuredClone(letter) } });
 }
 
-/** Mort : solde logique sous minVital. Règle les dettes, marque le registre, balaie le solde restant vers le maître. */
+/** Death: logical balance below minVital. Settles debts, marks the registry, sweeps the remaining balance to the master. */
 export async function die(ctx: Ctx, a: Agent, cause: CauseOfDeath): Promise<void> {
   const { chain, journal, now } = ctx.deps;
   const finalBalance = bal(a);

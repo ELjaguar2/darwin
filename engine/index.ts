@@ -1,4 +1,4 @@
-// Moteur d'évolution : boucle de ticks (contrat ARCHITECTURE §13). Dépend uniquement des interfaces de shared/.
+// Evolution engine: tick loop (ARCHITECTURE contract §13). Depends only on the shared/ interfaces.
 import {
   PROFESSIONS, type Agent, type Profession, type Deps, type Engine, type Letter, type Market, type SimState, type Task,
 } from "../shared/index.ts";
@@ -14,15 +14,15 @@ export type { EngineOptions } from "./context.ts";
 export { createFounderGenome, mutateGenome } from "./genome.ts";
 
 const TASK_PROMPTS: Record<Profession, string> = {
-  logo: "Crée trois propositions de logo SVG pour une boutique en ligne de thé bio nommée « Feuille ».",
-  finance: "Analyse ces chiffres : recettes 12 400, charges 9 800, stock 3 200, trésorerie 1 500. Donne trois constats et un risque.",
-  architecture: "Décris l'architecture d'une petite application de réservation de salles : document court et schéma Mermaid.",
-  marketing: "Rédige une accroche de 80 mots pour le lancement d'un café de quartier, ton chaleureux.",
-  translation: "Traduis en anglais : « La sélection naturelle favorise ceux qui gagnent leur vie. »",
-  legal: "Prépare une checklist de 8 points pour les mentions légales d'un site e-commerce français.",
+  logo: "Create three SVG logo concepts for an online organic tea shop called \"Leaf\".",
+  finance: "Analyse these figures: revenue 12,400, costs 9,800, stock 3,200, cash 1,500. Give three findings and one risk.",
+  architecture: "Describe the architecture of a small meeting-room booking app: a short document and a Mermaid diagram.",
+  marketing: "Write an 80-word hook for the launch of a neighbourhood coffee shop, warm tone.",
+  translation: "Translate into English: \"La selección natural favorece a quienes se ganan la vida.\"",
+  legal: "Prepare an 8-point checklist for the legal notices of an e-commerce website.",
 };
 
-/** Un instantané de la répartition par métier toutes les N ticks (indicateur de spécialisation). */
+/** A snapshot of the distribution by profession every N ticks (specialisation indicator). */
 export const POPULATION_SNAPSHOT_EVERY = 5;
 
 export function populationSnapshot(live: readonly Agent[], tick: number) {
@@ -55,7 +55,7 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
   const stats = { tasksSettled: 0 };
   const bidsPlaced = new Set<string>();
 
-  // Le moteur apprend les gains et la réputation par le journal (événements du marché), jamais en créditant lui-même.
+  // The engine learns earnings and reputation through the journal (market events), never by crediting itself.
   journal.subscribe((e) => {
     if (e.type === "escrow.released") {
       const a = [...ctx.agents.values()].find((x) => x.accountId === e.data.payee || x.id === e.data.payee);
@@ -100,8 +100,8 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
       const budget = sim.taskBudgetMin + (BigInt(Math.floor(rng.next() * 1_000_000)) * span) / 1_000_000n;
       try {
         await market.postTask({
-          requester: { kind: "simulated", label: "Client simulé" }, profession,
-          title: `Mission ${profession} (tick ${ctx.tick})`, prompt: TASK_PROMPTS[profession]!, budget: budget.toString(),
+          requester: { kind: "simulated", label: "Simulated client" }, profession,
+          title: `${profession} mission (tick ${ctx.tick})`, prompt: TASK_PROMPTS[profession]!, budget: budget.toString(),
         });
       } catch (e) {
         warnOnce(ctx, "POST_TASK_FAILED", (e as Error).message);
@@ -109,7 +109,7 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
     }
   }
 
-  /** Un agent libre enchérit sur au plus une tâche ouverte (la plus rentable pour lui). */
+  /** A free agent bids on at most one open task (the most profitable for it). */
   async function bidding() {
     const open = market.openTasks();
     const busy = new Set<string>();
@@ -149,7 +149,7 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
         try {
           await market.postTask({
             requester: { kind: "agent", agentId: a.id }, profession: rng.pick(PROFESSIONS), parentTaskId: t.id,
-            title: `Sous-traitance de ${t.id}`, prompt: t.prompt, budget: sub.toString(),
+            title: `Subcontract of ${t.id}`, prompt: t.prompt, budget: sub.toString(),
           });
         } catch (e) {
           warnOnce(ctx, "SUBCONTRACT_FAILED", (e as Error).message);
@@ -157,7 +157,7 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
       }
       await market.submitResult({ taskId: t.id, agentId: a.id, text: resp.text });
     } catch (e) {
-      warnOnce(ctx, "EXECUTION_FAILED", `${t.id} : ${(e as Error).message}`);
+      warnOnce(ctx, "EXECUTION_FAILED", `${t.id}: ${(e as Error).message}`);
     }
   }
 
@@ -186,22 +186,22 @@ export function createEngine(deps: Deps, market: Market, options: EngineOptions 
     if (stopped) return;
     ctx.tick++;
     journal.setTick(ctx.tick);
-    // 1. métabolisme
+    // 1. metabolism
     for (const a of alive()) await debit(ctx, a, sim.metabolism, "metabolism");
     await syncBalances(ctx);
-    // 2. client simulé, 3. enchères et attribution
+    // 2. simulated client, 3. bidding and awarding
     await simulatedClient();
     await bidding();
     await market.step(ctx.tick);
-    // 4-5. exécution, validation et paiement (dans submitResult)
+    // 4-5. execution, validation and payment (inside submitResult)
     await executions();
     await syncBalances(ctx);
     // 6. reproduction
     for (const a of alive()) if (canReproduce(ctx, a)) await reproduce(ctx, a);
-    // 7. règlement groupé puis mort
+    // 7. batched settlement then death
     await flushAll(ctx);
     for (const a of alive()) if (bal(a) < sim.minVital) await die(ctx, a, "starvation");
-    // 8. instantané
+    // 8. snapshot
     const live = alive();
     if (ctx.tick % POPULATION_SNAPSHOT_EVERY === 0) journal.emit({ type: "population.snapshot", data: populationSnapshot(live, ctx.tick) });
     journal.emit({

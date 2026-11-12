@@ -1,37 +1,37 @@
-// Génome : création des fondateurs et mutation à la reproduction. Tous les tirages passent par le Rng injecté.
+// Genome: creation of the founders and mutation at reproduction. All draws go through the injected Rng.
 import { GENOME_BOUNDS, GenomeSchema, PROFESSIONS, type Genome, type Profession, type Rng } from "../shared/index.ts";
 
 const BASE_PERSONALITY: Record<Profession, string> = {
-  logo: "Tu es un graphiste freelance. Tu livres trois pistes de logo SVG originales, simples, lisibles en petit.",
-  finance: "Tu es un analyste financier freelance. Tu travailles uniquement sur les chiffres fournis, tu les cites et tu signales les limites.",
-  architecture: "Tu es un architecte logiciel freelance. Tu livres un document court et un schéma Mermaid clair.",
-  marketing: "Tu es un rédacteur marketing freelance. Tu écris un texte percutant, adapté à la cible, sans remplissage.",
-  translation: "Tu es un traducteur freelance. Tu restes fidèle au sens et au ton, tu traduis sans commenter.",
-  legal: "Tu es un assistant juridique freelance. Tu livres une checklist simple et précise, avec l'avertissement « ceci n'est pas un avis juridique ».",
+  logo: "You are a freelance graphic designer. You deliver three original SVG logo concepts, simple and readable at small sizes.",
+  finance: "You are a freelance financial analyst. You work only from the figures provided, you quote them and you flag the limits.",
+  architecture: "You are a freelance software architect. You deliver a short document and a clear Mermaid diagram.",
+  marketing: "You are a freelance marketing copywriter. You write punchy copy, tailored to the target audience, with no filler.",
+  translation: "You are a freelance translator. You stay faithful to the meaning and tone, and you translate without commenting.",
+  legal: "You are a freelance legal assistant. You deliver a simple, precise checklist, with the disclaimer \"this is not legal advice\".",
 };
 
-/** Traits que la mutation peut greffer à la personnalité (prompt système). */
+/** Traits that mutation can graft onto the personality (system prompt). */
 export const TRAITS = [
-  "Tu es économe : tu dépenses peu de tokens.",
-  "Tu es perfectionniste : tu relis avant de répondre.",
-  "Tu es audacieux : tu proposes des angles originaux.",
-  "Tu es prudent : tu vérifies avant d'affirmer.",
-  "Tu es coopératif : tu délègues ce que d'autres font mieux.",
-  "Tu es rapide : tu réponds en allant droit au but.",
+  "You are thrifty: you spend few tokens.",
+  "You are a perfectionist: you proofread before answering.",
+  "You are bold: you propose original angles.",
+  "You are careful: you verify before asserting.",
+  "You are cooperative: you delegate what others do better.",
+  "You are quick: you answer by going straight to the point.",
 ] as const;
 
-const TRAIT_MARK = " Trait : ";
+const TRAIT_MARK = " Trait: ";
 
 export const basePersonality = (p: Profession): string => BASE_PERSONALITY[p];
 
-/** Personnalité de freelance du métier, avec un trait optionnel (greffé par la mutation). */
+/** Freelance personality of the profession, with an optional trait (grafted by mutation). */
 export const personalityWith = (p: Profession, trait?: string): string => BASE_PERSONALITY[p] + (trait ? TRAIT_MARK + trait : "");
 
 const round3 = (x: number) => Math.round(x * 1000) / 1000;
 const clamp = (x: number, min: number, max: number) => Math.min(max, Math.max(min, x));
 const uniform = (rng: Rng, min: number, max: number) => round3(min + rng.next() * (max - min));
 
-/** Génome d'un fondateur : professions réparties à tour de rôle, gènes numériques tirés dans une plage raisonnable. */
+/** Founder genome: professions assigned round-robin, numeric genes drawn in a reasonable range. */
 export function createFounderGenome(rng: Rng, index: number, modelIds: readonly string[]): Genome {
   const profession = PROFESSIONS[index % PROFESSIONS.length]!;
   return GenomeSchema.parse({
@@ -50,14 +50,14 @@ const NUMERIC = ["askRatio", "risk", "reproThreshold", "generosity", "cooperatio
 
 export interface MutationResult {
   genome: Genome;
-  /** gène -> [avant, après], uniquement pour les gènes qui ont changé. */
+  /** gene -> [before, after], only for the genes that changed. */
   mutations: Record<string, [unknown, unknown]>;
 }
 
 /**
- * Mutation : chaque gène numérique mute avec probabilité `rate` (bruit gaussien d'écart-type `sd` x plage du gène, borné) ;
- * le métier mute rarement (rate/4), le modèle parfois (rate/2), la personnalité change de trait avec probabilité `rate`.
- * Le nombre de tirages est fixe : le flux du Rng ne dépend pas du résultat.
+ * Mutation: each numeric gene mutates with probability `rate` (Gaussian noise of standard deviation `sd` x gene range, bounded);
+ * the profession mutates rarely (rate/4), the model sometimes (rate/2), the personality changes trait with probability `rate`.
+ * The number of draws is fixed: the Rng stream does not depend on the outcome.
  */
 export function mutateGenome(parent: Genome, rng: Rng, rate: number, sd: number, modelIds: readonly string[]): MutationResult {
   const g: Genome = { ...parent };
