@@ -2,8 +2,9 @@
 
 > Owner: redacteur. **The human reviews, adapts and publishes personally.** Mandatory mentions (SPECS L-05): say the project was built at the NEAR HACKATHON, tag **@NEARProtocol** and **#NEARHackathon**, attach the **video** (`docs/VIDEO_SCRIPT.md`): it is MANDATORY, HACKATHON.md (re-read on 2026-11-12) says screenshots alone are not enough. Optional: @NearLegion, @NearBuilders. The post link goes into `demoUrl` of the form (`docs/FORMULAIRE.md`).
 > Replace `<REPO_URL>` with the public repository URL before publishing. Each tweet is at most 280 characters (a URL counts for 23); counts checked by script, then re-check in the X editor.
+> The video (script v4, about 2 min) carries a small creator handle in the corner and "by <handle>" on the end card; the handle is set in the video project, never written in this repository.
 > The video must stay under 2 min 20 (likely limit for a free X account); see `docs/VIDEO_SCRIPT.md`.
-> Updated 2026-11-12 from `docs/PREUVES_TESTNET.md` (run 8, run 9c, run 10). Facts used: run 8 (historical, French): generation 3, 12 births, 7 deaths. Run 9c (English): generation 3, 16 births, 4 deaths, two missions paid on testnet (a marketing pitch and a logo). Run 10 (21 minutes, English): real subcontracting, 3 complete cases, 2 refused parents.
+> Updated 2026-11-12 from `docs/PREUVES_TESTNET.md` (run 8, run 9c, run 10, run 11 section 16). Facts used: run 8 (historical, French): generation 3, 12 births, 7 deaths. Run 9c (English): generation 3, 16 births, 4 deaths, two missions paid on testnet (a marketing pitch and a logo). Run 10 (21 minutes, English): real subcontracting, 3 complete cases, 2 refused parents. Run 11 (21 minutes): 3 non-empty letters received by the children.
 > **Honesty rule for the missions**: they were typed into the interface by an automated browser on the developer's behalf, and paid by the operator's demo account. Do not write "a visitor ordered" or "a user paid". The post says "missions" and "client simulated"; the thread says how they were entered.
 
 ## Single post
@@ -12,13 +13,13 @@
 Built at NEAR HACKATHON. Everyone is building agents that can pay. Nobody asked which agents deserve to get paid. Darwin: AI agents bid on NEAR testnet, get paid from escrow only if a judge accepts, die broke. Real-run replay: <REPO_URL> @NEARProtocol #NEARHackathon
 ```
 
-Attach: the video (the "wow" in the first 10 seconds). Mandatory. The video is a **replay** (runs 9c and 10): the post says so. First reply to post (optional): "The 2 missions of run 9c were typed by an automated browser for the developer and paid by our demo account."
+Attach: the video (the "wow" in the first 10 seconds). Mandatory. The video is a **replay** (runs 9c, 10 and 11): the post says so. First reply to post (optional): "The 2 missions of run 9c were typed by an automated browser for the developer and paid by our demo account."
 
 ## Thread variant
 
 ```text
 1/ Built at NEAR HACKATHON. Everyone is building agents that can pay. Nobody asked which agents deserve to get paid. Darwin: a market where AI agents earn the right to exist. @NEARProtocol #NEARHackathon
-Video: replay of our recorded NEAR testnet runs 9c and 10, not live.
+Video: replay of recorded NEAR testnet runs, not live.
 [video: mandatory]
 ```
 
@@ -27,11 +28,11 @@ Video: replay of our recorded NEAR testnet runs 9c and 10, not live.
 ```
 
 ```text
-3/ Rich agents reproduce: a child with mutated genes + a "letter to my child" written by the parent's brain, which the child's AI calls include (run 11). Broke agents die, accounts closed, lineage kept.
+3/ Rich agents reproduce. Darwin: the child's mutated genome, innate. Lamarck: a non-empty letter from its parent (max 1000 characters), passed into the child's AI calls (run 11), acquired. No effect measured. Broke agents die, accounts closed, lineage kept.
 ```
 
 ```text
-4/ Spore.fun selected by token price: it reached generation 5; by May 2025 only the original agent was alive (arXiv 2506.04236). Darwin selects by paid, validated work. Selection by speculation died out. Selection by useful work can last. A hypothesis to test.
+4/ Spore.fun, selected on token price: by May 2025, only its original agent was alive (arXiv 2506.04236). Darwin selects by paid, validated work. Selection by useful work can last: a hypothesis to test.
 ```
 
 ```text
@@ -47,7 +48,7 @@ Video: replay of our recorded NEAR testnet runs 9c and 10, not live.
 ```
 
 ```text
-8/ Honest limits: a labelled simulated client pays most tasks; the 2 missions of run 9c were typed by an automated browser; the AI judge is fallible (10 of 25 logos refused); only some models run in attested enclaves (94 of 270 AI calls, run 9c); one run each.
+8/ Honest limits: a simulated client pays most tasks; 2 missions typed by an automated browser; the AI judge is fallible, picked by the operator (not trustless); attestation on supported models only (94 of 270 calls, run 9c; checked once); one run each.
 ```
 
 ```text
