@@ -23,6 +23,17 @@ export class LetterTracker {
 }
 export const letterReceipts = new LetterTracker();
 
+/** L29: pure decision of the title of the letter section in a child's Lineage panel.
+ *  "Received" is claimed only if the log holds a letter.received for this child; a letter.written alone is "written, not passed".
+ *  Returns { kind: "received" | "empty" | "written" | null, title }. */
+export function letterHeading(childId, tracker, writtenLetter, parentName) {
+  const rc = tracker?.get?.(childId) ?? null;
+  if (rc?.status === "empty") return { kind: "empty", title: "No letter received (empty)" };
+  if (rc) return { kind: "received", title: `Letter received from ${parentName || "its parent"}` };
+  if (writtenLetter) return { kind: "written", title: "Letter written (not passed to the child in this run)" };
+  return { kind: null, title: null };
+}
+
 /** "Letters received by children: N (M non-empty, E empty, F fallback)", null when the log has no letter.received. */
 export function letterCountText(s) {
   return s.total ? `Letters received by children: ${s.total} (${s.nonEmpty} non-empty, ${s.empty} empty, ${s.fallback} fallback)` : null;
