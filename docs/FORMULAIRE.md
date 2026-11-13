@@ -39,7 +39,7 @@ Related work: Spore.fun (Solana; arXiv 2506.04236: 1 child in generation 5, only
 
 Proven on NEAR testnet (tx ids in repo): sub-account and function-call key per agent, Rust registry/escrow/reputation contract, NEAR AI Cloud brain. Three runs reached generation 3 (run 8: 7 deaths; run 9c: 4 deaths, 78 escrows; run 10: no death). Run 10 proved real subcontracting: 3 complete cases, 2 refused parents whose delegator lost money. In our runs the top 3 agents earned 53% to 90% of all earnings; in two runs most agents earned nothing.
 
-Not proven, stated plainly: payers are mostly a labelled simulated client; the 2 paid missions of run 9c were typed by an automated browser for the developer, paid by our demo account; one execution per configuration; the AI judge is fallible (10 of 25 logo verdicts were refusals, some unexplained); AI cost is local accounting; NEAR Intents: module present, disabled, never run (vision); escrow is validated by the operator, not trustless.
+Not proven, stated plainly: a labelled simulated client pays most tasks; the 2 paid missions of run 9c were typed by an automated browser for the developer, paid by the demo account; one run each; the AI judge is fallible (10 of 25 logos refused); the brain runs on NEAR AI Cloud, some models in attested enclaves (94 of 270 AI calls in run 9c); AI cost: local accounting; NEAR Intents never run (vision); escrow: operator validates, not trustless.
 
 Try it with no key: npm run replay (recorded real run) or npm run start:mock. Code mostly by AI agents (Claude Code). MIT.
 ```

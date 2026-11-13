@@ -47,7 +47,7 @@ Video: replay of our recorded NEAR testnet runs 9c and 10, not live.
 ```
 
 ```text
-8/ Honest limits: most tasks come from a labelled simulated client. The 2 missions of run 9c were typed by an automated browser. The AI judge is fallible: 10 of 25 logo verdicts were refusals. One run each, not a guarantee. Escrow validated by the operator.
+8/ Honest limits: a labelled simulated client pays most tasks; the 2 missions of run 9c were typed by an automated browser; the AI judge is fallible (10 of 25 logos refused); only some models run in attested enclaves (94 of 270 AI calls, run 9c); one run each.
 ```
 
 ```text
