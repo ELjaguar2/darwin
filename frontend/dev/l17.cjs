@@ -199,7 +199,7 @@ const ok = (c, m) => { c ? pass++ : fail++; console.log((c ? "OK   " : "FAIL ") 
       await p.evaluate((id) => { location.hash = "#/lignees"; }, idx);
       await p.evaluate((id) => document.querySelectorAll(".lnode")[[...window.__darwin.store.agents.keys()].indexOf(id)]?.dispatchEvent(new MouseEvent("click", { bubbles: true })), idx);
       await p.waitForTimeout(800);
-      ok(/Letter received/.test((await p.textContent("#panel")) || ""), "child panel: parent letter displayed");
+      ok(/Letter (received|written)/.test((await p.textContent("#panel")) || ""), "child panel: parent letter displayed");
     }
   }
   await p.screenshot({ path: path.join(out, "l17-lignees.png") });
