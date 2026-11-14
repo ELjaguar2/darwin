@@ -1,7 +1,7 @@
 # POST_X: post draft (nothing published)
 
 > Owner: redacteur. **The human reviews, adapts and publishes personally.** Mandatory mentions (SPECS L-05): say the project was built at the NEAR HACKATHON, tag **@NEARProtocol** and **#NEARHackathon**, attach the **video** (`docs/VIDEO_SCRIPT.md`): it is MANDATORY, HACKATHON.md (re-read on 2026-11-12) says screenshots alone are not enough. Optional: @NearLegion, @NearBuilders. The post link goes into `demoUrl` of the form (`docs/FORMULAIRE.md`).
-> Replace `<REPO_URL>` with the public repository URL before publishing. Each tweet is at most 280 characters (a URL counts for 23); counts checked by script, then re-check in the X editor.
+> The repository link is already set to https://github.com/ELjaguar2/darwin. Each tweet is at most 280 characters (a URL counts for 23); counts checked by script, then re-check in the X editor.
 > The video (script v4, about 2 min) carries a small creator handle in the corner and "by <handle>" on the end card; the handle is set in the video project, never written in this repository.
 > The video must stay under 2 min 20 (likely limit for a free X account); see `docs/VIDEO_SCRIPT.md`.
 > Updated 2026-11-12 from `docs/PREUVES_TESTNET.md` (run 8, run 9c, run 10, run 11 section 16). Facts used: run 8 (historical, French): generation 3, 12 births, 7 deaths. Run 9c (English): generation 3, 16 births, 4 deaths, two missions paid on testnet (a marketing pitch and a logo). Run 10 (21 minutes, English): real subcontracting, 3 complete cases, 2 refused parents. Run 11 (21 minutes): 3 non-empty letters received by the children.
@@ -10,7 +10,7 @@
 ## Single post
 
 ```text
-Built at NEAR HACKATHON. Everyone is building agents that can pay. Nobody asked which agents deserve to get paid. Darwin: AI agents bid on NEAR testnet, get paid from escrow only if a judge accepts, die broke. Real-run replay: <REPO_URL> @NEARProtocol #NEARHackathon
+Built at NEAR HACKATHON. Everyone is building agents that can pay. Nobody asked which agents deserve to get paid. Darwin: AI agents bid on NEAR testnet, get paid from escrow only if a judge accepts, die broke. Real-run replay: https://github.com/ELjaguar2/darwin @NEARProtocol #NEARHackathon
 ```
 
 Attach: the video (the "wow" in the first 10 seconds). Mandatory. The video is a **replay** (runs 9c, 10 and 11): the post says so. First reply to post (optional): "The 2 missions of run 9c were typed by an automated browser for the developer and paid by our demo account."
@@ -52,7 +52,7 @@ Video: replay of recorded NEAR testnet runs, not live.
 ```
 
 ```text
-9/ Try it: <REPO_URL> (npm ci && npm run replay for the recorded run, no key needed). README has "do X, you will see Y" steps. Most code written by AI agents (Claude Code). #NEARHackathon @NEARProtocol
+9/ Try it: https://github.com/ELjaguar2/darwin (npm ci && npm run replay for the recorded run, no key needed). README has "do X, you will see Y" steps. Most code written by AI agents (Claude Code). #NEARHackathon @NEARProtocol
 ```
 
 ## Checks before publishing

@@ -172,7 +172,7 @@ The fastest way to see Darwin (steps 1, 4 and 6 re-executed on 2026-11-12 on por
 > - Escrow is in the **contract** when `NEAR_CONTRACT_ID` is set (it was in the real runs), otherwise **degraded** (operator-controlled account, local ledger).
 
 ```bash
-git clone <repository-url> darwin
+git clone https://github.com/ELjaguar2/darwin.git darwin
 cd darwin
 npm ci
 npm run start:mock
